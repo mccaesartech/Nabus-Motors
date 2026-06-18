@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+Disallow: /tg-console-8f2k/
+Disallow: /api/admin/

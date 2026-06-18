@@ -36,6 +36,11 @@ yarn-error.log*
 # vercel
 .vercel
 
+# vehicle photos — generated at build (one per slug)
+/public/vehicles/cars/*.jpg
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel

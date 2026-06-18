@@ -1,0 +1,89 @@
+import type { SortOption, Vehicle, VehicleFilters } from "@/lib/types";
+
+export function filterVehicles(
+  allVehicles: Vehicle[],
+  filters: VehicleFilters
+): Vehicle[] {
+  return allVehicles.filter((vehicle) => {
+    if (filters.make && vehicle.make !== filters.make) return false;
+    if (filters.model && vehicle.model !== filters.model) return false;
+    if (filters.yearMin && vehicle.year < filters.yearMin) return false;
+    if (filters.yearMax && vehicle.year > filters.yearMax) return false;
+    if (filters.priceMin && vehicle.price < filters.priceMin) return false;
+    if (filters.priceMax && vehicle.price > filters.priceMax) return false;
+    if (filters.transmission && vehicle.transmission !== filters.transmission)
+      return false;
+    if (filters.fuelType && vehicle.fuelType !== filters.fuelType) return false;
+    if (filters.condition && vehicle.condition !== filters.condition) return false;
+    if (filters.bodyType && vehicle.bodyType !== filters.bodyType) return false;
+    if (filters.location && vehicle.location !== filters.location) return false;
+    if (filters.mileageMax && vehicle.mileage > filters.mileageMax) return false;
+    return true;
+  });
+}
+
+export function sortVehicles(
+  vehicleList: Vehicle[],
+  sort: SortOption
+): Vehicle[] {
+  const sorted = [...vehicleList];
+  switch (sort) {
+    case "price-asc":
+      return sorted.sort((a, b) => a.price - b.price);
+    case "price-desc":
+      return sorted.sort((a, b) => b.price - a.price);
+    case "year-desc":
+      return sorted.sort((a, b) => b.year - a.year);
+    case "year-asc":
+      return sorted.sort((a, b) => a.year - b.year);
+    case "mileage-asc":
+      return sorted.sort((a, b) => a.mileage - b.mileage);
+    case "newest":
+      return sorted.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    default:
+      return sorted;
+  }
+}
+
+export function parseFiltersFromSearchParams(
+  params: Record<string, string | string[] | undefined>
+): VehicleFilters {
+  const get = (key: string) => {
+    const val = params[key];
+    return typeof val === "string" ? val : undefined;
+  };
+
+  return {
+    make: get("make"),
+    model: get("model"),
+    yearMin: get("yearMin") ? Number(get("yearMin")) : undefined,
+    yearMax: get("yearMax") ? Number(get("yearMax")) : undefined,
+    priceMin: get("priceMin") ? Number(get("priceMin")) : undefined,
+    priceMax: get("priceMax") ? Number(get("priceMax")) : undefined,
+    transmission: get("transmission") as VehicleFilters["transmission"],
+    fuelType: get("fuelType") as VehicleFilters["fuelType"],
+    condition: get("condition") as VehicleFilters["condition"],
+    bodyType: get("bodyType") as VehicleFilters["bodyType"],
+    location: get("location"),
+    mileageMax: get("mileageMax") ? Number(get("mileageMax")) : undefined,
+  };
+}
+
+export function buildFilterSearchParams(
+  filters: VehicleFilters,
+  sort?: SortOption,
+  page?: number
+): URLSearchParams {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") {
+      params.set(key, String(value));
+    }
+  });
+  if (sort) params.set("sort", sort);
+  if (page && page > 1) params.set("page", String(page));
+  return params;
+}
