@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { ADMIN_COOKIE, adminLoginPath } from "@/lib/admin/config";
+import {
+  ADMIN_COOKIE,
+  adminLoginPath,
+  resolvedAdminPath,
+} from "@/lib/admin/config";
 
 async function expectedAdminToken(): Promise<string | null> {
   const password = process.env.ADMIN_PASSWORD;
@@ -15,8 +19,9 @@ async function expectedAdminToken(): Promise<string | null> {
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const dashboardPrefix = `/${resolvedAdminPath()}/dashboard`;
 
-  if (!pathname.startsWith("/tg-console-8f2k/dashboard")) {
+  if (!pathname.startsWith(dashboardPrefix)) {
     return NextResponse.next();
   }
 
@@ -31,5 +36,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/tg-console-8f2k/dashboard/:path*"],
+  matcher: ["/admin/dashboard/:path*"],
 };

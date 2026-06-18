@@ -5,7 +5,8 @@
 | Resource | URL |
 |----------|-----|
 | **Public website** | https://true-goshen-auto.vercel.app |
-| **Vercel project dashboard** | https://vercel.com/mc-caesar-te-chnology-solutions/true-goshen-auto |
+| **Alternate URL** | https://truegoshenauto.vercel.app |
+| **Vercel project dashboard** | https://vercel.com/mc-caesar-te-chnology-solutions/truegoshenauto |
 | **Vercel account** | `mccaesartech` / team `mc-caesar-te-chnology-solutions` |
 
 Deploy from your PC:
@@ -74,19 +75,19 @@ Without Supabase, the site uses **generated demo inventory** (~1,000+ vehicles) 
 
 | Resource | URL |
 |----------|-----|
-| **Admin login** | https://true-goshen-auto.vercel.app/tg-console-8f2k |
-| **Admin dashboard** | https://true-goshen-auto.vercel.app/tg-console-8f2k/dashboard |
+| **Admin login** | https://true-goshen-auto.vercel.app/admin |
+| **Admin dashboard** | https://true-goshen-auto.vercel.app/admin/dashboard |
 
 Local:
 
-- http://localhost:3000/tg-console-8f2k
+- http://localhost:3000/admin
 
 **Not linked** from the header, footer, or any public page. Blocked in `robots.txt`.
 
 Set in Vercel / `.env.local`:
 
 ```
-ADMIN_PATH=tg-console-8f2k
+ADMIN_PATH=admin
 ADMIN_PASSWORD=your-strong-password
 ADMIN_SECRET=random-secret-string
 ```
