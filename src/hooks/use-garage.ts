@@ -12,23 +12,34 @@ interface GarageData {
   prices: Record<string, number>;
 }
 
+const EMPTY_GARAGE: GarageData = { saved: [], prices: {} };
+const EMPTY_RECENT: string[] = [];
+
+function getServerGarage(): GarageData {
+  return EMPTY_GARAGE;
+}
+
+function getServerRecent(): string[] {
+  return EMPTY_RECENT;
+}
+
 function readGarage(): GarageData {
-  if (typeof window === "undefined") return { saved: [], prices: {} };
+  if (typeof window === "undefined") return EMPTY_GARAGE;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : { saved: [], prices: {} };
+    return raw ? JSON.parse(raw) : EMPTY_GARAGE;
   } catch {
-    return { saved: [], prices: {} };
+    return EMPTY_GARAGE;
   }
 }
 
 function readRecent(): string[] {
-  if (typeof window === "undefined") return [];
+  if (typeof window === "undefined") return EMPTY_RECENT;
   try {
     const recent = localStorage.getItem(RECENT_KEY);
-    return recent ? JSON.parse(recent) : [];
+    return recent ? JSON.parse(recent) : EMPTY_RECENT;
   } catch {
-    return [];
+    return EMPTY_RECENT;
   }
 }
 
@@ -49,22 +60,14 @@ function subscribe(callback: () => void) {
   };
 }
 
-function useHydrated() {
-  return useSyncExternalStore(
+export function useGarage() {
+  const garage = useSyncExternalStore(subscribe, readGarage, getServerGarage);
+  const recentIds = useSyncExternalStore(subscribe, readRecent, getServerRecent);
+  const loaded = useSyncExternalStore(
     () => () => {},
     () => true,
     () => false
   );
-}
-
-export function useGarage() {
-  const hydrated = useHydrated();
-  const garage = useSyncExternalStore(
-    subscribe,
-    readGarage,
-    () => ({ saved: [], prices: {} })
-  );
-  const recentIds = useSyncExternalStore(subscribe, readRecent, () => []);
 
   const savedIds = garage.saved;
   const priceMap = garage.prices;
@@ -100,7 +103,7 @@ export function useGarage() {
     savedCount: savedIds.length,
     priceMap,
     recentIds,
-    loaded: hydrated,
+    loaded,
     isSaved,
     toggleSave,
     addRecent,
