@@ -1,3 +1,4 @@
+import "server-only";
 import type { Category, Testimonial, Vehicle } from "@/lib/types";
 import {
   CHINESE_MAKES,
@@ -138,11 +139,4 @@ export const testimonials: Testimonial[] = [
 ];
 
 export { CHINESE_MAKES };
-
-export const makes = [...new Set(vehicles.map((v) => v.make))].sort();
-export const modelsByMake = makes.reduce<Record<string, string[]>>((acc, make) => {
-  acc[make] = [...new Set(vehicles.filter((v) => v.make === make).map((v) => v.model))].sort();
-  return acc;
-}, {});
-
-export const locations = [...new Set(vehicles.map((v) => v.location))].sort();
+export { makes, modelsByMake, locations } from "./catalog-meta";

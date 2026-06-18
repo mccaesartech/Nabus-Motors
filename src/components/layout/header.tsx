@@ -107,7 +107,7 @@ export function Header() {
       </Container>
 
       {mobileOpen && (
-        <div className="border-t border-white/10 bg-brand-charcoal lg:hidden">
+        <div key={pathname} className="border-t border-white/10 bg-brand-charcoal lg:hidden">
           <Container className="py-4">
             <nav className="flex flex-col gap-1" aria-label="Mobile">
               {navLinks.map((link) => (

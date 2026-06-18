@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { Vehicle } from "@/lib/types";
 
 const STORAGE_KEY = "true-goshen-garage";
 const RECENT_KEY = "true-goshen-recent";
+const GARAGE_EVENT = "true-goshen-garage-change";
 
 interface GarageData {
   saved: string[];
@@ -35,12 +36,29 @@ function writeGarage(data: GarageData) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
+function notifyGarageChange() {
+  window.dispatchEvent(new Event(GARAGE_EVENT));
+}
+
 function subscribe(callback: () => void) {
+  window.addEventListener(GARAGE_EVENT, callback);
   window.addEventListener("storage", callback);
-  return () => window.removeEventListener("storage", callback);
+  return () => {
+    window.removeEventListener(GARAGE_EVENT, callback);
+    window.removeEventListener("storage", callback);
+  };
+}
+
+function useHydrated() {
+  return useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 }
 
 export function useGarage() {
+  const hydrated = useHydrated();
   const garage = useSyncExternalStore(
     subscribe,
     readGarage,
@@ -50,7 +68,6 @@ export function useGarage() {
 
   const savedIds = garage.saved;
   const priceMap = garage.prices;
-  const loaded = typeof window !== "undefined";
 
   const isSaved = useCallback(
     (id: string) => savedIds.includes(id),
@@ -68,14 +85,14 @@ export function useGarage() {
       data.prices[vehicle.id] = vehicle.price;
     }
     writeGarage(data);
-    window.dispatchEvent(new Event("storage"));
+    notifyGarageChange();
   }, []);
 
   const addRecent = useCallback((id: string) => {
     const prev = readRecent();
     const updated = [id, ...prev.filter((i) => i !== id)].slice(0, 8);
     localStorage.setItem(RECENT_KEY, JSON.stringify(updated));
-    window.dispatchEvent(new Event("storage"));
+    notifyGarageChange();
   }, []);
 
   return {
@@ -83,9 +100,53 @@ export function useGarage() {
     savedCount: savedIds.length,
     priceMap,
     recentIds,
-    loaded,
+    loaded: hydrated,
     isSaved,
     toggleSave,
     addRecent,
   };
+}
+
+export function useGarageVehicles(ids: string[]) {
+  const { loaded } = useGarage();
+  const [result, setResult] = useState<{ vehicles: Vehicle[]; key: string }>({
+    vehicles: [],
+    key: "",
+  });
+
+  const idKey = ids.join(",");
+
+  useEffect(() => {
+    if (!loaded || ids.length === 0) return;
+
+    let cancelled = false;
+
+    fetch(`/api/vehicles/lookup?ids=${encodeURIComponent(idKey)}`)
+      .then((res) => res.json())
+      .then((data: { vehicles: Vehicle[] }) => {
+        if (!cancelled) {
+          setResult({ vehicles: data.vehicles, key: idKey });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setResult({ vehicles: [], key: idKey });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loaded, idKey, ids.length]);
+
+  const vehiclesLoaded =
+    loaded && (ids.length === 0 || result.key === idKey);
+  const vehicles =
+    ids.length === 0
+      ? []
+      : result.key === idKey
+        ? result.vehicles
+        : [];
+
+  return { vehicles, loaded: vehiclesLoaded };
 }

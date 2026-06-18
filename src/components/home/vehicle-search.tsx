@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { makes, modelsByMake, locations } from "@/lib/data/vehicles";
+import { makes, modelsByMake, locations } from "@/lib/data/catalog-meta";
 import { buildFilterSearchParams } from "@/lib/vehicles";
 import type { Condition, FuelType, Transmission } from "@/lib/types";
 

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { makes, modelsByMake } from "@/lib/data/vehicles";
+import { makes, modelsByMake } from "@/lib/data/catalog-meta";
 import { buildFilterSearchParams, parseFiltersFromSearchParams } from "@/lib/vehicles";
 import type { BodyType, Condition, FuelType, SortOption, VehicleFilters } from "@/lib/types";
 
