@@ -6,7 +6,7 @@ import {
   expectedAdminToken,
 } from "@/lib/admin/config";
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   if (!pathname.startsWith("/tg-console-8f2k/dashboard")) {
@@ -14,7 +14,7 @@ export function middleware(req: NextRequest) {
   }
 
   const token = req.cookies.get(ADMIN_COOKIE)?.value;
-  const expected = expectedAdminToken();
+  const expected = await expectedAdminToken();
 
   if (!token || !expected || token !== expected) {
     return NextResponse.redirect(new URL(adminLoginPath(), req.url));

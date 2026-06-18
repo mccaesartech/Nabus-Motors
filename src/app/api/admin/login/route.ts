@@ -7,7 +7,7 @@ import {
 
 export async function POST(req: NextRequest) {
   const { password } = await req.json();
-  const expected = expectedAdminToken();
+  const expected = await expectedAdminToken();
 
   if (!expected || !process.env.ADMIN_PASSWORD) {
     return NextResponse.json(

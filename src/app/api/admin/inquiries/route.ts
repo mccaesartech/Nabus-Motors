@@ -9,7 +9,7 @@ import { createAdminSupabase } from "@/lib/supabase/admin";
 async function isAuthed() {
   const cookieStore = await cookies();
   const token = cookieStore.get(ADMIN_COOKIE)?.value;
-  const expected = expectedAdminToken();
+  const expected = await expectedAdminToken();
   return Boolean(token && expected && token === expected);
 }
 
