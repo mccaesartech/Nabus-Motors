@@ -7,6 +7,7 @@ import type { Vehicle } from "@/lib/types";
 import { formatMileage, formatPrice, formatVehicleName } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { primaryPhotoFor } from "@/lib/data/vehicle-images";
 import { SafeVehicleImage } from "@/components/shared/safe-vehicle-image";
 import {
   Dialog,
@@ -35,6 +36,7 @@ export function VehicleCard({ vehicle, className }: VehicleCardProps) {
   const { isSaved, toggleSave } = useGarage();
   const saved = isSaved(vehicle.id);
   const premium = isPremiumVehicle(vehicle);
+  const photo = primaryPhotoFor(vehicle);
 
   return (
     <>
@@ -50,7 +52,7 @@ export function VehicleCard({ vehicle, className }: VehicleCardProps) {
         <div className="relative aspect-[4/3] overflow-hidden bg-muted">
           <Link href={`/inventory/${vehicle.slug}`} className="block overflow-hidden">
             <SafeVehicleImage
-              src={vehicle.images[0]}
+              src={photo}
               alt={formatVehicleName(vehicle)}
               className="transition-transform duration-500 ease-out group-hover:scale-[1.02]"
             />
@@ -129,7 +131,7 @@ export function VehicleCard({ vehicle, className }: VehicleCardProps) {
           </DialogHeader>
           <div className="relative aspect-video overflow-hidden rounded-md bg-muted">
             <SafeVehicleImage
-              src={vehicle.images[0]}
+              src={photo}
               alt={formatVehicleName(vehicle)}
             />
           </div>

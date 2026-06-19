@@ -27,9 +27,19 @@ export function WhatsAppFloat() {
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Chat on WhatsApp"
-      className="whatsapp-float fixed bottom-6 right-6 z-50 flex size-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg transition-transform hover:scale-105"
+      className="whatsapp-float group fixed bottom-6 right-6 z-50 flex size-14 items-center justify-center"
     >
-      <WhatsAppIcon className="size-7" />
+      <span
+        className="whatsapp-float-ring absolute inset-0 rounded-full bg-[#25D366]"
+        aria-hidden="true"
+      />
+      <span
+        className="whatsapp-float-ring whatsapp-float-ring-delay absolute inset-0 rounded-full bg-[#25D366]"
+        aria-hidden="true"
+      />
+      <span className="relative flex size-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg transition-transform group-hover:scale-105">
+        <WhatsAppIcon className="size-7" />
+      </span>
     </a>
   );
 }

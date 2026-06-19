@@ -172,7 +172,7 @@ function generateVehicle(
     vin: `${slugify(brand.make).slice(0, 3).toUpperCase()}${year}${String(globalId).padStart(5, "0")}`,
     description: `${year} ${brand.make} ${modelTpl.model} ${trim} — verified, inspected, and ready for delivery across Ghana. Transparent pricing with full documentation from True Goshen Auto.`,
     featured,
-    images: photosFor(slug, globalId),
+    images: photosFor(slug, globalId, modelTpl.bodyType),
     specs: buildSpecs(modelTpl.bodyType, fuelType, rand),
     history: buildHistory(rand),
     createdAt,

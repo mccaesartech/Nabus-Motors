@@ -16,6 +16,7 @@ import { VehicleRecentTracker } from "@/components/vehicle/vehicle-recent-tracke
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { fetchVehicleBySlug } from "@/lib/supabase/vehicles";
+import { primaryPhotoFor } from "@/lib/data/vehicle-images";
 import {
   formatMileage,
   formatPrice,
@@ -46,7 +47,7 @@ export async function VehicleDetailPage({ slug }: VehicleDetailPageProps) {
         <div className="grid gap-10 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <VehicleGallery
-              images={vehicle.images}
+              images={[primaryPhotoFor(vehicle)]}
               alt={formatVehicleName(vehicle)}
             />
 
