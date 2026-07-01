@@ -4,8 +4,8 @@
 
 | Resource | URL |
 |----------|-----|
-| **Public website** | https://true-goshen-auto.vercel.app |
-| **Alternate URL** | https://truegoshenauto.vercel.app |
+| **Corporate HQ** | https://truegoshen.com |
+| **Auto Division (direct)** | https://truegoshenauto.com · https://truegoshenauto.vercel.app |
 | **Vercel project dashboard** | https://vercel.com/mc-caesar-te-chnology-solutions/truegoshenauto |
 | **Vercel account** | `mccaesartech` / team `mc-caesar-te-chnology-solutions` |
 
@@ -75,8 +75,8 @@ Without Supabase, the site uses **generated demo inventory** (~1,000+ vehicles) 
 
 | Resource | URL |
 |----------|-----|
-| **Admin login** | https://true-goshen-auto.vercel.app/admin |
-| **Admin dashboard** | https://true-goshen-auto.vercel.app/admin/dashboard |
+| **Admin login** | https://truegoshen.com/admin |
+| **Admin dashboard** | https://truegoshen.com/platform/dashboard |
 
 Local:
 

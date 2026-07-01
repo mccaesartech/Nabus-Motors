@@ -1,0 +1,159 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { PageHeader } from "@/components/platform/page-header";
+import { CategoryBadges } from "@/components/admin/category-badges";
+import { PlatformVehicleForm } from "@/components/platform/platform-vehicle-form";
+import type { VehicleInput } from "@/lib/admin/vehicle-fields";
+import { adminLoginPath } from "@/lib/admin/paths";
+import {
+  adminErrorMessage,
+  isAdminAuthError,
+  parseAdminResponse,
+  redirectToAdminLogin,
+} from "@/lib/admin/client";
+import { platformPath } from "@/lib/platform/paths";
+import type { DbVehicle } from "@/lib/platform/types";
+import { ApprovalStatusBadge } from "@/components/platform/status-badge";
+import { usePlatformSession } from "@/components/platform/platform-shell";
+import {
+  hasPendingEdits,
+  isRejectedEditPending,
+  mergeVehicleWithPending,
+} from "@/lib/admin/vehicle-pending-changes";
+
+export default function EditVehiclePage() {
+  const router = useRouter();
+  const session = usePlatformSession();
+  const isManager = session?.role === "manager";
+  const params = useParams();
+  const id = String(params.id ?? "");
+  const [vehicle, setVehicle] = useState<DbVehicle | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    const res = await fetch("/api/admin/vehicles");
+    if (isAdminAuthError(res)) {
+      router.push(adminLoginPath());
+      return;
+    }
+    const json = await res.json();
+    const found = (json.vehicles as DbVehicle[] | undefined)?.find((v) => v.id === id);
+    setVehicle(found ?? null);
+    setLoading(false);
+  }, [id, router]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function save(data: VehicleInput) {
+    setSaving(true);
+    const res = await fetch("/api/admin/vehicles", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ id, ...data }),
+    });
+    const json = await parseAdminResponse(res);
+    setSaving(false);
+    if (isAdminAuthError(res)) {
+      redirectToAdminLogin(router);
+      throw new Error(adminErrorMessage(json, "Session expired. Please sign in again."));
+    }
+    if (!res.ok || !json.ok) {
+      throw new Error(adminErrorMessage(json));
+    }
+    router.push(platformPath("inventory"));
+  }
+
+  if (loading) {
+    return <p className="text-sm text-[var(--platform-text-secondary)]">Loading vehicle…</p>;
+  }
+
+  if (!vehicle) {
+    return (
+      <div className="space-y-4">
+        <PageHeader
+          title="Vehicle not found"
+          breadcrumb="Inventory"
+          backFallbackHref={platformPath("inventory")}
+          backLabel="Back to inventory"
+        />
+      </div>
+    );
+  }
+
+  const isEditPending = hasPendingEdits(vehicle.pending_changes);
+  const isRejectedEdit = isRejectedEditPending(vehicle.approval_status, vehicle.pending_changes);
+  const formVehicle = isEditPending
+    ? mergeVehicleWithPending(vehicle, vehicle.pending_changes)
+    : vehicle;
+
+  return (
+    <div className="mx-auto max-w-5xl space-y-6">
+      <PageHeader
+        title={`Edit ${formVehicle.year} ${formVehicle.make} ${formVehicle.model}`}
+        description={
+          isRejectedEdit
+            ? "These proposed edits were rejected. Update and save to resubmit, or re-approve from the inventory list."
+            : isManager && vehicle.approval_status === "approved"
+              ? "Saving changes will send proposed edits for owner approval. The live listing stays unchanged until approved."
+              : isEditPending
+                ? "This listing has proposed edits awaiting approval. Saving again will update the pending submission."
+                : vehicle.approval_status === "rejected"
+                  ? "This submission was rejected. Update and save to resubmit for approval."
+                  : "Update listing details, pricing, and availability."
+        }
+        breadcrumb="Inventory"
+        backFallbackHref={platformPath("inventory")}
+        backLabel="Back to inventory"
+      />
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-xs font-medium uppercase tracking-wide text-[var(--platform-text-secondary)]">
+          Approval
+        </span>
+        <ApprovalStatusBadge status={vehicle.approval_status ?? "approved"} />
+        {vehicle.approval_status === "rejected" && vehicle.approval_note && (
+          <p className="text-sm text-[var(--platform-text-secondary)]">{vehicle.approval_note}</p>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-xs font-medium uppercase tracking-wide text-[var(--platform-text-secondary)]">
+          Categories
+        </span>
+        <CategoryBadges vehicle={vehicle} variant="platform" />
+      </div>
+      <PlatformVehicleForm
+        initial={{
+          id: vehicle.id,
+          slug: vehicle.slug,
+          make: formVehicle.make,
+          model: formVehicle.model,
+          year: formVehicle.year,
+          trim: formVehicle.trim ?? undefined,
+          price: formVehicle.price,
+          mileage: formVehicle.mileage,
+          fuel_type: formVehicle.fuel_type,
+          transmission: formVehicle.transmission,
+          condition: formVehicle.condition,
+          body_type: formVehicle.body_type,
+          location: formVehicle.location,
+          engine_size: formVehicle.engine_size ?? undefined,
+          color: formVehicle.color ?? undefined,
+          vin: formVehicle.vin ?? undefined,
+          description: formVehicle.description ?? undefined,
+          featured: formVehicle.featured,
+          status: formVehicle.status,
+          images: formVehicle.images,
+          gallery: formVehicle.gallery,
+        }}
+        onSave={save}
+        onCancel={() => router.push(platformPath("inventory"))}
+        saving={saving}
+      />
+    </div>
+  );
+}

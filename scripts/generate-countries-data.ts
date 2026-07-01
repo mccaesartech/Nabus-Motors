@@ -1,0 +1,282 @@
+/**
+ * Generates src/lib/countries-data.ts from scripts/data/countries-source.json
+ * (mledoze/countries — ISO 3166-1 + ISO 4217).
+ *
+ * Run: npx tsx scripts/generate-countries-data.ts
+ */
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+interface SourceCountry {
+  name: { common: string };
+  cca2: string;
+  currencies?: Record<string, { name: string; symbol: string }>;
+}
+
+/** ISO country → native currency (user-provided sovereign mapping). */
+const USER_CURRENCY_OVERRIDES: Record<string, string> = {
+  AF: "AFN",
+  AL: "ALL",
+  DZ: "DZD",
+  AD: "EUR",
+  AO: "AOA",
+  AG: "XCD",
+  AR: "ARS",
+  AM: "AMD",
+  AU: "AUD",
+  AT: "EUR",
+  AZ: "AZN",
+  BS: "BSD",
+  BH: "BHD",
+  BD: "BDT",
+  BB: "BBD",
+  BY: "BYN",
+  BE: "EUR",
+  BZ: "BZD",
+  BJ: "XOF",
+  BT: "BTN",
+  BO: "BOB",
+  BA: "BAM",
+  BW: "BWP",
+  BR: "BRL",
+  BN: "BND",
+  BG: "BGN",
+  BF: "XOF",
+  BI: "BIF",
+  CV: "CVE",
+  KH: "KHR",
+  CM: "XAF",
+  CA: "CAD",
+  CF: "XAF",
+  TD: "XAF",
+  CL: "CLP",
+  CN: "CNY",
+  CO: "COP",
+  KM: "KMF",
+  CG: "XAF",
+  CD: "CDF",
+  CK: "NZD",
+  CR: "CRC",
+  CI: "XOF",
+  HR: "EUR",
+  CU: "CUP",
+  CY: "EUR",
+  CZ: "CZK",
+  DK: "DKK",
+  DJ: "DJF",
+  DM: "XCD",
+  DO: "DOP",
+  EC: "USD",
+  EG: "EGP",
+  SV: "USD",
+  GQ: "XAF",
+  ER: "ERN",
+  EE: "EUR",
+  SZ: "SZL",
+  ET: "ETB",
+  FJ: "FJD",
+  FI: "EUR",
+  FR: "EUR",
+  GA: "XAF",
+  GM: "GMD",
+  GE: "GEL",
+  DE: "EUR",
+  GH: "GHS",
+  GR: "EUR",
+  GD: "XCD",
+  GT: "GTQ",
+  GN: "GNF",
+  GW: "XOF",
+  GY: "GYD",
+  HT: "HTG",
+  HN: "HNL",
+  HU: "HUF",
+  IS: "ISK",
+  IN: "INR",
+  ID: "IDR",
+  IR: "IRR",
+  IQ: "IQD",
+  IE: "EUR",
+  IL: "ILS",
+  IT: "EUR",
+  JM: "JMD",
+  JP: "JPY",
+  JO: "JOD",
+  KZ: "KZT",
+  KE: "KES",
+  KI: "AUD",
+  KP: "KPW",
+  KR: "KRW",
+  KW: "KWD",
+  KG: "KGS",
+  LA: "LAK",
+  LV: "EUR",
+  LB: "LBP",
+  LS: "LSL",
+  LR: "LRD",
+  LY: "LYD",
+  LI: "CHF",
+  LT: "EUR",
+  LU: "EUR",
+  MG: "MGA",
+  MW: "MWK",
+  MY: "MYR",
+  MV: "MVR",
+  ML: "XOF",
+  MT: "EUR",
+  MH: "USD",
+  MR: "MRU",
+  MU: "MUR",
+  MX: "MXN",
+  FM: "USD",
+  MD: "MDL",
+  MC: "EUR",
+  MN: "MNT",
+  ME: "EUR",
+  MA: "MAD",
+  MZ: "MZN",
+  MM: "MMK",
+  NA: "NAD",
+  NR: "AUD",
+  NP: "NPR",
+  NL: "EUR",
+  NZ: "NZD",
+  NI: "NIO",
+  NE: "XOF",
+  NG: "NGN",
+  MK: "MKD",
+  NO: "NOK",
+  OM: "OMR",
+  PK: "PKR",
+  PW: "USD",
+  PA: "PAB",
+  PG: "PGK",
+  PY: "PYG",
+  PE: "PEN",
+  PH: "PHP",
+  PL: "PLN",
+  PT: "EUR",
+  QA: "QAR",
+  RO: "RON",
+  RU: "RUB",
+  RW: "RWF",
+  KN: "XCD",
+  LC: "XCD",
+  VC: "XCD",
+  WS: "WST",
+  SM: "EUR",
+  ST: "STN",
+  SA: "SAR",
+  SN: "XOF",
+  RS: "RSD",
+  SC: "SCR",
+  SL: "SLE",
+  SG: "SGD",
+  SK: "EUR",
+  SI: "EUR",
+  SB: "SBD",
+  SO: "SOS",
+  ZA: "ZAR",
+  SS: "SSP",
+  ES: "EUR",
+  LK: "LKR",
+  SD: "SDG",
+  SR: "SRD",
+  SE: "SEK",
+  CH: "CHF",
+  SY: "SYP",
+  TW: "TWD",
+  TJ: "TJS",
+  TZ: "TZS",
+  TH: "THB",
+  TL: "USD",
+  TG: "XOF",
+  TO: "TOP",
+  TT: "TTD",
+  TN: "TND",
+  TR: "TRY",
+  TM: "TMT",
+  TV: "AUD",
+  UG: "UGX",
+  UA: "UAH",
+  AE: "AED",
+  GB: "GBP",
+  US: "USD",
+  UY: "UYU",
+  UZ: "UZS",
+  VU: "VUV",
+  VA: "EUR",
+  VE: "VES",
+  VN: "VND",
+  YE: "YER",
+  ZM: "ZMW",
+  ZW: "ZWL",
+};
+
+/** Display-name overrides for countries where we prefer an established label. */
+const NAME_OVERRIDES: Record<string, string> = {
+  CI: "Côte d'Ivoire",
+};
+
+function nativeCurrencyCodes(country: SourceCountry): string[] {
+  return country.currencies ? Object.keys(country.currencies) : [];
+}
+
+function resolveCurrency(code: string, country: SourceCountry): string {
+  if (USER_CURRENCY_OVERRIDES[code]) {
+    return USER_CURRENCY_OVERRIDES[code];
+  }
+  const native = nativeCurrencyCodes(country);
+  if (native.length > 0) return native[0];
+  return "USD";
+}
+
+function countryName(country: SourceCountry): string {
+  return NAME_OVERRIDES[country.cca2] ?? country.name.common;
+}
+
+const root = join(import.meta.dirname ?? __dirname, "..");
+const sourcePath = join(root, "scripts/data/countries-source.json");
+const flagCodesPath = join(
+  root,
+  "node_modules/country-flag-icons/modules/countries.json"
+);
+const outputPath = join(root, "src/lib/countries-data.ts");
+
+const source: SourceCountry[] = JSON.parse(readFileSync(sourcePath, "utf8"));
+const flagCodes = new Set<string>(
+  JSON.parse(readFileSync(flagCodesPath, "utf8")).filter((code: string) =>
+    /^[A-Z]{2}$/.test(code)
+  )
+);
+
+const countries = source
+  .filter((c) => flagCodes.has(c.cca2))
+  .map((c) => ({
+    code: c.cca2,
+    name: countryName(c),
+    currency: resolveCurrency(c.cca2, c),
+  }))
+  .sort((a, b) => a.name.localeCompare(b.name, "en"));
+
+function escapeString(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+const lines = countries.map(
+  (c) =>
+    `  { code: "${c.code}", name: "${escapeString(c.name)}", currency: "${c.currency}" },`
+);
+
+const output = `/** Generated by scripts/generate-countries-data.ts — do not edit manually. */
+export const COUNTRIES_DATA = [
+${lines.join("\n")}
+] as const satisfies readonly {
+  code: string;
+  name: string;
+  currency: string;
+}[];
+`;
+
+writeFileSync(outputPath, output, "utf8");
+console.log(`Wrote ${countries.length} countries to ${outputPath}`);

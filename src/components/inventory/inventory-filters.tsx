@@ -14,18 +14,29 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { makes, modelsByMake } from "@/lib/data/catalog-meta";
 import { buildFilterSearchParams, parseFiltersFromSearchParams } from "@/lib/vehicles";
+import { PRICE_FILTER_TIERS, formatFilterPriceLabel } from "@/lib/currency";
+import { useCurrency } from "@/context/currency-context";
+import { ROUTES } from "@/lib/routes";
+import { CustomVehicleRequestCta } from "@/components/vehicle/custom-vehicle-request-cta";
 import type { BodyType, Condition, FuelType, SortOption, VehicleFilters } from "@/lib/types";
 
 const currentYear = new Date().getFullYear();
+const FILTER_ANY = "any";
+
+function filterSelectValue(value: string | number | undefined): string {
+  return value !== undefined && value !== "" ? String(value) : FILTER_ANY;
+}
 
 interface InventoryFiltersProps {
   className?: string;
+  onApplied?: () => void;
 }
 
-export function InventoryFilters({ className }: InventoryFiltersProps) {
+export function InventoryFilters({ className, onApplied }: InventoryFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const { currency } = useCurrency();
 
   const params = Object.fromEntries(searchParams.entries());
   const filters = parseFiltersFromSearchParams(params);
@@ -42,14 +53,23 @@ export function InventoryFilters({ className }: InventoryFiltersProps) {
       });
       const query = buildFilterSearchParams(newFilters, sort);
       startTransition(() => {
-        router.push(`/inventory?${query.toString()}`);
+        router.push(`${ROUTES.auto.inventory}?${query.toString()}`);
+        onApplied?.();
       });
     },
-    [filters, sort, router]
+    [filters, sort, onApplied, router]
   );
 
   const clearFilters = () => {
-    startTransition(() => router.push("/inventory"));
+    const query = filters.status
+      ? buildFilterSearchParams({ status: filters.status }).toString()
+      : "";
+    startTransition(() => {
+      router.push(
+        query ? `${ROUTES.auto.inventory}?${query}` : ROUTES.auto.inventory
+      );
+      onApplied?.();
+    });
   };
 
   const availableModels = filters.make ? modelsByMake[filters.make] ?? [] : [];
@@ -70,18 +90,21 @@ export function InventoryFilters({ className }: InventoryFiltersProps) {
           <div className="space-y-1.5">
             <Label className="text-xs">Max Price</Label>
             <Select
-              value={filters.priceMax ? String(filters.priceMax) : ""}
+              value={filterSelectValue(filters.priceMax)}
               onValueChange={(v) =>
-                updateFilters({ priceMax: v ? Number(v) : undefined })
+                updateFilters({
+                  priceMax: !v || v === FILTER_ANY ? undefined : Number(v),
+                })
               }
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Any price" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {[20000, 30000, 40000, 50000, 60000, 75000, 100000].map((p) => (
+                <SelectItem value={FILTER_ANY}>Any price</SelectItem>
+                {PRICE_FILTER_TIERS.map((p) => (
                   <SelectItem key={p} value={String(p)}>
-                    Up to ${p.toLocaleString()}
+                    {formatFilterPriceLabel(p, currency)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -91,15 +114,19 @@ export function InventoryFilters({ className }: InventoryFiltersProps) {
           <div className="space-y-1.5">
             <Label className="text-xs">Brand</Label>
             <Select
-              value={filters.make ?? ""}
+              value={filterSelectValue(filters.make)}
               onValueChange={(v) =>
-                updateFilters({ make: v || undefined, model: undefined })
+                updateFilters({
+                  make: !v || v === FILTER_ANY ? undefined : v,
+                  model: undefined,
+                })
               }
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Any brand" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value={FILTER_ANY}>Any brand</SelectItem>
                 {makes.map((m) => (
                   <SelectItem key={m} value={m}>
                     {m}
@@ -112,14 +139,19 @@ export function InventoryFilters({ className }: InventoryFiltersProps) {
           <div className="space-y-1.5">
             <Label className="text-xs">Model</Label>
             <Select
-              value={filters.model ?? ""}
-              onValueChange={(v) => updateFilters({ model: v || undefined })}
+              value={filterSelectValue(filters.model)}
+              onValueChange={(v) =>
+                updateFilters({
+                  model: !v || v === FILTER_ANY ? undefined : v,
+                })
+              }
               disabled={!filters.make}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Any model" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value={FILTER_ANY}>Any model</SelectItem>
                 {availableModels.map((m) => (
                   <SelectItem key={m} value={m}>
                     {m}
@@ -132,16 +164,17 @@ export function InventoryFilters({ className }: InventoryFiltersProps) {
           <div className="space-y-1.5">
             <Label className="text-xs">Year</Label>
             <Select
-              value={filters.yearMin ? String(filters.yearMin) : ""}
+              value={filterSelectValue(filters.yearMin)}
               onValueChange={(v) => {
-                const year = v ? Number(v) : undefined;
+                const year = !v || v === FILTER_ANY ? undefined : Number(v);
                 updateFilters({ yearMin: year, yearMax: year });
               }}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Any year" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value={FILTER_ANY}>Any year</SelectItem>
                 {Array.from({ length: 15 }, (_, i) => currentYear - i).map((y) => (
                   <SelectItem key={y} value={String(y)}>
                     {y}
@@ -154,15 +187,18 @@ export function InventoryFilters({ className }: InventoryFiltersProps) {
           <div className="space-y-1.5">
             <Label className="text-xs">Max Mileage</Label>
             <Select
-              value={filters.mileageMax ? String(filters.mileageMax) : ""}
+              value={filterSelectValue(filters.mileageMax)}
               onValueChange={(v) =>
-                updateFilters({ mileageMax: v ? Number(v) : undefined })
+                updateFilters({
+                  mileageMax: !v || v === FILTER_ANY ? undefined : Number(v),
+                })
               }
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Any mileage" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value={FILTER_ANY}>Any mileage</SelectItem>
                 {[15000, 30000, 50000, 75000, 100000].map((m) => (
                   <SelectItem key={m} value={String(m)}>
                     Under {m.toLocaleString()} mi
@@ -175,15 +211,19 @@ export function InventoryFilters({ className }: InventoryFiltersProps) {
           <div className="space-y-1.5">
             <Label className="text-xs">Fuel Type</Label>
             <Select
-              value={filters.fuelType ?? ""}
+              value={filterSelectValue(filters.fuelType)}
               onValueChange={(v) =>
-                updateFilters({ fuelType: (v as FuelType) || undefined })
+                updateFilters({
+                  fuelType:
+                    !v || v === FILTER_ANY ? undefined : (v as FuelType),
+                })
               }
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Any fuel type" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value={FILTER_ANY}>Any fuel type</SelectItem>
                 {["Petrol", "Diesel", "Hybrid", "Electric", "Plug-in Hybrid"].map(
                   (f) => (
                     <SelectItem key={f} value={f}>
@@ -198,15 +238,18 @@ export function InventoryFilters({ className }: InventoryFiltersProps) {
           <div className="space-y-1.5">
             <Label className="text-xs">Body Type</Label>
             <Select
-              value={filters.bodyType ?? ""}
+              value={filterSelectValue(filters.bodyType)}
               onValueChange={(v) =>
-                updateFilters({ bodyType: (v as BodyType) || undefined })
+                updateFilters({
+                  bodyType: !v || v === FILTER_ANY ? undefined : (v as BodyType),
+                })
               }
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Any body type" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value={FILTER_ANY}>Any body type</SelectItem>
                 {["SUV", "Sedan", "Luxury", "Truck", "Commercial", "Electric"].map(
                   (b) => (
                     <SelectItem key={b} value={b}>
@@ -221,15 +264,18 @@ export function InventoryFilters({ className }: InventoryFiltersProps) {
           <div className="space-y-1.5">
             <Label className="text-xs">Condition</Label>
             <Select
-              value={filters.condition ?? ""}
+              value={filterSelectValue(filters.condition)}
               onValueChange={(v) =>
-                updateFilters({ condition: (v as Condition) || undefined })
+                updateFilters({
+                  condition: !v || v === FILTER_ANY ? undefined : (v as Condition),
+                })
               }
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Any condition" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value={FILTER_ANY}>Any condition</SelectItem>
                 {["New", "Used", "Certified Pre-Owned"].map((c) => (
                   <SelectItem key={c} value={c}>
                     {c}
@@ -243,6 +289,8 @@ export function InventoryFilters({ className }: InventoryFiltersProps) {
         {isPending && (
           <p className="text-xs text-muted-foreground">Updating results...</p>
         )}
+
+        <CustomVehicleRequestCta className="mt-2" />
       </div>
     </aside>
   );

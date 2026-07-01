@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { vehicles } from "@/lib/data/vehicles";
+import { resolvePublicVehiclesByIdentifiers } from "@/lib/supabase/vehicles";
 
 export async function GET(req: NextRequest) {
   const idsParam = req.nextUrl.searchParams.get("ids");
   if (!idsParam) {
-    return NextResponse.json({ vehicles: [] });
+    return NextResponse.json({ vehicles: [], unresolved: [], catalog: {} });
   }
 
-  const ids = new Set(idsParam.split(",").map((id) => id.trim()).filter(Boolean));
-  const matched = vehicles.filter((v) => ids.has(v.id));
+  const identifiers = idsParam
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
 
-  return NextResponse.json({ vehicles: matched });
+  const result = await resolvePublicVehiclesByIdentifiers(identifiers);
+
+  return NextResponse.json(result, {
+    headers: {
+      "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
+    },
+  });
 }

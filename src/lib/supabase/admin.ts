@@ -1,9 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
+import { getSupabaseServiceRoleKey, getSupabaseUrl } from "./env";
 
 /** Server-only Supabase client with service role for admin reads */
 export function createAdminSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = getSupabaseUrl();
+  const key = getSupabaseServiceRoleKey();
 
   if (!url || !key) return null;
 

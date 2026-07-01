@@ -1,11 +1,18 @@
 import { createClient } from "@supabase/supabase-js";
+import { createPreferenceAwareAuthStorage } from "./auth-storage";
+import { getSupabaseAnonKey, getSupabaseUrl } from "./env";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+const url = getSupabaseUrl();
+const key = getSupabaseAnonKey();
 
-export const supabase =
-  supabaseUrl && supabaseAnonKey
-    ? createClient(supabaseUrl, supabaseAnonKey)
-    : null;
+export const supabase = url && key
+  ? createClient(url, key, {
+      auth: {
+        storage: createPreferenceAwareAuthStorage(),
+        persistSession: true,
+        autoRefreshToken: true,
+      },
+    })
+  : null;
 
 export const isSupabaseConfigured = Boolean(supabase);

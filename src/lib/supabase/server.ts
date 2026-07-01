@@ -1,17 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAnonKey, getSupabaseUrl, isSupabaseConfigured } from "./env";
 
 export function createServerSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = getSupabaseUrl();
+  const key = getSupabaseAnonKey();
 
   if (!url || !key) return null;
 
   return createClient(url, key);
 }
 
-export function isSupabaseConfigured(): boolean {
-  return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
-}
+export { isSupabaseConfigured };

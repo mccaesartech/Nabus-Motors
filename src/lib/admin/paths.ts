@@ -6,5 +6,5 @@ export function adminLoginPath() {
 }
 
 export function adminDashboardPath() {
-  return `/${ADMIN_PATH}/dashboard`;
+  return "/platform/dashboard";
 }

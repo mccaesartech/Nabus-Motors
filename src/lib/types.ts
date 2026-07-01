@@ -14,6 +14,12 @@ export type Transmission = "Automatic" | "Manual" | "CVT" | "DCT";
 
 export type Condition = "New" | "Used" | "Certified Pre-Owned";
 
+export type VehicleAvailabilityStatus =
+  | "available"
+  | "pre_order"
+  | "reserved"
+  | "sold";
+
 export interface VehicleSpec {
   label: string;
   value: string;
@@ -24,6 +30,29 @@ export interface HistoryEvent {
   title: string;
   description: string;
 }
+
+export type VehicleImageCategory = "exterior" | "interior" | "engine" | "other";
+
+export interface VehicleGalleryData {
+  exterior: string[];
+  interior: string[];
+  engine: string[];
+  other: string[];
+}
+
+export const EMPTY_VEHICLE_GALLERY: VehicleGalleryData = {
+  exterior: [],
+  interior: [],
+  engine: [],
+  other: [],
+};
+
+export const VEHICLE_GALLERY_ORDER: VehicleImageCategory[] = [
+  "exterior",
+  "interior",
+  "engine",
+  "other",
+];
 
 export interface Vehicle {
   id: string;
@@ -45,8 +74,10 @@ export interface Vehicle {
   description: string;
   featured: boolean;
   images: string[];
+  gallery?: VehicleGalleryData;
   specs: VehicleSpec[];
   history: HistoryEvent[];
+  status?: VehicleAvailabilityStatus;
   createdAt: string;
 }
 
@@ -63,6 +94,8 @@ export interface VehicleFilters {
   bodyType?: BodyType;
   location?: string;
   mileageMax?: number;
+  chineseBrands?: boolean;
+  status?: VehicleAvailabilityStatus;
 }
 
 export type SortOption =

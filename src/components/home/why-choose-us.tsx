@@ -1,73 +1,43 @@
-import {
-  BadgeCheck,
-  Calculator,
-  Headphones,
-  SearchCheck,
-  Truck,
-} from "lucide-react";
 import { Container } from "@/components/shared/container";
 import { SectionHeader } from "@/components/shared/section-header";
+import { resolveSiteContentIcon } from "@/lib/site-content-icons";
+import type { WhyChooseUsSiteContent } from "@/lib/site-content/defaults";
 
-const features = [
-  {
-    icon: BadgeCheck,
-    title: "Verified Vehicles",
-    description:
-      "Every vehicle undergoes identity verification, title checks, and odometer validation before listing.",
-  },
-  {
-    icon: SearchCheck,
-    title: "Thorough Inspections",
-    description:
-      "Our 150-point inspection covers mechanical, structural, and cosmetic condition with documented results.",
-  },
-  {
-    icon: Calculator,
-    title: "Flexible Financing",
-    description:
-      "Competitive rates with multiple lender options. Pre-qualification available without impacting your credit score.",
-  },
-  {
-    icon: Truck,
-    title: "Nationwide Delivery",
-    description:
-      "Professional transport to your location with full insurance coverage and delivery tracking.",
-  },
-  {
-    icon: Headphones,
-    title: "Customer Support",
-    description:
-      "Dedicated advisors available throughout your purchase, from initial inquiry through post-delivery follow-up.",
-  },
-];
+type WhyChooseUsProps = {
+  content: WhyChooseUsSiteContent;
+};
 
-export function WhyChooseUs() {
+export function WhyChooseUs({ content }: WhyChooseUsProps) {
   return (
-    <section className="border-y border-border bg-brand-cream py-20 sm:py-24">
+    <section className="border-y border-border bg-section-warm py-20 sm:py-24">
       <Container>
         <SectionHeader
-          title="Why Choose True Goshen"
-          description="We built our process around transparency and accountability — the qualities that matter when purchasing a vehicle."
+          title={content.title}
+          description={content.description}
           align="center"
           className="mx-auto"
         />
 
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-          {features.map((feature) => (
-            <div key={feature.title} className="flex gap-4">
-              <div className="flex size-11 shrink-0 items-center justify-center rounded-sm bg-brand-charcoal text-brand-gold shadow-luxury">
-                <feature.icon className="size-5 text-brand-purple" strokeWidth={1.5} />
-              </div>
-              <div>
-                <h3 className="text-[15px] font-semibold text-foreground">
+        <div className="grid w-full gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          {content.cards.map((feature) => {
+            const Icon = resolveSiteContentIcon(feature.icon);
+            return (
+              <article
+                key={feature.title}
+                className="group rounded-xl border border-border/70 bg-card p-6 shadow-luxury transition-shadow duration-300 hover:shadow-luxury-lg"
+              >
+                <div className="flex size-12 items-center justify-center rounded-lg border border-icon-box-border bg-icon-box-bg shadow-sm ring-1 ring-icon-box-border/40">
+                  <Icon className="size-6 text-icon-box-fg" strokeWidth={2} />
+                </div>
+                <h3 className="mt-4 text-[15px] font-semibold text-foreground">
                   {feature.title}
                 </h3>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                   {feature.description}
                 </p>
-              </div>
-            </div>
-          ))}
+              </article>
+            );
+          })}
         </div>
       </Container>
     </section>

@@ -9,13 +9,13 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-brand-purple text-white [a]:hover:bg-brand-gold [a]:hover:text-brand-black",
+        default: "bg-primary text-primary-foreground [a]:hover:bg-primary/90",
         secondary:
           "bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80",
         verified:
-          "bg-brand-gold text-brand-black [a]:hover:bg-brand-gold-muted",
+          "bg-muted text-foreground [a]:hover:bg-muted/80",
         featured:
-          "bg-brand-purple text-white [a]:hover:bg-brand-purple-light",
+          "bg-foreground text-background [a]:hover:bg-foreground/90",
         destructive:
           "bg-destructive/10 text-destructive focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:focus-visible:ring-destructive/40 [a]:hover:bg-destructive/20",
         outline:

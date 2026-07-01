@@ -15,6 +15,9 @@ import {
 } from "@/components/ui/select";
 import { makes, modelsByMake, locations } from "@/lib/data/catalog-meta";
 import { buildFilterSearchParams } from "@/lib/vehicles";
+import { ROUTES } from "@/lib/routes";
+import { PRICE_FILTER_TIERS, formatFilterPriceLabel } from "@/lib/currency";
+import { useCurrency } from "@/context/currency-context";
 import type { Condition, FuelType, Transmission } from "@/lib/types";
 
 const currentYear = new Date().getFullYear();
@@ -22,6 +25,7 @@ const years = Array.from({ length: 15 }, (_, i) => currentYear - i);
 
 export function VehicleSearch() {
   const router = useRouter();
+  const { currency } = useCurrency();
   const [make, setMake] = useState("");
   const [model, setModel] = useState("");
   const [year, setYear] = useState("");
@@ -45,23 +49,20 @@ export function VehicleSearch() {
       condition: (condition as Condition) || undefined,
       location: location || undefined,
     });
-    router.push(`/inventory?${params.toString()}`);
+    router.push(`${ROUTES.auto.inventory}?${params.toString()}`);
   }
 
   return (
-    <section className="relative z-10 -mt-8 pb-4">
+    <section className="relative z-10 -mt-12 pb-8 sm:-mt-14 lg:-mt-16">
       <Container>
-        <div className="border border-border bg-white p-5 shadow-luxury sm:p-6">
-          <div className="mb-5 flex items-center gap-2">
-            <Search className="size-4 text-brand-purple" />
-            <h2 className="text-sm font-semibold text-foreground">
-              Find Your Vehicle
-            </h2>
-          </div>
+        <div className="w-full rounded-sm border border-border/60 bg-card p-4 shadow-luxury-lg sm:p-8 lg:p-10">
+          <h2 className="text-lg font-bold tracking-tight text-foreground sm:text-xl">
+            Find Your Vehicle
+          </h2>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="search-make" className="text-xs">
+          <div className="mt-6 grid w-full grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4 xl:gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="search-make" className="text-xs font-medium">
                 Make
               </Label>
               <Select
@@ -84,8 +85,8 @@ export function VehicleSearch() {
               </Select>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="search-model" className="text-xs">
+            <div className="space-y-2">
+              <Label htmlFor="search-model" className="text-xs font-medium">
                 Model
               </Label>
               <Select value={model} onValueChange={(v) => setModel(v ?? "")} disabled={!make}>
@@ -102,8 +103,8 @@ export function VehicleSearch() {
               </Select>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="search-year" className="text-xs">
+            <div className="space-y-2">
+              <Label htmlFor="search-year" className="text-xs font-medium">
                 Year
               </Label>
               <Select value={year} onValueChange={(v) => setYear(v ?? "")}>
@@ -120,8 +121,8 @@ export function VehicleSearch() {
               </Select>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="search-price" className="text-xs">
+            <div className="space-y-2">
+              <Label htmlFor="search-price" className="text-xs font-medium">
                 Max Price
               </Label>
               <Select value={priceMax} onValueChange={(v) => setPriceMax(v ?? "")}>
@@ -129,17 +130,17 @@ export function VehicleSearch() {
                   <SelectValue placeholder="Any price" />
                 </SelectTrigger>
                 <SelectContent>
-                  {[20000, 30000, 40000, 50000, 60000, 75000, 100000].map((p) => (
+                  {PRICE_FILTER_TIERS.map((p) => (
                     <SelectItem key={p} value={String(p)}>
-                      Up to ${p.toLocaleString()}
+                      {formatFilterPriceLabel(p, currency)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="search-transmission" className="text-xs">
+            <div className="space-y-2">
+              <Label htmlFor="search-transmission" className="text-xs font-medium">
                 Transmission
               </Label>
               <Select value={transmission} onValueChange={(v) => setTransmission(v ?? "")}>
@@ -156,8 +157,8 @@ export function VehicleSearch() {
               </Select>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="search-fuel" className="text-xs">
+            <div className="space-y-2">
+              <Label htmlFor="search-fuel" className="text-xs font-medium">
                 Fuel Type
               </Label>
               <Select value={fuelType} onValueChange={(v) => setFuelType(v ?? "")}>
@@ -176,8 +177,8 @@ export function VehicleSearch() {
               </Select>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="search-condition" className="text-xs">
+            <div className="space-y-2">
+              <Label htmlFor="search-condition" className="text-xs font-medium">
                 Condition
               </Label>
               <Select value={condition} onValueChange={(v) => setCondition(v ?? "")}>
@@ -194,8 +195,8 @@ export function VehicleSearch() {
               </Select>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="search-location" className="text-xs">
+            <div className="space-y-2">
+              <Label htmlFor="search-location" className="text-xs font-medium">
                 Location
               </Label>
               <Select value={location} onValueChange={(v) => setLocation(v ?? "")}>
@@ -213,8 +214,8 @@ export function VehicleSearch() {
             </div>
           </div>
 
-          <div className="mt-5 flex justify-end">
-            <Button onClick={handleSearch} className="min-w-[140px]">
+          <div className="mt-8 flex justify-stretch sm:justify-end">
+            <Button onClick={handleSearch} className="w-full min-w-0 sm:w-auto sm:min-w-[160px]">
               <Search className="size-4" />
               Search Inventory
             </Button>

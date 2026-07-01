@@ -1,19 +1,36 @@
-import { Hero } from "@/components/home/hero";
-import { VehicleSearch } from "@/components/home/vehicle-search";
-import { FeaturedVehicles } from "@/components/home/featured-vehicles";
-import { WhyChooseUs } from "@/components/home/why-choose-us";
-import { VehicleCategories } from "@/components/home/vehicle-categories";
+import { CorporateAbout, CorporateContactCta, CorporateFaq, CorporateHero, CorporateServices, CorporateStats } from "@/components/corporate/corporate-sections";
 import { Testimonials } from "@/components/home/testimonials";
+import { WhyChooseUs } from "@/components/home/why-choose-us";
+import { DeferredSection } from "@/components/shared/deferred-section";
+import { getSiteContent } from "@/lib/site-content";
 
-export default function HomePage() {
+export const revalidate = 60;
+
+export const metadata = {
+  title: "True Goshen Company Limited",
+  description:
+    "True Goshen Company Limited — vehicle imports, freight forwarding, customs clearing, and genuine spare parts for Ghana and beyond.",
+};
+
+export default async function CorporateHomePage() {
+  const content = await getSiteContent();
+
   return (
     <>
-      <Hero />
-      <VehicleSearch />
-      <FeaturedVehicles />
-      <WhyChooseUs />
-      <VehicleCategories />
-      <Testimonials />
+      <CorporateHero content={content.corporateHomepage} />
+      <CorporateAbout content={content.corporateHomepage} />
+      <CorporateServices content={content.corporateServices} />
+      <WhyChooseUs content={content.whyChooseUs} />
+      <DeferredSection fallback={<div className="min-h-[12rem] border-b border-border bg-brand-black" aria-hidden />}>
+        <CorporateStats content={content.corporateStats} />
+      </DeferredSection>
+      <DeferredSection fallback={<div className="min-h-[16rem] border-t border-border bg-background" aria-hidden />}>
+        <Testimonials content={content.corporateTestimonials} />
+      </DeferredSection>
+      <DeferredSection fallback={<div className="min-h-[16rem] border-b border-border bg-background" aria-hidden />}>
+        <CorporateFaq content={content.corporateFaq} />
+      </DeferredSection>
+      <CorporateContactCta content={content.corporateHomepage} />
     </>
   );
 }

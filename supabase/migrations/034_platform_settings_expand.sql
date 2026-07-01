@@ -1,0 +1,31 @@
+-- Expand platform operational settings (site_settings key-value store)
+
+INSERT INTO site_settings (key, value) VALUES
+  ('company_legal_name', 'True Goshen Company Limited'),
+  ('tagline', 'Your Safe Place for Quality Vehicles'),
+  ('address_line1', 'Ring Road East, Accra'),
+  ('address_line2', 'Greater Accra, Ghana'),
+  ('google_maps_url', 'https://www.google.com/maps/search/?api=1&query=Ring+Road+East,+Accra,+Greater+Accra,+Ghana'),
+  ('hours_weekday', 'Mon–Fri: 9:00 AM – 7:00 PM'),
+  ('hours_saturday', 'Sat: 9:00 AM – 5:00 PM'),
+  ('hours_sunday', 'Sun: Closed'),
+  ('preorder_terms_a', 'Option A — I will arrange my own shipping and clearing'),
+  ('preorder_terms_b', 'Option B — True Goshen handles freight forwarding & clearing'),
+  ('preorder_terms_c', 'Option C — I need consultation before deciding'),
+  ('social_facebook', ''),
+  ('social_instagram', ''),
+  ('social_linkedin', ''),
+  ('default_currency_display', 'GHS'),
+  ('inventory_low_stock_threshold', '5'),
+  ('appointment_branches', 'Accra'),
+  ('freight_default_origins', E'China\nJapan\nUSA\nUnited Kingdom\nUAE'),
+  ('freight_quote_notification_email', 'info@truegoshenauto.com'),
+  ('notify_email_enabled', 'true'),
+  ('notify_freight_quotes_enabled', 'true'),
+  ('notify_preorders_enabled', 'true'),
+  ('notify_low_stock_enabled', 'true'),
+  ('maintenance_mode', 'false'),
+  ('maintenance_message', 'We are performing scheduled maintenance. Some features may be temporarily unavailable.'),
+  ('feature_show_spare_parts_nav', 'true'),
+  ('feature_show_freight_nav', 'true')
+ON CONFLICT (key) DO NOTHING;

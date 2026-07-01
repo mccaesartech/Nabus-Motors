@@ -1,14 +1,20 @@
 "use client";
 
 import { Phone, MessageCircle, Calendar, FileText, Heart } from "lucide-react";
-import Link from "next/link";
 import type { Vehicle } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { FullPageLink } from "@/components/shared/full-page-link";
 import { useGarage } from "@/hooks/use-garage";
+import { useCurrency } from "@/context/currency-context";
+import {
+  downPaymentUsd,
+  canPreorder,
+} from "@/lib/vehicles/availability";
 import {
   GHANA_PHONE_TEL,
   GHANA_WHATSAPP,
 } from "@/lib/data/vehicle-images";
+import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
 interface ContactActionsProps {
@@ -16,24 +22,34 @@ interface ContactActionsProps {
 }
 
 export function ContactActions({ vehicle }: ContactActionsProps) {
-  const { isSaved, toggleSave } = useGarage();
-  const saved = isSaved(vehicle.id);
+  const { isSavedVehicle, toggleSave } = useGarage();
+  const { formatPrice } = useCurrency();
+  const saved = isSavedVehicle(vehicle);
+  const showPreorder = canPreorder(vehicle.status);
   const whatsappNumber =
     process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? GHANA_WHATSAPP;
+  const downPayment = formatPrice(downPaymentUsd(vehicle.price));
   const whatsappMessage = encodeURIComponent(
-    `Hi, I'm interested in the ${vehicle.year} ${vehicle.make} ${vehicle.model} (Stock #${vehicle.id}).`
+    showPreorder
+      ? `Hi, I'd like to pre-order the ${vehicle.year} ${vehicle.make} ${vehicle.model} (Stock #${vehicle.id}). Down payment: ${downPayment} (25%).`
+      : `Hi, I'm interested in the ${vehicle.year} ${vehicle.make} ${vehicle.model} (Stock #${vehicle.id}).`
   );
 
   return (
     <div className="space-y-3">
-      <Button className="w-full" render={<Link href={`/contact?vehicle=${vehicle.slug}`} />}>
+      <Button
+        className="w-full"
+        render={
+          <FullPageLink href={`/contact?vehicle=${vehicle.slug}`} />
+        }
+      >
         <Calendar className="size-4" />
-        Schedule Inspection
+        {showPreorder ? "Schedule Consultation" : "Schedule Inspection"}
       </Button>
       <Button
         variant="outline"
         className="w-full"
-        render={<Link href="/financing" />}
+        render={<FullPageLink href={ROUTES.auto.financing} />}
       >
         <FileText className="size-4" />
         Request Financing
@@ -61,12 +77,22 @@ export function ContactActions({ vehicle }: ContactActionsProps) {
         WhatsApp Inquiry
       </Button>
       <Button
-        variant="secondary"
-        className="w-full"
+        variant={saved ? "outline" : "secondary"}
+        className={cn(
+          "w-full transition-colors",
+          saved && "border-brand-purple/30 text-brand-purple hover:bg-brand-purple/10 hover:text-brand-purple-dark"
+        )}
         onClick={() => toggleSave(vehicle)}
+        aria-label={saved ? "Remove from saved vehicles" : "Save vehicle to garage"}
+        aria-pressed={saved}
       >
-        <Heart className={cn("size-4", saved && "fill-red-500 text-red-500")} />
-        {saved ? "Saved to Garage" : "Save Vehicle"}
+        <Heart
+          className={cn(
+            "size-4",
+            saved && "fill-brand-purple text-brand-purple"
+          )}
+        />
+        {saved ? "Remove from Saved" : "Save Vehicle"}
       </Button>
     </div>
   );

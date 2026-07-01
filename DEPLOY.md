@@ -31,8 +31,10 @@ When prompted for environment variables, add:
 |------|-------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your Supabase anon key |
-| `NEXT_PUBLIC_SITE_URL` | Your Vercel URL (e.g. `https://true-goshen-auto.vercel.app`) |
-| `NEXT_PUBLIC_WHATSAPP_NUMBER` | Your WhatsApp number (digits only, e.g. `15745550100`) |
+| `NEXT_PUBLIC_SITE_URL` | `https://truegoshen.com` (corporate HQ — canonical URL) |
+| `NEXT_PUBLIC_AUTO_SITE_URL` | `https://truegoshenauto.com` (optional — Auto Division direct entry) |
+| `AUTO_DIVISION_HOSTS` | `truegoshenauto.com,truegoshenauto.vercel.app,auto.truegoshen.com` |
+| `NEXT_PUBLIC_WHATSAPP_NUMBER` | Your WhatsApp number (digits only, e.g. `233244876784`) |
 
 ### Option B — Vercel Dashboard
 
@@ -65,6 +67,20 @@ If port 3000 is busy:
 npx next dev -p 3001
 ```
 
-## Custom domain (optional)
+## Custom domains
 
-Vercel → your project → **Settings → Domains** → add e.g. `truegoshenauto.com`
+Add **both** domains in Vercel → your project → **Settings → Domains**:
+
+| Domain | Purpose |
+|--------|---------|
+| `truegoshen.com` (+ `www.truegoshen.com`) | Corporate HQ — `/` is the main company homepage |
+| `truegoshenauto.com` (+ `www`, `auto.truegoshen.com`) | Auto Division — visitors go straight to `/auto` |
+
+The app uses one deployment. Middleware detects the hostname:
+
+- **truegoshen.com** — normal routing (`/` = corporate, `/auto` = marketplace)
+- **truegoshenauto.com** (and `truegoshenauto.vercel.app`) — `/` redirects to `/auto`; short paths like `/inventory` redirect to `/auto/inventory`
+
+Set `NEXT_PUBLIC_SITE_URL=https://truegoshen.com` in Vercel env vars so invites, sitemap, and OG tags use the corporate domain.
+
+`truegoshenauto.vercel.app` keeps working as an Auto Division entry point until you add the custom domain.

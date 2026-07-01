@@ -1,9 +1,8 @@
+import { DEFAULT_DISPLAY_CURRENCY, formatUsdPrice } from "@/lib/currency";
+
+/** Format a base USD price using the site default display currency. */
 export function formatPrice(price: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(price);
+  return formatUsdPrice(price, DEFAULT_DISPLAY_CURRENCY);
 }
 
 export function formatMileage(mileage: number): string {

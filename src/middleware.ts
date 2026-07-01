@@ -1,40 +1,59 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { adminLoginPath, resolvedAdminPath } from "@/lib/admin/config";
+import { resolvePlatformAuthFromRequest } from "@/lib/admin/platform-auth-request";
+import { resolveAutoDivisionRedirect } from "@/lib/domain-routing";
 import {
-  ADMIN_COOKIE,
-  adminLoginPath,
-  resolvedAdminPath,
-} from "@/lib/admin/config";
+  canViewFinance,
+  hasPermission,
+  permissionForPath,
+} from "@/lib/platform/permissions";
 
-async function expectedAdminToken(): Promise<string | null> {
-  const password = process.env.ADMIN_PASSWORD;
-  const secret = process.env.ADMIN_SECRET ?? "true-goshen-admin-secret";
-  if (!password) return null;
-  const data = new TextEncoder().encode(`${password}:${secret}`);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+function isProtectedAdminPath(pathname: string) {
+  const dashboardPrefix = `/${resolvedAdminPath()}/dashboard`;
+  return pathname.startsWith(dashboardPrefix) || pathname.startsWith("/platform");
+}
+
+function isInvitePath(pathname: string) {
+  return /^\/platform\/invite\/[^/]+$/.test(pathname);
 }
 
 export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-  const dashboardPrefix = `/${resolvedAdminPath()}/dashboard`;
+  const autoRedirect = resolveAutoDivisionRedirect(req);
+  if (autoRedirect) return autoRedirect;
 
-  if (!pathname.startsWith(dashboardPrefix)) {
+  const { pathname } = req.nextUrl;
+
+  if (!isProtectedAdminPath(pathname)) {
     return NextResponse.next();
   }
 
-  const token = req.cookies.get(ADMIN_COOKIE)?.value;
-  const expected = await expectedAdminToken();
+  if (isInvitePath(pathname)) {
+    const response = NextResponse.next();
+    response.headers.set("x-pathname", pathname);
+    return response;
+  }
 
-  if (!token || !expected || token !== expected) {
+  const auth = await resolvePlatformAuthFromRequest(req);
+  if (!auth.authenticated || !auth.role) {
     return NextResponse.redirect(new URL(adminLoginPath(), req.url));
   }
 
-  return NextResponse.next();
+  const required = permissionForPath(pathname);
+  if (required && !hasPermission(auth.role, required)) {
+    if (required === "finance" || !canViewFinance(auth.role)) {
+      return NextResponse.redirect(new URL("/platform/dashboard", req.url));
+    }
+    return NextResponse.redirect(new URL("/platform/dashboard", req.url));
+  }
+
+  const response = NextResponse.next();
+  response.headers.set("x-pathname", pathname);
+  return response;
 }
 
 export const config = {
-  matcher: ["/admin/dashboard/:path*"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|mp4)$).*)",
+  ],
 };

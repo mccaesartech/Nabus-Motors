@@ -9,7 +9,7 @@ export function NewsletterForm() {
 
   return (
     <form
-      className="mt-4 flex gap-2"
+      className="mt-4 flex w-full flex-col gap-2.5 sm:flex-row"
       onSubmit={async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -26,13 +26,13 @@ export function NewsletterForm() {
       <Input
         type="email"
         placeholder="Email address"
-        className="border-white/20 bg-white/10 text-white placeholder:text-white/40"
+        className="h-10 min-w-0 flex-1 rounded-md border-white/20 bg-white/[0.08] text-sm text-white placeholder:text-white/40 focus-visible:border-brand-cta-gold/50 focus-visible:ring-brand-cta-gold/25"
         required
       />
       <Button
         type="submit"
         disabled={loading}
-        className="shrink-0 bg-brand-gold text-brand-black hover:bg-brand-gold-muted"
+        className="h-10 shrink-0 rounded-md bg-brand-cta-gold px-5 text-sm font-semibold text-brand-charcoal hover:bg-brand-cta-gold-hover"
       >
         {loading ? "…" : "Subscribe"}
       </Button>

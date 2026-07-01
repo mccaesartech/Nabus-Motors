@@ -1,6 +1,106 @@
-import type { Vehicle, VehicleSpec, HistoryEvent } from "@/lib/types";
+import { unstable_cache } from "next/cache";
+import { cache as reactCache } from "react";
+import type { Vehicle, VehicleSpec, HistoryEvent, VehicleAvailabilityStatus, VehicleGalleryData } from "@/lib/types";
 import { vehicles as mockVehicles } from "@/lib/data/vehicles";
+import { resolveVehicleGallery, flattenGallery } from "@/lib/data/vehicle-images";
+import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createServerSupabase } from "@/lib/supabase/server";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
+import {
+  isPendingNewListing,
+  isPubliclyListed,
+} from "@/lib/admin/vehicle-pending-changes";
+import type { CartVehicleCatalogState } from "@/lib/parts/cart-types";
+import { PUBLIC_VEHICLE_STATUSES } from "@/lib/vehicles/availability";
+import { notDeletedFilter } from "@/lib/platform/trash-types";
+import { splitVehicleIdentifiers } from "@/lib/vehicles/identifier-map";
+
+const FETCH_TIMEOUT_MS = 5000;
+
+/** Cache tag for on-demand invalidation after admin inventory changes. */
+export const PUBLIC_VEHICLES_CACHE_TAG = "public-vehicles";
+
+/** Time-based revalidation for public vehicle listings (seconds). */
+export const PUBLIC_VEHICLES_REVALIDATE_SECONDS = 60;
+
+/** After first pending_changes schema error, skip the expensive OR filter. */
+let pendingChangesColumnAvailable: boolean | null = null;
+
+/** Same approval filter as public RLS and fetchAllVehicles. */
+export const PUBLIC_LISTING_APPROVAL_OR =
+  "approval_status.eq.approved,and(approval_status.eq.pending_approval,pending_changes.not.is.null),and(approval_status.eq.rejected,pending_changes.not.is.null)";
+
+const PUBLIC_LISTING_APPROVAL_APPROVED_ONLY = "approval_status.eq.approved";
+
+function isPendingChangesSchemaError(message?: string | null): boolean {
+  return Boolean(message?.includes("pending_changes"));
+}
+
+type PublicListingResult = {
+  data: unknown;
+  error: { message: string } | null;
+};
+
+/** Run a public listing query; fall back when pending_changes column is not migrated yet. */
+async function runPublicListingQuery(
+  build: (approvalOr: string) => PromiseLike<PublicListingResult>
+): Promise<PublicListingResult> {
+  const approvalOr =
+    pendingChangesColumnAvailable === false
+      ? PUBLIC_LISTING_APPROVAL_APPROVED_ONLY
+      : PUBLIC_LISTING_APPROVAL_OR;
+
+  const primary = await build(approvalOr);
+  if (!primary.error) {
+    if (pendingChangesColumnAvailable === null) {
+      pendingChangesColumnAvailable = true;
+    }
+    return primary;
+  }
+  if (!isPendingChangesSchemaError(primary.error.message)) {
+    return primary;
+  }
+
+  pendingChangesColumnAvailable = false;
+  if (approvalOr === PUBLIC_LISTING_APPROVAL_APPROVED_ONLY) {
+    return primary;
+  }
+
+  if (process.env.NODE_ENV === "development") {
+    console.warn(
+      "[vehicles] pending_changes column missing — using approved-only public filter"
+    );
+  }
+  return build(PUBLIC_LISTING_APPROVAL_APPROVED_ONLY);
+}
+
+export type VehicleLookupUnresolved = {
+  identifier: string;
+  reason: "not_found" | "listing_pending" | "not_public";
+};
+
+export type VehicleLookupResult = {
+  vehicles: Vehicle[];
+  unresolved: VehicleLookupUnresolved[];
+  /** Per vehicle id/slug — how the row was resolved for cart display. */
+  catalog?: Record<string, CartVehicleCatalogState>;
+  debug?: {
+    requested: string[];
+    publicHits: string[];
+    adminHits: string[];
+    unresolved: string[];
+    error?: string;
+  };
+};
+
+async function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out`)), FETCH_TIMEOUT_MS)
+    ),
+  ]);
+}
 
 interface VehicleRow {
   id: string;
@@ -22,12 +122,20 @@ interface VehicleRow {
   description: string | null;
   featured: boolean;
   images: string[];
+  gallery?: VehicleGalleryData | null;
   specs: VehicleSpec[];
   history: HistoryEvent[];
+  status: string;
   created_at: string;
 }
 
 function mapRow(row: VehicleRow): Vehicle {
+  const gallery = resolveVehicleGallery({
+    gallery: row.gallery as VehicleGalleryData | null,
+    images: row.images ?? [],
+  });
+  const images = flattenGallery(gallery);
+
   return {
     id: row.id,
     slug: row.slug,
@@ -47,56 +155,531 @@ function mapRow(row: VehicleRow): Vehicle {
     vin: row.vin ?? "",
     description: row.description ?? "",
     featured: row.featured,
-    images: row.images ?? [],
+    images,
+    gallery,
     specs: row.specs ?? [],
     history: row.history ?? [],
+    status: (row.status as VehicleAvailabilityStatus) ?? "available",
     createdAt: row.created_at.split("T")[0],
   };
 }
 
-export async function fetchAllVehicles(): Promise<Vehicle[]> {
+async function fetchAllVehiclesUncached(): Promise<Vehicle[]> {
   const supabase = createServerSupabase();
 
   if (!supabase) {
-    return mockVehicles;
+    return mockVehicles.filter(
+      (v) => !v.status || v.status === "available" || v.status === "pre_order"
+    );
   }
 
-  const { data, error } = await supabase
-    .from("vehicles")
-    .select("*")
-    .eq("status", "available")
-    .order("created_at", { ascending: false });
+  try {
+    const result = await withTimeout(
+      runPublicListingQuery((approvalOr) =>
+        notDeletedFilter(
+          supabase
+            .from("vehicles")
+            .select("*")
+            .in("status", PUBLIC_VEHICLE_STATUSES)
+            .or(approvalOr)
+        ).order("created_at", { ascending: false })
+      ),
+      "Supabase vehicles"
+    );
+    const { data, error } = result as { data: VehicleRow[] | null; error: { message: string } | null };
 
-  if (error || !data?.length) {
-    console.error("Supabase fetch failed, using mock data:", error?.message);
-    return mockVehicles;
+    if (error || !data?.length) {
+      if (error) console.error("Supabase fetch failed, using mock data:", error.message);
+      return isSupabaseConfigured() && data?.length === 0
+        ? []
+        : mockVehicles.filter(
+            (v) => !v.status || v.status === "available" || v.status === "pre_order"
+          );
+    }
+
+    return data.map((row) => mapRow(row as VehicleRow));
+  } catch (err) {
+    console.error("Supabase fetch failed, using mock data:", err);
+    return mockVehicles.filter(
+      (v) => !v.status || v.status === "available" || v.status === "pre_order"
+    );
   }
-
-  return data.map((row) => mapRow(row as VehicleRow));
 }
 
-export async function fetchVehicleBySlug(slug: string): Promise<Vehicle | null> {
+const getCachedAllVehicles = unstable_cache(
+  fetchAllVehiclesUncached,
+  ["public-vehicles-all"],
+  {
+    revalidate: PUBLIC_VEHICLES_REVALIDATE_SECONDS,
+    tags: [PUBLIC_VEHICLES_CACHE_TAG],
+  }
+);
+
+/** Public inventory listing — cached 60s, busted on admin inventory saves. */
+export const fetchAllVehicles = reactCache(() => getCachedAllVehicles());
+
+export const fetchVehicleBySlug = reactCache(async (slug: string): Promise<Vehicle | null> => {
+  const normalized = slug.trim();
+  if (!normalized) return null;
+
   const supabase = createServerSupabase();
 
   if (!supabase) {
-    return mockVehicles.find((v) => v.slug === slug) ?? null;
+    return (
+      mockVehicles.find(
+        (v) =>
+          v.slug === normalized &&
+          (!v.status || v.status === "available" || v.status === "pre_order")
+      ) ?? null
+    );
   }
 
-  const { data, error } = await supabase
-    .from("vehicles")
-    .select("*")
-    .eq("slug", slug)
-    .eq("status", "available")
-    .single();
+  try {
+    const result = await withTimeout(
+      runPublicListingQuery((approvalOr) =>
+        notDeletedFilter(
+          supabase
+            .from("vehicles")
+            .select("*")
+            .eq("slug", normalized)
+            .in("status", PUBLIC_VEHICLE_STATUSES)
+            .or(approvalOr)
+        ).maybeSingle()
+      ),
+      "Supabase vehicle"
+    );
+    const { data, error } = result;
 
-  if (error || !data) {
-    return mockVehicles.find((v) => v.slug === slug) ?? null;
+    if (!error && data) {
+      return mapRow(data as VehicleRow);
+    }
+
+    if (error) {
+      console.error("Supabase vehicle by slug failed:", error.message);
+    }
+  } catch (err) {
+    console.error("Supabase vehicle fetch failed:", err);
   }
 
-  return mapRow(data as VehicleRow);
-}
+  return null;
+});
 
 export async function fetchFeaturedVehicles(): Promise<Vehicle[]> {
   const all = await fetchAllVehicles();
   return all.filter((v) => v.featured);
+}
+
+export type CheckoutVehicleRecord = {
+  id: string;
+  slug: string;
+  year: number | null;
+  make: string;
+  model: string;
+  trim: string | null;
+  price: number | null;
+  status: string | null;
+};
+
+function matchMockByIdentifiers(identifiers: string[]): Vehicle[] {
+  const idSet = new Set(identifiers);
+  return mockVehicles.filter((v) => idSet.has(v.id) || idSet.has(v.slug));
+}
+
+function logMissingVehicleIds(identifiers: string[], found: Map<string, Vehicle>) {
+  if (process.env.NODE_ENV !== "development") return;
+  const missing = identifiers.filter((key) => !found.has(key));
+  if (missing.length) {
+    console.warn("[vehicles/lookup] identifiers not publicly listed:", missing);
+  }
+}
+
+type AdminVehicleRow = VehicleRow & {
+  approval_status: string | null;
+  pending_changes: unknown;
+};
+
+const ADMIN_VEHICLE_LOOKUP_SELECT = "*";
+
+async function selectAdminVehicles(
+  admin: NonNullable<ReturnType<typeof createAdminSupabase>>,
+  column: "id" | "slug",
+  values: string[]
+): Promise<AdminVehicleRow[] | null> {
+  if (!values.length) return null;
+
+  const primary = await admin
+    .from("vehicles")
+    .select(ADMIN_VEHICLE_LOOKUP_SELECT)
+    .in(column, values);
+  if (!primary.error || !isPendingChangesSchemaError(primary.error.message)) {
+    return primary.data as AdminVehicleRow[] | null;
+  }
+
+  const fallback = await admin
+    .from("vehicles")
+    .select("*")
+    .in(column, values);
+  if (fallback.error) {
+    console.error(`Admin vehicles by ${column} failed:`, fallback.error.message);
+    return null;
+  }
+  return fallback.data as AdminVehicleRow[] | null;
+}
+
+function catalogStateForRow(
+  row: AdminVehicleRow,
+  source: "public" | "admin"
+): CartVehicleCatalogState {
+  return {
+    source,
+    approvalStatus: row.approval_status ?? null,
+    publiclyListed: isPubliclyListed(row.approval_status, row.pending_changes),
+    listingPending: isPendingNewListing(row.approval_status, row.pending_changes),
+  };
+}
+
+function attachCatalogEntries(
+  catalog: Record<string, CartVehicleCatalogState>,
+  vehicle: Vehicle,
+  state: CartVehicleCatalogState
+) {
+  catalog[vehicle.id] = state;
+  catalog[vehicle.slug] = state;
+}
+
+/** Classify identifiers missing from the public inventory query. */
+async function classifyUnresolvedIdentifiers(
+  identifiers: string[],
+  publicByKey: Map<string, Vehicle>
+): Promise<VehicleLookupUnresolved[]> {
+  const missing = identifiers.filter((key) => !publicByKey.has(key));
+  if (!missing.length) return [];
+
+  const admin = createAdminSupabase();
+  if (!admin) {
+    return missing.map((identifier) => ({ identifier, reason: "not_found" as const }));
+  }
+
+  const { unique, ids, slugs } = splitVehicleIdentifiers(missing);
+  const adminByKey = new Map<string, AdminVehicleRow>();
+
+  const addAdminRows = (rows: AdminVehicleRow[] | null) => {
+    for (const row of rows ?? []) {
+      adminByKey.set(row.id, row);
+      adminByKey.set(row.slug, row);
+    }
+  };
+
+  const [idRows, slugRows] = await Promise.all([
+    ids.length ? selectAdminVehicles(admin, "id", ids) : Promise.resolve(null),
+    slugs.length ? selectAdminVehicles(admin, "slug", slugs) : Promise.resolve(null),
+  ]);
+  addAdminRows(idRows);
+  addAdminRows(slugRows);
+
+  return unique.map((identifier) => {
+    const row = adminByKey.get(identifier);
+    if (!row) return { identifier, reason: "not_found" as const };
+    if (isPendingNewListing(row.approval_status, row.pending_changes)) {
+      return { identifier, reason: "listing_pending" as const };
+    }
+    return { identifier, reason: "not_public" as const };
+  });
+}
+
+async function queryPublicVehiclesByIdentifiers(
+  identifiers: string[],
+  supabase: NonNullable<ReturnType<typeof createServerSupabase>>
+): Promise<Map<string, Vehicle>> {
+  const { unique, ids, slugs } = splitVehicleIdentifiers(identifiers);
+  const byKey = new Map<string, Vehicle>();
+
+  const addRows = (rows: VehicleRow[] | null) => {
+    for (const row of rows ?? []) {
+      const vehicle = mapRow(row);
+      byKey.set(vehicle.id, vehicle);
+      byKey.set(vehicle.slug, vehicle);
+    }
+  };
+
+  const [idsResult, slugsResult] = await Promise.all([
+    ids.length
+      ? withTimeout(
+          runPublicListingQuery((approvalOr) =>
+            notDeletedFilter(
+              supabase
+                .from("vehicles")
+                .select("*")
+                .in("id", ids)
+                .in("status", PUBLIC_VEHICLE_STATUSES)
+                .or(approvalOr)
+            )
+          ),
+          "Supabase vehicles by id"
+        )
+      : Promise.resolve({ data: null as VehicleRow[] | null, error: null }),
+    slugs.length
+      ? withTimeout(
+          runPublicListingQuery((approvalOr) =>
+            notDeletedFilter(
+              supabase
+                .from("vehicles")
+                .select("*")
+                .in("slug", slugs)
+                .in("status", PUBLIC_VEHICLE_STATUSES)
+                .or(approvalOr)
+            )
+          ),
+          "Supabase vehicles by slug"
+        )
+      : Promise.resolve({ data: null as VehicleRow[] | null, error: null }),
+  ]);
+
+  if (idsResult.error) {
+    console.error("Supabase vehicles by id failed:", idsResult.error.message);
+  }
+  if (slugsResult.error) {
+    console.error("Supabase vehicles by slug failed:", slugsResult.error.message);
+  }
+  addRows(idsResult.data);
+  addRows(slugsResult.data);
+
+  for (const key of unique) {
+    const vehicle = byKey.get(key);
+    if (vehicle) byKey.set(key, vehicle);
+  }
+
+  logMissingVehicleIds(unique, byKey);
+  return byKey;
+}
+
+/** Admin fallback — same vehicles table as Platform inventory, without public filters. */
+async function queryAdminVehiclesByIdentifiers(
+  identifiers: string[],
+  excludeKeys: ReadonlySet<string>,
+  admin: NonNullable<ReturnType<typeof createAdminSupabase>>
+): Promise<{
+  byKey: Map<string, Vehicle>;
+  catalog: Record<string, CartVehicleCatalogState>;
+}> {
+  const missing = identifiers.filter((key) => !excludeKeys.has(key));
+  const { unique, ids, slugs } = splitVehicleIdentifiers(missing);
+  const byKey = new Map<string, Vehicle>();
+  const catalog: Record<string, CartVehicleCatalogState> = {};
+
+  const addRows = (rows: AdminVehicleRow[] | null) => {
+    for (const row of rows ?? []) {
+      const vehicle = mapRow(row);
+      const state = catalogStateForRow(row, "admin");
+      byKey.set(vehicle.id, vehicle);
+      byKey.set(vehicle.slug, vehicle);
+      attachCatalogEntries(catalog, vehicle, state);
+    }
+  };
+
+  const [idRows, slugRows] = await Promise.all([
+    ids.length ? selectAdminVehicles(admin, "id", ids) : Promise.resolve(null),
+    slugs.length ? selectAdminVehicles(admin, "slug", slugs) : Promise.resolve(null),
+  ]);
+  addRows(idRows);
+  addRows(slugRows);
+
+  for (const key of unique) {
+    const vehicle = byKey.get(key);
+    if (vehicle) byKey.set(key, vehicle);
+  }
+
+  return { byKey, catalog };
+}
+
+/** Resolve cart/garage IDs (UUID or legacy slug) to publicly listed vehicle records. */
+export async function resolvePublicVehiclesByIdentifiers(
+  identifiers: string[],
+  supabase?: NonNullable<ReturnType<typeof createServerSupabase>> | null
+): Promise<VehicleLookupResult> {
+  const { unique } = splitVehicleIdentifiers(identifiers);
+  if (!unique.length) return { vehicles: [], unresolved: [] };
+
+  const client = supabase ?? createServerSupabase();
+
+  if (!client) {
+    const vehicles = matchMockByIdentifiers(unique);
+    const found = new Map<string, Vehicle>();
+    for (const vehicle of vehicles) {
+      found.set(vehicle.id, vehicle);
+      found.set(vehicle.slug, vehicle);
+    }
+    const unresolved = unique
+      .filter((key) => !found.has(key))
+      .map((identifier) => ({ identifier, reason: "not_found" as const }));
+    return {
+      vehicles: unique
+        .map((key) => found.get(key))
+        .filter((v): v is Vehicle => Boolean(v)),
+      unresolved,
+    };
+  }
+
+  try {
+    const byKey = await queryPublicVehiclesByIdentifiers(unique, client);
+    const catalog: Record<string, CartVehicleCatalogState> = {};
+    const publicVehicles = new Map<string, Vehicle>();
+
+    for (const vehicle of byKey.values()) {
+      if (publicVehicles.has(vehicle.id)) continue;
+      publicVehicles.set(vehicle.id, vehicle);
+      attachCatalogEntries(catalog, vehicle, {
+        source: "public",
+        approvalStatus: "approved",
+        publiclyListed: true,
+        listingPending: false,
+      });
+    }
+
+    const admin = createAdminSupabase();
+    let adminByKey = new Map<string, Vehicle>();
+    if (admin) {
+      const adminResult = await queryAdminVehiclesByIdentifiers(
+        unique,
+        new Set(byKey.keys()),
+        admin
+      );
+      adminByKey = adminResult.byKey;
+      Object.assign(catalog, adminResult.catalog);
+      for (const vehicle of adminByKey.values()) {
+        if (!publicVehicles.has(vehicle.id)) {
+          publicVehicles.set(vehicle.id, vehicle);
+        }
+      }
+    }
+
+    const mergedByKey = new Map<string, Vehicle>(byKey);
+    for (const [key, vehicle] of adminByKey) {
+      if (!mergedByKey.has(key)) mergedByKey.set(key, vehicle);
+    }
+
+    const vehicles = [...publicVehicles.values()];
+    const unresolved = await classifyUnresolvedIdentifiers(unique, mergedByKey);
+
+    const result: VehicleLookupResult = { vehicles, unresolved, catalog };
+    if (process.env.NODE_ENV === "development") {
+      result.debug = {
+        requested: unique,
+        publicHits: [...byKey.keys()],
+        adminHits: [...adminByKey.keys()],
+        unresolved: unresolved.map((entry) => entry.identifier),
+      };
+    }
+    return result;
+  } catch (err) {
+    console.error("Supabase vehicle lookup failed:", err);
+    if (isSupabaseConfigured()) {
+      const unresolved = unique.map((identifier) => ({
+        identifier,
+        reason: "not_found" as const,
+      }));
+      return {
+        vehicles: [],
+        unresolved,
+        ...(process.env.NODE_ENV === "development" && {
+          debug: {
+            requested: unique,
+            publicHits: [],
+            adminHits: [],
+            unresolved: unique,
+            error: err instanceof Error ? err.message : String(err),
+          },
+        }),
+      };
+    }
+    const vehicles = matchMockByIdentifiers(unique);
+    const found = new Map<string, Vehicle>();
+    for (const vehicle of vehicles) {
+      found.set(vehicle.id, vehicle);
+      found.set(vehicle.slug, vehicle);
+    }
+    return {
+      vehicles: unique
+        .map((key) => found.get(key))
+        .filter((v): v is Vehicle => Boolean(v)),
+      unresolved: unique
+        .filter((key) => !found.has(key))
+        .map((identifier) => ({ identifier, reason: "not_found" as const })),
+    };
+  }
+}
+
+/** Resolve saved garage IDs (UUID or legacy slug) to full vehicle records. */
+export async function fetchVehiclesByIdentifiers(identifiers: string[]): Promise<Vehicle[]> {
+  const { vehicles } = await resolvePublicVehiclesByIdentifiers(identifiers);
+  return vehicles;
+}
+
+const CHECKOUT_VEHICLE_SELECT =
+  "id, slug, year, make, model, trim, price, status";
+
+/** Checkout-time lookup — same public listing rules as /auto/inventory. */
+export async function fetchCheckoutVehiclesByIdentifiers(
+  identifiers: string[],
+  supabase: NonNullable<ReturnType<typeof createServerSupabase>>
+): Promise<Map<string, CheckoutVehicleRecord>> {
+  const { unique, ids, slugs } = splitVehicleIdentifiers(identifiers);
+  const byKey = new Map<string, CheckoutVehicleRecord>();
+
+  const addRows = (rows: CheckoutVehicleRecord[] | null) => {
+    for (const row of rows ?? []) {
+      byKey.set(row.id, row);
+      byKey.set(row.slug, row);
+    }
+  };
+
+  const [idsResult, slugsResult] = await Promise.all([
+    ids.length
+      ? runPublicListingQuery((approvalOr) =>
+          notDeletedFilter(
+            supabase
+              .from("vehicles")
+              .select(CHECKOUT_VEHICLE_SELECT)
+              .in("id", ids)
+              .in("status", PUBLIC_VEHICLE_STATUSES)
+              .or(approvalOr)
+          )
+        )
+      : Promise.resolve({ data: null as CheckoutVehicleRecord[] | null, error: null }),
+    slugs.length
+      ? runPublicListingQuery((approvalOr) =>
+          notDeletedFilter(
+            supabase
+              .from("vehicles")
+              .select(CHECKOUT_VEHICLE_SELECT)
+              .in("slug", slugs)
+              .in("status", PUBLIC_VEHICLE_STATUSES)
+              .or(approvalOr)
+          )
+        )
+      : Promise.resolve({ data: null as CheckoutVehicleRecord[] | null, error: null }),
+  ]);
+
+  if (idsResult.error) {
+    console.error("Checkout vehicles by id failed:", idsResult.error.message);
+  }
+  if (slugsResult.error) {
+    console.error("Checkout vehicles by slug failed:", slugsResult.error.message);
+  }
+  addRows(idsResult.data);
+  addRows(slugsResult.data);
+
+  for (const key of unique) {
+    const vehicle = byKey.get(key);
+    if (vehicle) byKey.set(key, vehicle);
+  }
+
+  if (process.env.NODE_ENV === "development") {
+    const missing = unique.filter((key) => !byKey.has(key));
+    if (missing.length) {
+      console.warn("[parts/orders] checkout vehicles not publicly listed:", missing);
+    }
+  }
+
+  return byKey;
 }

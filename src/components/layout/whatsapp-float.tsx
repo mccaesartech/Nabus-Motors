@@ -1,6 +1,6 @@
 "use client";
 
-import { GHANA_WHATSAPP } from "@/lib/data/vehicle-images";
+import { WHATSAPP_NUMBER, whatsappUrl } from "@/lib/constants";
 
 function WhatsAppIcon({ className }: { className?: string }) {
   return (
@@ -15,19 +15,19 @@ function WhatsAppIcon({ className }: { className?: string }) {
   );
 }
 
-export function WhatsAppFloat() {
-  const number = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? GHANA_WHATSAPP;
-  const message = encodeURIComponent(
-    "Hello True Goshen Auto, I would like to inquire about a vehicle."
-  );
+export function WhatsAppFloat({ whatsappNumber }: { whatsappNumber?: string }) {
+  const number = whatsappNumber?.trim() || process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || WHATSAPP_NUMBER;
 
   return (
     <a
-      href={`https://wa.me/${number}?text=${message}`}
+      href={whatsappUrl(
+        "Hello True Goshen Auto, I would like to inquire about a vehicle.",
+        number
+      )}
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Chat on WhatsApp"
-      className="whatsapp-float group fixed bottom-6 right-6 z-50 flex size-14 items-center justify-center"
+      className="whatsapp-float group fixed bottom-4 right-4 z-50 flex size-12 items-center justify-center sm:bottom-6 sm:right-6 sm:size-14"
     >
       <span
         className="whatsapp-float-ring absolute inset-0 rounded-full bg-[#25D366]"
@@ -37,8 +37,8 @@ export function WhatsAppFloat() {
         className="whatsapp-float-ring whatsapp-float-ring-delay absolute inset-0 rounded-full bg-[#25D366]"
         aria-hidden="true"
       />
-      <span className="relative flex size-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg transition-transform group-hover:scale-105">
-        <WhatsAppIcon className="size-7" />
+      <span className="relative flex size-12 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg transition-transform group-hover:scale-105 sm:size-14">
+        <WhatsAppIcon className="size-6 sm:size-7" />
       </span>
     </a>
   );

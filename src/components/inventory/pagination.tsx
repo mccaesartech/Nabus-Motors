@@ -8,6 +8,7 @@ import {
   buildFilterSearchParams,
   parseFiltersFromSearchParams,
 } from "@/lib/vehicles";
+import { ROUTES } from "@/lib/routes";
 import type { SortOption } from "@/lib/types";
 
 interface PaginationProps {
@@ -25,7 +26,7 @@ export function Pagination({ currentPage, totalPages }: PaginationProps) {
 
   function pageHref(page: number) {
     const query = buildFilterSearchParams(filters, sort, page);
-    return `/inventory?${query.toString()}`;
+    return `${ROUTES.auto.inventory}?${query.toString()}`;
   }
 
   return (

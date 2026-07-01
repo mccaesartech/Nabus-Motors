@@ -1,3 +1,4 @@
+import { CHINESE_MAKES } from "@/lib/data/generate-inventory";
 import type { SortOption, Vehicle, VehicleFilters } from "@/lib/types";
 
 export function filterVehicles(
@@ -16,8 +17,18 @@ export function filterVehicles(
     if (filters.fuelType && vehicle.fuelType !== filters.fuelType) return false;
     if (filters.condition && vehicle.condition !== filters.condition) return false;
     if (filters.bodyType && vehicle.bodyType !== filters.bodyType) return false;
+    if (
+      filters.chineseBrands &&
+      !CHINESE_MAKES.includes(vehicle.make as (typeof CHINESE_MAKES)[number])
+    ) {
+      return false;
+    }
     if (filters.location && vehicle.location !== filters.location) return false;
     if (filters.mileageMax && vehicle.mileage > filters.mileageMax) return false;
+    if (filters.status) {
+      const vehicleStatus = vehicle.status ?? "available";
+      if (vehicleStatus !== filters.status) return false;
+    }
     return true;
   });
 }
@@ -67,8 +78,10 @@ export function parseFiltersFromSearchParams(
     fuelType: get("fuelType") as VehicleFilters["fuelType"],
     condition: get("condition") as VehicleFilters["condition"],
     bodyType: get("bodyType") as VehicleFilters["bodyType"],
+    chineseBrands: get("chinese") === "1" || get("chineseBrands") === "1",
     location: get("location"),
     mileageMax: get("mileageMax") ? Number(get("mileageMax")) : undefined,
+    status: get("status") as VehicleFilters["status"],
   };
 }
 

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { formatPrice, calculateMonthlyPayment } from "@/lib/format";
+import { calculateMonthlyPayment } from "@/lib/format";
+import { useCurrency } from "@/context/currency-context";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -17,6 +18,7 @@ interface FinancingCalculatorProps {
 }
 
 export function FinancingCalculator({ price }: FinancingCalculatorProps) {
+  const { formatPrice } = useCurrency();
   const [downPayment, setDownPayment] = useState(Math.round(price * 0.1));
   const [term, setTerm] = useState("60");
   const [rate, setRate] = useState("6.9");
@@ -29,7 +31,7 @@ export function FinancingCalculator({ price }: FinancingCalculatorProps) {
   );
 
   return (
-    <div className="border border-border bg-brand-cream/30 p-5">
+    <div className="border border-border bg-muted/50 p-5">
       <h3 className="text-sm font-semibold">Financing Calculator</h3>
       <p className="mt-1 text-xs text-muted-foreground">
         Estimate your monthly payment. Actual rates may vary.
@@ -88,7 +90,7 @@ export function FinancingCalculator({ price }: FinancingCalculatorProps) {
 
         <div className="border-t border-border pt-4">
           <p className="text-xs text-muted-foreground">Estimated Monthly Payment</p>
-          <p className="text-2xl font-semibold text-brand-purple">
+          <p className="text-2xl font-semibold text-foreground">
             {formatPrice(monthly)}
             <span className="text-sm font-normal text-muted-foreground">/mo</span>
           </p>

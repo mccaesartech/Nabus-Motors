@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PLACEHOLDER_IMAGE } from "@/lib/data/vehicle-images";
+import { normalizeMediaUrl } from "@/lib/site-content/media-url";
 import { cn } from "@/lib/utils";
 
 interface SafeVehicleImageProps {
@@ -23,9 +24,14 @@ export function SafeVehicleImage({
   width,
   height,
 }: SafeVehicleImageProps) {
-  const initial = src?.trim() || PLACEHOLDER_IMAGE;
-  const [imgSrc, setImgSrc] = useState(initial);
+  const resolved = normalizeMediaUrl(src ?? "") || PLACEHOLDER_IMAGE;
+  const [imgSrc, setImgSrc] = useState(resolved);
   const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setImgSrc(resolved);
+    setFailed(false);
+  }, [resolved]);
 
   const handleError = () => {
     if (!failed && imgSrc !== PLACEHOLDER_IMAGE) {

@@ -80,6 +80,7 @@ export const categories: Category[] = [
       (v) => v.bodyType === "Electric" || v.fuelType === "Electric"
     ).length,
     image: vehicleImages.electric,
+    href: "/auto/inventory?fuelType=Electric",
   },
   {
     id: "chinese",
@@ -87,7 +88,7 @@ export const categories: Category[] = [
     slug: "SUV",
     count: chineseVehicleCount(vehicles),
     image: vehicleImages.chinese,
-    href: "/inventory?make=BYD",
+    href: "/auto/inventory?chinese=1",
   },
 ];
 

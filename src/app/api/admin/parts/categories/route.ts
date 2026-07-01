@@ -1,0 +1,132 @@
+import { NextRequest, NextResponse } from "next/server";
+import { requirePermission } from "@/lib/admin/auth";
+import { createAdminSupabase } from "@/lib/supabase/admin";
+
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export async function GET() {
+  const auth = await requirePermission("parts");
+  if (!auth.ok) {
+    return NextResponse.json({ ok: false, message: auth.message }, { status: auth.status });
+  }
+
+  const supabase = createAdminSupabase();
+  if (!supabase) {
+    return NextResponse.json({ ok: true, configured: false, categories: [] });
+  }
+
+  const { data, error } = await supabase
+    .from("parts_categories")
+    .select("*")
+    .order("sort_order", { ascending: true });
+
+  if (error) {
+    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, configured: true, categories: data ?? [] });
+}
+
+export async function POST(req: NextRequest) {
+  const auth = await requirePermission("parts");
+  if (!auth.ok) {
+    return NextResponse.json({ ok: false, message: auth.message }, { status: auth.status });
+  }
+
+  const supabase = createAdminSupabase();
+  if (!supabase) {
+    return NextResponse.json({ ok: false, message: "Not configured" }, { status: 503 });
+  }
+
+  const body = await req.json();
+  const name = String(body.name ?? "").trim();
+  if (!name) {
+    return NextResponse.json({ ok: false, message: "Name is required." }, { status: 400 });
+  }
+
+  const slug = String(body.slug ?? "").trim() || slugify(name);
+  const { data, error } = await supabase
+    .from("parts_categories")
+    .insert({
+      name,
+      slug,
+      description: body.description ?? null,
+      icon: body.icon ?? null,
+      sort_order: Number(body.sort_order) || 0,
+      is_active: body.is_active !== false,
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, category: data });
+}
+
+export async function PATCH(req: NextRequest) {
+  const auth = await requirePermission("parts");
+  if (!auth.ok) {
+    return NextResponse.json({ ok: false, message: auth.message }, { status: auth.status });
+  }
+
+  const supabase = createAdminSupabase();
+  if (!supabase) {
+    return NextResponse.json({ ok: false, message: "Not configured" }, { status: 503 });
+  }
+
+  const body = await req.json();
+  const id = String(body.id ?? "").trim();
+  if (!id) {
+    return NextResponse.json({ ok: false, message: "Category id is required." }, { status: 400 });
+  }
+
+  const updates: Record<string, unknown> = {};
+  for (const key of ["name", "slug", "description", "icon", "sort_order", "is_active"]) {
+    if (body[key] !== undefined) updates[key] = body[key];
+  }
+
+  const { data, error } = await supabase
+    .from("parts_categories")
+    .update(updates)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
+    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, category: data });
+}
+
+export async function DELETE(req: NextRequest) {
+  const auth = await requirePermission("parts");
+  if (!auth.ok) {
+    return NextResponse.json({ ok: false, message: auth.message }, { status: auth.status });
+  }
+
+  const supabase = createAdminSupabase();
+  if (!supabase) {
+    return NextResponse.json({ ok: false, message: "Not configured" }, { status: 503 });
+  }
+
+  const id = req.nextUrl.searchParams.get("id")?.trim();
+  if (!id) {
+    return NextResponse.json({ ok: false, message: "Category id is required." }, { status: 400 });
+  }
+
+  const { error } = await supabase.from("parts_categories").delete().eq("id", id);
+  if (error) {
+    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
+}

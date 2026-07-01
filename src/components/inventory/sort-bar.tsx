@@ -13,7 +13,9 @@ import {
   buildFilterSearchParams,
   parseFiltersFromSearchParams,
 } from "@/lib/vehicles";
+import { ROUTES } from "@/lib/routes";
 import type { SortOption } from "@/lib/types";
+import { InventoryMobileFilters } from "@/components/inventory/inventory-mobile-filters";
 
 interface SortBarProps {
   total: number;
@@ -31,7 +33,7 @@ export function SortBar({ total }: SortBarProps) {
   function handleSortChange(value: string) {
     const query = buildFilterSearchParams(filters, value as SortOption);
     startTransition(() => {
-      router.push(`/inventory?${query.toString()}`);
+      router.push(`${ROUTES.auto.inventory}?${query.toString()}`);
     });
   }
 
@@ -41,10 +43,11 @@ export function SortBar({ total }: SortBarProps) {
         {total} vehicle{total !== 1 ? "s" : ""} found
         {isPending && " · Updating..."}
       </p>
-      <div className="flex items-center gap-2">
+      <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+        <InventoryMobileFilters />
         <span className="text-xs text-muted-foreground">Sort by</span>
         <Select value={sort} onValueChange={(v) => handleSortChange(v ?? "newest")}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-full min-w-0 sm:w-[180px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

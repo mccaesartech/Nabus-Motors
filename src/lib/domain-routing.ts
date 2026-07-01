@@ -1,0 +1,68 @@
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+
+const DEFAULT_AUTO_DIVISION_HOSTS = [
+  "truegoshenauto.com",
+  "www.truegoshenauto.com",
+  "truegoshenauto.vercel.app",
+  "auto.truegoshen.com",
+];
+
+/** Auto section paths served at `/auto/*` on the main domain; short paths on the auto host. */
+const AUTO_SHORT_PATH_SEGMENTS = new Set([
+  "inventory",
+  "buy",
+  "sell",
+  "financing",
+  "garage",
+  "spare-parts",
+  "parts",
+]);
+
+const PASSTHROUGH_PREFIXES = ["/api", "/platform", "/admin", "/_next", "/auto"];
+
+export function getAutoDivisionHosts(): string[] {
+  const env = process.env.AUTO_DIVISION_HOSTS?.trim();
+  if (env) {
+    return env
+      .split(",")
+      .map((host) => host.trim().toLowerCase())
+      .filter(Boolean);
+  }
+  return DEFAULT_AUTO_DIVISION_HOSTS;
+}
+
+export function isAutoDivisionHost(hostname: string): boolean {
+  const normalized = hostname.toLowerCase().split(":")[0];
+  if (normalized.includes("truegoshenauto")) return true;
+  return getAutoDivisionHosts().includes(normalized);
+}
+
+function shouldPassthrough(pathname: string): boolean {
+  return PASSTHROUGH_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+}
+
+/**
+ * On auto-division hosts, send visitors straight to the Auto marketplace:
+ * `/` → `/auto`, `/inventory` → `/auto/inventory`, etc.
+ */
+export function resolveAutoDivisionRedirect(req: NextRequest): NextResponse | null {
+  const hostname = req.headers.get("host") ?? "";
+  if (!isAutoDivisionHost(hostname)) return null;
+
+  const { pathname, search } = req.nextUrl;
+  if (shouldPassthrough(pathname) || pathname.includes(".")) return null;
+
+  if (pathname === "/") {
+    return NextResponse.redirect(new URL(`/auto${search}`, req.url));
+  }
+
+  const firstSegment = pathname.slice(1).split("/")[0];
+  if (firstSegment && AUTO_SHORT_PATH_SEGMENTS.has(firstSegment)) {
+    return NextResponse.redirect(new URL(`/auto${pathname}${search}`, req.url));
+  }
+
+  return null;
+}

@@ -2,17 +2,44 @@
 
 import Link from "next/link";
 import { ArrowRightLeft, Clock, Heart, TrendingDown } from "lucide-react";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Container } from "@/components/shared/container";
+import { BackNav } from "@/components/shared/back-nav";
 import { VehicleCard } from "@/components/shared/vehicle-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { formatPrice } from "@/lib/format";
-import { useGarage, useGarageVehicles } from "@/hooks/use-garage";
+import {
+  buildVehicleLookupMap,
+  useGarage,
+  useGarageVehicles,
+} from "@/hooks/use-garage";
+import { useRequireCustomerAuth } from "@/hooks/use-require-customer-auth";
+import { useCurrency } from "@/context/currency-context";
+import { ROUTES } from "@/lib/routes";
 import type { Vehicle } from "@/lib/types";
 
 export function GarageView() {
-  const { savedIds, priceMap, recentIds, loaded } = useGarage();
+  const { user, loading: authLoading } = useRequireCustomerAuth();
+  const { savedIds, priceMap, recentIds, loaded, clearSaved } = useGarage();
+  const { formatPrice } = useCurrency();
+  const [toast, setToast] = useState<string | null>(null);
+
+  const handleSaveToggle = useCallback((action: "saved" | "removed") => {
+    if (action === "removed") {
+      setToast("Removed from saved");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 2200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  const handleClearAll = useCallback(() => {
+    clearSaved();
+    setToast("All saved vehicles cleared");
+  }, [clearSaved]);
 
   const lookupIds = useMemo(
     () => [...new Set([...savedIds, ...recentIds])],
@@ -20,10 +47,10 @@ export function GarageView() {
   );
 
   const { vehicles: garageVehicles, loaded: vehiclesLoaded } =
-    useGarageVehicles(lookupIds);
+    useGarageVehicles(lookupIds, savedIds);
 
   const vehicleById = useMemo(
-    () => new Map(garageVehicles.map((v) => [v.id, v])),
+    () => buildVehicleLookupMap(garageVehicles),
     [garageVehicles]
   );
 
@@ -35,6 +62,14 @@ export function GarageView() {
     .map((id) => vehicleById.get(id))
     .filter((v): v is Vehicle => Boolean(v));
 
+  if (authLoading || !user) {
+    return (
+      <Container className="py-20">
+        <p className="text-sm text-muted-foreground">Loading your garage…</p>
+      </Container>
+    );
+  }
+
   if (!loaded || (lookupIds.length > 0 && !vehiclesLoaded)) {
     return (
       <Container className="py-20">
@@ -45,7 +80,16 @@ export function GarageView() {
 
   return (
     <div className="py-10 sm:py-14">
+      {toast && (
+        <div
+          role="status"
+          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-md border border-brand-purple/30 bg-background px-4 py-2 text-sm font-medium text-foreground shadow-luxury"
+        >
+          {toast}
+        </div>
+      )}
       <Container>
+        <BackNav href={ROUTES.auto.inventory} label="Back to inventory" variant="public" className="mb-6" />
         <div className="mb-8">
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
             My Garage
@@ -75,11 +119,23 @@ export function GarageView() {
           <TabsContent value="saved" className="mt-6">
             {savedVehicles.length > 0 ? (
               <div className="space-y-6">
+                {savedVehicles.length > 1 && (
+                  <div className="flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleClearAll}
+                      className="text-muted-foreground transition-colors hover:border-brand-purple/40 hover:bg-brand-purple/5 hover:text-brand-purple"
+                    >
+                      Clear all saved vehicles
+                    </Button>
+                  </div>
+                )}
                 {savedVehicles.some(
                   (v) => priceMap[v.id] && priceMap[v.id] > v.price
                 ) && (
-                  <div className="flex items-center gap-2 border border-brand-gold/30 bg-brand-gold/5 px-4 py-3 text-sm">
-                    <TrendingDown className="size-4 text-brand-gold" />
+                  <div className="flex items-center gap-2 border border-border bg-muted px-4 py-3 text-sm">
+                    <TrendingDown className="size-4 text-muted-foreground" />
                     Price drops detected on saved vehicles
                   </div>
                 )}
@@ -90,21 +146,40 @@ export function GarageView() {
                     return (
                       <div key={vehicle.id} className="relative">
                         {priceDrop && (
-                          <div className="absolute -top-2 right-2 z-10 bg-brand-gold px-2 py-0.5 text-[10px] font-semibold text-brand-black">
+                          <div className="absolute -top-2 right-2 z-10 bg-foreground px-2 py-0.5 text-[10px] font-semibold text-background">
                             Price dropped {formatPrice(prevPrice - vehicle.price)}
                           </div>
                         )}
-                        <VehicleCard vehicle={vehicle} />
+                        <VehicleCard
+                          vehicle={vehicle}
+                          showRemoveAction
+                          onSaveToggle={handleSaveToggle}
+                        />
                       </div>
                     );
                   })}
+                </div>
+              </div>
+            ) : savedIds.length > 0 ? (
+              <div className="border border-dashed border-border py-16 text-center">
+                <p className="text-sm font-medium">Saved vehicles unavailable</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {savedIds.length === 1
+                    ? "1 saved vehicle could not be found. It may have been sold or removed."
+                    : `${savedIds.length} saved vehicles could not be found. They may have been sold or removed.`}
+                </p>
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                  <Button variant="outline" onClick={handleClearAll}>
+                    Clear saved
+                  </Button>
+                  <Button render={<Link href={ROUTES.auto.inventory} />}>Browse Inventory</Button>
                 </div>
               </div>
             ) : (
               <EmptyState
                 title="No saved vehicles"
                 description="Save vehicles from inventory to track them here."
-                href="/inventory"
+                href={ROUTES.auto.inventory}
                 label="Browse Inventory"
               />
             )}
@@ -121,7 +196,7 @@ export function GarageView() {
               <EmptyState
                 title="No recently viewed vehicles"
                 description="Vehicles you view will appear here for easy access."
-                href="/inventory"
+                href={ROUTES.auto.inventory}
                 label="Browse Inventory"
               />
             )}
@@ -173,7 +248,7 @@ export function GarageView() {
               <EmptyState
                 title="Save at least 2 vehicles to compare"
                 description="Add vehicles to your saved list to compare specifications side by side."
-                href="/inventory"
+                href={ROUTES.auto.inventory}
                 label="Browse Inventory"
               />
             )}
