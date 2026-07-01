@@ -17,7 +17,16 @@ export const memoryAuthStorage: SupportedStorage = {
   },
 };
 
+function noopStorage(): SupportedStorage {
+  return {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+  };
+}
+
 function storageForPreference(preference: SessionPreference | null): SupportedStorage {
+  if (typeof window === "undefined") return noopStorage();
   if (preference === "stay_signed_in") return localStorage;
   if (preference === "no_save") return memoryAuthStorage;
   return sessionStorage;

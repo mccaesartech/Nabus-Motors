@@ -22,8 +22,6 @@ import {
 } from "@/components/platform/printable-record";
 import { useMarkNotificationsOnVisit } from "@/hooks/use-mark-notifications-read";
 import {
-  ContactEmailAction,
-  ContactPhoneAction,
   ContactWhatsAppAction,
 } from "@/components/platform/contact-actions";
 import { SafeVehicleImage } from "@/components/shared/safe-vehicle-image";
@@ -37,7 +35,6 @@ import {
   type AdminOrderDetail,
 } from "@/lib/platform/orders-admin";
 import { formatPlatformDateTime } from "@/lib/platform/datetime";
-import { PlatformDateLabel } from "@/components/platform/platform-datetime";
 
 export default function OrderDetailPage() {
   const router = useRouter();

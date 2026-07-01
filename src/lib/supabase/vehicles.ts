@@ -441,8 +441,8 @@ async function queryPublicVehiclesByIdentifiers(
   if (slugsResult.error) {
     console.error("Supabase vehicles by slug failed:", slugsResult.error.message);
   }
-  addRows(idsResult.data);
-  addRows(slugsResult.data);
+  addRows(idsResult.data as VehicleRow[] | null);
+  addRows(slugsResult.data as VehicleRow[] | null);
 
   for (const key of unique) {
     const vehicle = byKey.get(key);
@@ -644,7 +644,10 @@ export async function fetchCheckoutVehiclesByIdentifiers(
               .in("status", PUBLIC_VEHICLE_STATUSES)
               .or(approvalOr)
           )
-        )
+        ).then((r) => ({
+          data: r.data as CheckoutVehicleRecord[] | null,
+          error: r.error,
+        }))
       : Promise.resolve({ data: null as CheckoutVehicleRecord[] | null, error: null }),
     slugs.length
       ? runPublicListingQuery((approvalOr) =>
@@ -656,7 +659,10 @@ export async function fetchCheckoutVehiclesByIdentifiers(
               .in("status", PUBLIC_VEHICLE_STATUSES)
               .or(approvalOr)
           )
-        )
+        ).then((r) => ({
+          data: r.data as CheckoutVehicleRecord[] | null,
+          error: r.error,
+        }))
       : Promise.resolve({ data: null as CheckoutVehicleRecord[] | null, error: null }),
   ]);
 
@@ -666,8 +672,8 @@ export async function fetchCheckoutVehiclesByIdentifiers(
   if (slugsResult.error) {
     console.error("Checkout vehicles by slug failed:", slugsResult.error.message);
   }
-  addRows(idsResult.data);
-  addRows(slugsResult.data);
+  addRows(idsResult.data as CheckoutVehicleRecord[] | null);
+  addRows(slugsResult.data as CheckoutVehicleRecord[] | null);
 
   for (const key of unique) {
     const vehicle = byKey.get(key);
