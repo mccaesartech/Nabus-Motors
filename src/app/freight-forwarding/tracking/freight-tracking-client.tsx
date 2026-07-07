@@ -5,8 +5,10 @@ import { useState } from "react";
 import { useHashScroll } from "@/hooks/use-hash-scroll";
 import { Container } from "@/components/shared/container";
 import { SectionHeader } from "@/components/shared/section-header";
-import { ServiceImageCardGrid } from "@/components/shared/service-image-card";
-import { ShipmentTimeline } from "@/components/shared/shipment-timeline";
+import { FreightServiceCards } from "@/components/freight/freight-service-cards";
+import { FreightAdviceTrigger } from "@/components/freight/freight-advice-message-panel";
+import { LoggedInContactBanner, useFreightFormProfile } from "@/components/freight/freight-form-account-fields";
+import { ImportMilestoneTimeline } from "@/components/shared/import-milestone-timeline";
 import { VisualShipmentTimeline } from "@/components/shared/visual-shipment-timeline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +20,7 @@ import {
 } from "@/lib/platform/shipment";
 import { formatCargoDisplay } from "@/lib/freight/cargo-options";
 import type { FreightTrackingSiteContent } from "@/lib/site-content/corporate-defaults";
+import { setLastTracking } from "@/lib/journey-history";
 import { Package, MapPin, Ship } from "lucide-react";
 
 type TrackingResult = {
@@ -56,12 +59,11 @@ type LookupMode = "tracking" | "reference" | "contact";
 
 export function FreightTrackingClient({ pageContent }: FreightTrackingClientProps) {
   useHashScroll();
+  const { name, email, setEmail, phone, setPhone, isGuest } = useFreightFormProfile();
 
   const [lookupMode, setLookupMode] = useState<LookupMode>("tracking");
   const [trackingNumber, setTrackingNumber] = useState("");
   const [referenceCode, setReferenceCode] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<TrackingResult | null>(null);
@@ -74,11 +76,15 @@ export function FreightTrackingClient({ pageContent }: FreightTrackingClientProp
     setQuoteResult(null);
 
     if (lookupMode === "contact") {
-      if (!email.trim() || !phone.trim()) {
+      if (!email.trim()) {
+        setError("Enter the email from your quote or order.");
+        return;
+      }
+      if (isGuest && !phone.trim()) {
         setError("Enter both the email and phone number from your quote or order.");
         return;
       }
-    } else if (!email.trim() && !phone.trim()) {
+    } else if (isGuest && !email.trim() && !phone.trim()) {
       setError("Enter the email or phone number associated with your shipment or quote.");
       return;
     }
@@ -113,12 +119,20 @@ export function FreightTrackingClient({ pageContent }: FreightTrackingClientProp
       }
 
       if (json.type === "quote" && json.quote) {
-        setQuoteResult(json.quote as QuoteResult);
+        const quote = json.quote as QuoteResult;
+        if (quote.reference_code) {
+          setLastTracking({ number: quote.reference_code, mode: "reference" });
+        }
+        setQuoteResult(quote);
         return;
       }
 
       if (json.shipment) {
-        setResult(json.shipment as TrackingResult);
+        const shipment = json.shipment as TrackingResult;
+        if (shipment.tracking_number) {
+          setLastTracking({ number: shipment.tracking_number, mode: "tracking" });
+        }
+        setResult(shipment);
       }
     } catch {
       setError("Network error. Please try again.");
@@ -134,14 +148,14 @@ export function FreightTrackingClient({ pageContent }: FreightTrackingClientProp
 
         {pageContent.cards.length > 0 && (
           <div className="mb-10">
-            <ServiceImageCardGrid
+            <FreightServiceCards
               cards={pageContent.cards.map((card) => ({
                 id: card.id,
                 title: card.title,
                 subtitle: card.description,
                 image: card.image,
                 imageAlt: card.imageAlt,
-                href: card.href || "#track-form",
+                href: card.id === "advice" ? undefined : card.href || "#track-form",
               }))}
             />
           </div>
@@ -202,7 +216,11 @@ export function FreightTrackingClient({ pageContent }: FreightTrackingClientProp
               </div>
             )}
 
-            {lookupMode !== "contact" && (
+            {lookupMode !== "contact" && !isGuest && (
+              <LoggedInContactBanner name={name} email={email} phone={phone} />
+            )}
+
+            {lookupMode !== "contact" && isGuest && (
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="tracking-email">{pageContent.form.emailLabel}</Label>
@@ -227,7 +245,7 @@ export function FreightTrackingClient({ pageContent }: FreightTrackingClientProp
               </div>
             )}
 
-            {lookupMode === "contact" && (
+            {lookupMode === "contact" && isGuest && (
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="tracking-email-contact">{pageContent.form.emailLabel} *</Label>
@@ -252,6 +270,10 @@ export function FreightTrackingClient({ pageContent }: FreightTrackingClientProp
                   />
                 </div>
               </div>
+            )}
+
+            {lookupMode === "contact" && !isGuest && (
+              <LoggedInContactBanner name={name} email={email} phone={phone} />
             )}
 
             <p className="text-xs text-muted-foreground">{pageContent.form.helpText}</p>
@@ -306,6 +328,11 @@ export function FreightTrackingClient({ pageContent }: FreightTrackingClientProp
                   {quoteResult.origin_country ?? "—"} → {quoteResult.destination ?? "Ghana"}
                 </p>
               )}
+              <FreightAdviceTrigger
+                variant="outline"
+                context={{ referenceCode: quoteResult.reference_code }}
+                className="gap-2"
+              />
             </div>
           )}
 
@@ -371,10 +398,19 @@ export function FreightTrackingClient({ pageContent }: FreightTrackingClientProp
 
               {result.events.length > 0 && (
                 <div className="border-t border-border pt-6">
-                  <h3 className="text-sm font-semibold">Event history</h3>
-                  <ShipmentTimeline events={result.events} className="mt-4" />
+                  <h3 className="text-sm font-semibold">Import milestone timeline</h3>
+                  <ImportMilestoneTimeline
+                    events={result.events}
+                    shipmentStatus={result.status}
+                    className="mt-4"
+                  />
                 </div>
               )}
+
+              <FreightAdviceTrigger
+                context={{ trackingNumber: result.tracking_number }}
+                className="gap-2"
+              />
             </div>
           )}
         </div>

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { CartQuantityStepper } from "@/components/parts/cart-quantity-stepper";
 import { usePartsCart } from "@/context/parts-cart-context";
 import { isPreOrderStatus } from "@/lib/vehicles/availability";
+import { recordVehicleEngagement } from "@/lib/vehicle-preferences";
 import { formatVehicleName } from "@/lib/format";
 import { primaryPhotoFor } from "@/lib/data/vehicle-images";
 import type { Vehicle } from "@/lib/types";
@@ -52,6 +53,7 @@ export function AddVehicleToCartButton({
     e.preventDefault();
     e.stopPropagation();
     addVehicle(vehicle.id, intent, snapshot, 1);
+    recordVehicleEngagement(intent === "pre_order" ? "preorder" : "cart_add", vehicle);
     setFeedback(true);
     window.setTimeout(() => setFeedback(false), 1500);
   }

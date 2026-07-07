@@ -22,6 +22,8 @@ import {
   createTicketReopenedNotifications,
   notifyCustomerOfStaffMessage,
 } from "@/lib/platform/customer-chat-notifications";
+import { notifyCustomerStaffMessage } from "@/lib/customer/notifications-server";
+import { formatCustomerNotificationFeedback } from "@/lib/notifications/notification-status";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 
 export async function GET(req: NextRequest) {
@@ -248,16 +250,33 @@ export async function POST(req: NextRequest) {
     }
   );
 
-  if (isNewConversation) {
-    await notifyCustomerOfStaffMessage(supabase, message, conversation);
-  } else {
-    await broadcastCustomerChatRealtime(supabase, message, conversation, [], "staff");
-  }
+  const notificationResult = await notifyCustomerOfStaffMessage(supabase, message, conversation);
+  await broadcastCustomerChatRealtime(supabase, message, conversation, [], "staff");
+
+  const preview =
+    message.body.trim().length > 80
+      ? `${message.body.trim().slice(0, 80)}…`
+      : message.body.trim();
+  await notifyCustomerStaffMessage(supabase, {
+    userId: conversation.user_id,
+    conversationId: conversation.id,
+    subject: conversation.subject,
+    preview,
+    messageId: message.id,
+    staffName: message.sender_name,
+  });
+
+  const feedback = formatCustomerNotificationFeedback(notificationResult, {
+    savedPrefix: isNewConversation ? "Message sent" : "Reply sent",
+  });
 
   return NextResponse.json({
     ok: true,
     conversationId: conversation.id,
     message: mapped,
+    notification: notificationResult,
+    notificationMessage: feedback.message,
+    notificationVariant: feedback.variant,
   });
 }
 

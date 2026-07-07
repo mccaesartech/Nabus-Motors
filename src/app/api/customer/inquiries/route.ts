@@ -3,34 +3,109 @@ import { getCustomerFromAuthHeader } from "@/lib/customer/auth";
 import { syncCustomerAccount } from "@/lib/customer/preorder-account";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import type { CustomerInquirySummary } from "@/lib/customer/types";
+import { parseCustomRequestSpecs } from "@/lib/platform/custom-request";
 
-const PREORDER_SELECT =
-  "id, status, payment_status, down_payment_usd, created_at, vehicle_slug, vehicle_title, is_custom_request, reference_code, vehicle:vehicles(year, make, model, trim, slug)";
+const PREORDER_SELECT_FULL =
+  "id, status, payment_status, down_payment_usd, vehicle_price_usd, created_at, vehicle_slug, vehicle_title, is_custom_request, reference_code, requested_make, requested_model, requested_year, requested_specs, budget_min, budget_max, matched_vehicle_id, vehicle:vehicles(year, make, model, trim, slug), matched_vehicle:vehicles!preorder_inquiries_matched_vehicle_id_fkey(slug, make, model, year)";
+
+const PREORDER_SELECT_LEGACY =
+  "id, status, payment_status, down_payment_usd, vehicle_price_usd, created_at, vehicle_slug, vehicle_title, vehicle:vehicles(year, make, model, trim, slug)";
+
+type PreorderInquiryRow = {
+  id: string;
+  status?: string | null;
+  payment_status?: string | null;
+  down_payment_usd?: number | null;
+  vehicle_price_usd?: number | null;
+  created_at: string;
+  vehicle_slug?: string | null;
+  vehicle_title?: string | null;
+  is_custom_request?: boolean;
+  reference_code?: string | null;
+  requested_make?: string | null;
+  requested_model?: string | null;
+  requested_year?: string | null;
+  requested_specs?: unknown;
+  budget_min?: number | null;
+  budget_max?: number | null;
+  matched_vehicle_id?: string | null;
+  vehicle?:
+    | { year?: number; make?: string; model?: string; trim?: string; slug?: string }
+    | Array<{ year?: number; make?: string; model?: string; trim?: string; slug?: string }>
+    | null;
+  matched_vehicle?: { slug?: string; make?: string; model?: string; year?: number } | null;
+};
+
+type PreorderInquiryResult = { data: PreorderInquiryRow[] | null; error: { message: string } | null };
+
+function isMissingColumnError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return lower.includes("column") && lower.includes("does not exist");
+}
+
+async function runPreorderSelect(
+  supabase: NonNullable<ReturnType<typeof createAdminSupabase>>,
+  select: string,
+  userId: string,
+  email: string,
+  emailOnly: boolean
+): Promise<PreorderInquiryResult> {
+  let query = supabase.from("preorder_inquiries").select(select);
+
+  if (emailOnly) {
+    query = query.ilike("email", email);
+  } else {
+    query = query.or(`user_id.eq.${userId},email.ilike.${email}`);
+  }
+
+  const result = await query.order("created_at", { ascending: false }).limit(50);
+
+  if (result.error) {
+    return { data: null, error: result.error };
+  }
+
+  return {
+    data: (result.data ?? []) as unknown as PreorderInquiryRow[],
+    error: null,
+  };
+}
+
+async function fetchPreorderWithFallback(
+  supabase: NonNullable<ReturnType<typeof createAdminSupabase>>,
+  select: string,
+  userId: string,
+  email: string,
+  emailOnly: boolean
+): Promise<PreorderInquiryResult> {
+  const result = await runPreorderSelect(supabase, select, userId, email, emailOnly);
+  if (!result.error) return result;
+  if (isMissingColumnError(result.error.message) && select !== PREORDER_SELECT_LEGACY) {
+    console.warn("[customer/inquiries] custom request columns missing, using legacy select");
+    return runPreorderSelect(supabase, PREORDER_SELECT_LEGACY, userId, email, emailOnly);
+  }
+  return result;
+}
 
 async function fetchPreorderInquiries(
   supabase: NonNullable<ReturnType<typeof createAdminSupabase>>,
   userId: string,
   email: string
-) {
-  const byUserOrEmail = await supabase
-    .from("preorder_inquiries")
-    .select(PREORDER_SELECT)
-    .or(`user_id.eq.${userId},email.ilike.${email}`)
-    .order("created_at", { ascending: false })
-    .limit(50);
+): Promise<PreorderInquiryResult> {
+  const result = await fetchPreorderWithFallback(
+    supabase,
+    PREORDER_SELECT_FULL,
+    userId,
+    email,
+    false
+  );
 
-  if (!byUserOrEmail.error) {
-    return byUserOrEmail;
+  if (!result.error) {
+    return result;
   }
 
-  console.warn("[customer/inquiries] preorder query (user_id+email):", byUserOrEmail.error.message);
+  console.warn("[customer/inquiries] preorder query (user_id+email):", result.error.message);
 
-  return supabase
-    .from("preorder_inquiries")
-    .select(PREORDER_SELECT)
-    .ilike("email", email)
-    .order("created_at", { ascending: false })
-    .limit(50);
+  return fetchPreorderWithFallback(supabase, PREORDER_SELECT_FULL, userId, email, true);
 }
 
 export async function GET(req: NextRequest) {
@@ -95,27 +170,50 @@ export async function GET(req: NextRequest) {
   }
 
   for (const row of preorder.data ?? []) {
-    const vehicle = row.vehicle as
-      | { year?: number; make?: string; model?: string; trim?: string; slug?: string }
-      | null
-      | undefined;
-    const rowTitle = (row as { vehicle_title?: string | null }).vehicle_title;
-    const isCustom = (row as { is_custom_request?: boolean }).is_custom_request === true;
-    const referenceCode = (row as { reference_code?: string | null }).reference_code;
-    const vehicleLabel = vehicle
-      ? [vehicle.year, vehicle.make, vehicle.model, vehicle.trim].filter(Boolean).join(" ")
-      : rowTitle?.trim() || (isCustom ? "Custom vehicle request" : "Pre-order");
+    const vehicleData = row.vehicle;
+    const vehicleRow = Array.isArray(vehicleData) ? vehicleData[0] : vehicleData;
+    const matchedVehicle = row.matched_vehicle;
+    const rowTitle = row.vehicle_title;
+    const isCustom = row.is_custom_request === true;
+    const referenceCode = row.reference_code;
+    const requestedMake = row.requested_make;
+    const requestedModel = row.requested_model;
+    const requestedYear = row.requested_year;
+    const requestedSpecs = parseCustomRequestSpecs(row.requested_specs);
+    const budgetMin = row.budget_min;
+    const budgetMax = row.budget_max;
+    const matchedVehicleId = row.matched_vehicle_id;
+
+    const customLabel = [requestedYear, requestedMake, requestedModel]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+    const vehicleLabel = vehicleRow
+      ? [vehicleRow.year, vehicleRow.make, vehicleRow.model, vehicleRow.trim]
+          .filter(Boolean)
+          .join(" ")
+      : rowTitle?.trim() || customLabel || (isCustom ? "Custom vehicle request" : "Pre-order");
+
     inquiries.push({
-      id: row.id,
+      id: String(row.id),
       type: "preorder",
       title: isCustom ? `Custom request — ${vehicleLabel}` : vehicleLabel,
-      status: row.status ?? "new",
-      created_at: row.created_at,
-      down_payment_usd: isCustom ? undefined : row.down_payment_usd ?? undefined,
-      payment_status: isCustom ? undefined : row.payment_status ?? undefined,
-      vehicle_slug: row.vehicle_slug ?? vehicle?.slug ?? undefined,
+      status: String(row.status ?? "new"),
+      created_at: String(row.created_at),
+      down_payment_usd: isCustom ? undefined : (row.down_payment_usd as number | null) ?? undefined,
+      vehicle_price_usd: isCustom ? undefined : (row.vehicle_price_usd as number | null) ?? undefined,
+      payment_status: isCustom ? undefined : (row.payment_status as string | null) ?? undefined,
+      vehicle_slug: (row.vehicle_slug as string | null) ?? vehicleRow?.slug ?? undefined,
       is_custom_request: isCustom,
       reference_code: referenceCode ?? undefined,
+      requested_make: requestedMake ?? undefined,
+      requested_model: requestedModel ?? undefined,
+      requested_year: requestedYear ?? undefined,
+      requested_specs: isCustom ? requestedSpecs : undefined,
+      budget_min: isCustom ? budgetMin ?? undefined : undefined,
+      budget_max: isCustom ? budgetMax ?? undefined : undefined,
+      matched_vehicle_id: matchedVehicleId ?? undefined,
+      matched_vehicle_slug: matchedVehicle?.slug ?? undefined,
     });
   }
 

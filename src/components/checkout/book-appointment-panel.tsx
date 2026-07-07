@@ -11,6 +11,7 @@ import { CustomerDataTrustNote } from "@/components/forms/customer-data-trust-no
 import { useCustomerAuth } from "@/context/customer-auth-context";
 import type { CheckoutCompleteContext } from "@/lib/checkout/complete-context";
 import { ROUTES } from "@/lib/routes";
+import { markAppointmentBooked } from "@/lib/journey-history";
 import { cn } from "@/lib/utils";
 
 type BookAppointmentPanelProps = {
@@ -98,6 +99,7 @@ export function BookAppointmentPanel({
       }
 
       setFeedback({ ok: true, text: json.message ?? "Appointment request received." });
+      markAppointmentBooked();
       onBooked?.();
     } catch {
       setFeedback({ ok: false, text: "Network error. Please try again." });

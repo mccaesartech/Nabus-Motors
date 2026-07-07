@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { notifyCustomer } from "@/lib/notifications/customer-notify";
+import { notifyCustomerAppointmentConfirmed } from "@/lib/customer/notifications-server";
 import { formatCustomerNotificationFeedback } from "@/lib/notifications/notification-status";
 
 const APPOINTMENT_STATUSES = ["pending", "confirmed", "completed", "cancelled", "no_show"] as const;
@@ -84,6 +85,13 @@ export async function PATCH(req: NextRequest) {
       },
       sourceTable: "vehicle_appointments",
       sourceId: String(data.id),
+    });
+
+    await notifyCustomerAppointmentConfirmed(supabase, {
+      userId: data.user_id ? String(data.user_id) : null,
+      appointmentId: String(data.id),
+      preferredDate: data.preferred_date ? String(data.preferred_date) : null,
+      branch: data.branch ? String(data.branch) : null,
     });
   }
 

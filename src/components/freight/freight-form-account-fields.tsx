@@ -6,6 +6,7 @@ import { useCustomerAuth } from "@/context/customer-auth-context";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
+import { cn } from "@/lib/utils";
 
 type FreightFormAccountFieldsProps = {
   isGuest: boolean;
@@ -32,17 +33,19 @@ export function FreightFormAccountFields({
 }: FreightFormAccountFieldsProps) {
   return (
     <>
-      <div className="space-y-1.5">
-        <Label htmlFor={phoneId}>Phone *</Label>
-        <Input
-          id={phoneId}
-          type="tel"
-          value={phone}
-          onChange={(e) => onPhoneChange(e.target.value)}
-          required={phoneRequired}
-          autoComplete="tel"
-        />
-      </div>
+      {(isGuest || !phone.trim()) && (
+        <div className="space-y-1.5">
+          <Label htmlFor={phoneId}>Phone *</Label>
+          <Input
+            id={phoneId}
+            type="tel"
+            value={phone}
+            onChange={(e) => onPhoneChange(e.target.value)}
+            required={phoneRequired}
+            autoComplete="tel"
+          />
+        </div>
+      )}
 
       {isGuest && (
         <div className="space-y-3 sm:col-span-2">
@@ -158,6 +161,44 @@ export function FreightSubmitSuccess({
   );
 }
 
+type LoggedInContactBannerProps = {
+  name: string;
+  email: string;
+  phone?: string | null;
+  className?: string;
+};
+
+export function LoggedInContactBanner({
+  name,
+  email,
+  phone,
+  className,
+}: LoggedInContactBannerProps) {
+  return (
+    <div
+      className={cn(
+        "rounded-lg border border-brand-purple/20 bg-brand-purple/5 px-4 py-3 text-sm sm:col-span-2",
+        className
+      )}
+    >
+      <p className="text-xs font-medium uppercase tracking-wide text-brand-purple">
+        Contacting as
+      </p>
+      <p className="mt-1 font-medium text-foreground">
+        {name}
+        <span className="text-muted-foreground"> · </span>
+        {email}
+        {phone ? (
+          <>
+            <span className="text-muted-foreground"> · </span>
+            {phone}
+          </>
+        ) : null}
+      </p>
+    </div>
+  );
+}
+
 export function useFreightFormProfile() {
   const { user, profile, displayName } = useCustomerAuth();
   const [name, setName] = useState("");
@@ -166,10 +207,10 @@ export function useFreightFormProfile() {
 
   useEffect(() => {
     if (!user) return;
-    if (!name && displayName) setName(displayName);
-    if (!email && user.email) setEmail(user.email);
-    if (!phone && profile?.phone) setPhone(profile.phone);
-  }, [user, displayName, profile?.phone, name, email, phone]);
+    if (displayName) setName(displayName);
+    if (user.email) setEmail(user.email);
+    if (profile?.phone) setPhone(profile.phone);
+  }, [user, displayName, user?.email, profile?.phone]);
 
   return {
     user,

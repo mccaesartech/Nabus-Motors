@@ -533,10 +533,23 @@ export function PartsCartProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    void mergeOnLogin();
+    const run = () => {
+      if (!cancelled) void mergeOnLogin();
+    };
+
+    let idleId: number | undefined;
+    let timerId: ReturnType<typeof setTimeout> | undefined;
+
+    if (typeof window.requestIdleCallback === "function") {
+      idleId = window.requestIdleCallback(run, { timeout: 3000 });
+    } else {
+      timerId = setTimeout(run, 150);
+    }
 
     return () => {
       cancelled = true;
+      if (idleId !== undefined) window.cancelIdleCallback(idleId);
+      if (timerId !== undefined) clearTimeout(timerId);
     };
   }, [authLoading, user, getAccessToken, persistLocal, syncToServer]);
 

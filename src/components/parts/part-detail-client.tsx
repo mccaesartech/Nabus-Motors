@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Container } from "@/components/shared/container";
-import { BackNav } from "@/components/shared/back-nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -79,8 +78,6 @@ export function PartDetailClient({ part }: PartDetailClientProps) {
 
   return (
     <Container className="py-12 sm:py-16">
-      <BackNav href={ROUTES.auto.spareParts} label="Back to spare parts" variant="public" />
-
       <div className="mx-auto grid max-w-5xl gap-10 lg:grid-cols-2">
         <div>
           <div className="flex size-16 items-center justify-center rounded-xl border border-icon-box-border bg-icon-box-bg">

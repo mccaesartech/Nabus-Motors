@@ -5,10 +5,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CalendarCheck, CheckCircle2, UserCircle } from "lucide-react";
 import { Container } from "@/components/shared/container";
-import { BackNav } from "@/components/shared/back-nav";
 import { BookAppointmentPanel } from "@/components/checkout/book-appointment-panel";
+import { CheckoutOrderPrintButton } from "@/components/checkout/checkout-order-print-button";
 import { Button } from "@/components/ui/button";
 import { useCustomerAuth } from "@/context/customer-auth-context";
+import { orderReferenceId } from "@/lib/account/types";
+import {
+  buildOrderDocumentHtml,
+  buildPreorderDocumentHtml,
+  type CustomerPrintProfile,
+} from "@/lib/account/printable-documents";
 import {
   clearCheckoutCompleteContext,
   readCheckoutCompleteContext,
@@ -52,20 +58,46 @@ export function CheckoutCompleteClient() {
   const hasVehicles = context.vehicles.length > 0;
   const accountOrdersHref = `${ROUTES.corporate.account}?section=orders#my-orders`;
 
+  const customerPrintProfile: CustomerPrintProfile = {
+    name: context.name,
+    email: context.email,
+    phone: context.phone,
+  };
+
+  const orderRef =
+    context.registrationId ??
+    (context.order ? orderReferenceId(context.order.id) : undefined) ??
+    (context.orderId ? orderReferenceId(context.orderId) : undefined) ??
+    (context.preorder
+      ? context.preorder.reference_code ?? orderReferenceId(context.preorder.id)
+      : undefined);
+
+  const printConfig =
+    context.order != null
+      ? {
+          getHtml: () => buildOrderDocumentHtml(context.order!, customerPrintProfile),
+        }
+      : context.preorder != null
+        ? {
+            getHtml: () => buildPreorderDocumentHtml(context.preorder!, customerPrintProfile),
+          }
+        : null;
+
   return (
     <Container className="py-12 sm:py-16">
-      <BackNav href={ROUTES.auto.inventory} label="Back to inventory" variant="public" />
-      <div className="mx-auto mt-6 max-w-2xl space-y-8">
+      <div className="mx-auto max-w-2xl space-y-8">
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-50/50 px-6 py-8 text-center dark:bg-emerald-950/20">
           <CheckCircle2 className="mx-auto size-14 text-emerald-600" />
           <h1 className="mt-4 text-2xl font-semibold sm:text-3xl">{successTitle}</h1>
           <p className="mt-2 text-sm text-muted-foreground sm:text-base">{successDetail}</p>
-          {context.registrationId && (
+          {orderRef && (
             <p className="mt-2 text-sm font-medium text-foreground">
-              Reference: {context.registrationId}
+              Reference: {orderRef}
             </p>
           )}
         </div>
+
+        {printConfig && <CheckoutOrderPrintButton getHtml={printConfig.getHtml} />}
 
         {!user && (
           <div className="rounded-xl border border-brand-purple/25 bg-brand-purple/5 px-5 py-5">

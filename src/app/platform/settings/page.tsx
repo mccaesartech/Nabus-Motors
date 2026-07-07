@@ -38,6 +38,10 @@ type SettingsMeta = {
     setupGuideUrl: string;
     warning: string | null;
   };
+  notification?: {
+    recommendedProvider: "termii" | null;
+    termiiEnvConfigured: boolean;
+  };
 };
 
 type DbHealth = {
@@ -143,7 +147,14 @@ export default function SettingsPage() {
       return;
     }
     const json = await res.json();
-    setSettings({ ...DEFAULT_SITE_SETTINGS, ...(json.settings ?? {}) });
+    const merged = { ...DEFAULT_SITE_SETTINGS, ...(json.settings ?? {}) };
+    if (
+      json.meta?.notification?.recommendedProvider === "termii" &&
+      !merged.whatsapp_api_provider
+    ) {
+      merged.whatsapp_api_provider = "termii";
+    }
+    setSettings(merged);
     setMeta(json.meta ?? null);
     setDbHealth(json.db ?? null);
     setLoading(false);
@@ -586,18 +597,85 @@ export default function SettingsPage() {
           title="Customer WhatsApp API"
           description="Automatic WhatsApp messages to customers on bookings. Env vars override these settings. Without API keys, wa.me links are logged for manual follow-up."
         >
+          {meta?.notification?.recommendedProvider === "termii" && (
+            <div className="rounded-lg border border-[var(--platform-accent)]/30 bg-[rgba(107,33,168,0.08)] px-4 py-3 text-sm text-[var(--platform-text)]">
+              <p className="font-medium text-[var(--platform-accent)]">Termii recommended</p>
+              <p className="mt-1 text-[var(--platform-text-secondary)]">
+                Server env has <code className="rounded bg-[var(--platform-bg-secondary)] px-1">NOTIFICATION_PROVIDER=termii</code>{" "}
+                or <code className="rounded bg-[var(--platform-bg-secondary)] px-1">WHATSAPP_PROVIDER=termii</code>.
+                {meta.notification.termiiEnvConfigured
+                  ? " Termii credentials are set in Vercel — env vars take priority over the fields below."
+                  : " Add your Termii credentials below or set TERMII_* env vars in Vercel."}
+              </p>
+            </div>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Provider" hint="twilio or meta (Meta Cloud API)">
+            <Field
+              label="Provider"
+              hint="termii (Ghana), twilio, or meta (Meta Cloud API). Leave blank to auto-detect from credentials."
+            >
               <select
                 className="platform-input w-full"
                 value={settings.whatsapp_api_provider}
                 onChange={(e) => update("whatsapp_api_provider", e.target.value)}
               >
                 <option value="">Auto-detect from credentials</option>
+                <option value="termii">
+                  Termii (WhatsApp + SMS){meta?.notification?.recommendedProvider === "termii" ? " — recommended" : ""}
+                </option>
                 <option value="twilio">Twilio WhatsApp</option>
                 <option value="meta">Meta WhatsApp Cloud API</option>
               </select>
             </Field>
+            <Field label="Termii SMS channel" hint="dnd for transactional; generic for promotional">
+              <select
+                className="platform-input w-full"
+                value={settings.termii_sms_channel || "dnd"}
+                onChange={(e) => update("termii_sms_channel", e.target.value)}
+              >
+                <option value="dnd">DND (transactional)</option>
+                <option value="generic">Generic</option>
+              </select>
+            </Field>
+            <Field label="Termii API key" className="sm:col-span-2" hint="Or set TERMII_API_KEY in Vercel">
+              <input
+                type="password"
+                className="platform-input w-full font-mono text-sm"
+                value={settings.termii_api_key}
+                onChange={(e) => update("termii_api_key", e.target.value)}
+                placeholder="TLxxxxxxxx…"
+                autoComplete="off"
+              />
+            </Field>
+            <Field label="Termii sender ID" hint="Alphanumeric sender for SMS (max 11 chars)">
+              <input
+                className="platform-input w-full font-mono text-sm"
+                value={settings.termii_sender_id}
+                onChange={(e) => update("termii_sender_id", e.target.value)}
+                placeholder="TrueGoshen"
+              />
+            </Field>
+            <Field label="Termii WhatsApp device" hint="Device ID or phone for WhatsApp channel">
+              <input
+                className="platform-input w-full font-mono text-sm"
+                value={settings.termii_whatsapp_device}
+                onChange={(e) => update("termii_whatsapp_device", e.target.value)}
+                placeholder="23490126727"
+              />
+            </Field>
+            <Field label="Termii base URL" className="sm:col-span-2" hint="Default: https://api.ng.termii.com">
+              <input
+                className="platform-input w-full font-mono text-sm"
+                value={settings.termii_base_url}
+                onChange={(e) => update("termii_base_url", e.target.value)}
+                placeholder="https://api.ng.termii.com"
+              />
+            </Field>
+            <div className="sm:col-span-2 border-t border-[var(--platform-border)] pt-4">
+              <p className="mb-3 text-xs font-medium uppercase tracking-wide text-[var(--platform-text-secondary)]">
+                Twilio / Meta (alternative providers)
+              </p>
+            </div>
             <Field label="Meta phone number ID" hint="Required for Meta Cloud API">
               <input
                 className="platform-input w-full font-mono text-sm"

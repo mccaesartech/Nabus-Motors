@@ -24,7 +24,7 @@ export function PageHeader({
   backLabel,
 }: PageHeaderProps) {
   return (
-    <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="no-print mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
         {showBack && (
           <BackButton

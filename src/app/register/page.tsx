@@ -1,24 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Container } from "@/components/shared/container";
 import { Logo } from "@/components/shared/logo";
-import { BackNav } from "@/components/shared/back-nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
+import { GoogleSignInButton } from "@/components/customer/google-sign-in-button";
 import { useCustomerAuth } from "@/context/customer-auth-context";
+import { authRedirectFromSearchParams } from "@/lib/customer/auth-redirect";
 import {
   hasChosenSessionPreference,
   markSessionPreferencePromptPending,
 } from "@/lib/customer/session-preference";
 import { supabase } from "@/lib/supabase/client";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const {
     user,
     loading: authLoading,
@@ -33,20 +35,24 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [awaitingPreference, setAwaitingPreference] = useState(false);
+  const redirectTo = authRedirectFromSearchParams(
+    searchParams,
+    "/account?welcome=1"
+  );
 
   useEffect(() => {
     if (!authLoading && user && !sessionPreferenceModalOpen && !awaitingPreference) {
-      router.replace("/account?welcome=1");
+      router.replace(redirectTo);
     }
-  }, [authLoading, user, router, sessionPreferenceModalOpen, awaitingPreference]);
+  }, [authLoading, user, router, sessionPreferenceModalOpen, awaitingPreference, redirectTo]);
 
   useEffect(() => {
     if (!sessionPreferenceModalOpen && awaitingPreference && user) {
-      router.push("/account?welcome=1");
+      router.push(redirectTo);
       router.refresh();
       setAwaitingPreference(false);
     }
-  }, [sessionPreferenceModalOpen, awaitingPreference, user, router]);
+  }, [sessionPreferenceModalOpen, awaitingPreference, user, router, redirectTo]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -95,20 +101,23 @@ export default function RegisterPage() {
         setLoading(false);
         return;
       }
-      router.push("/account?welcome=1");
+      router.push(redirectTo);
       router.refresh();
       return;
     }
 
     markSessionPreferencePromptPending();
-    router.push("/login?registered=1");
+    router.push(
+      redirectTo === "/account?welcome=1"
+        ? "/login?registered=1"
+        : `/login?registered=1&redirect=${encodeURIComponent(redirectTo)}`
+    );
     router.refresh();
   }
 
   return (
     <Container className="py-16 sm:py-20">
       <div className="mx-auto max-w-md">
-        <BackNav href="/" label="Back to home" variant="public" className="mb-6" />
         <div className="mb-8 flex justify-center">
           <Logo variant="purple" brand="corporate" height={52} />
         </div>
@@ -117,8 +126,23 @@ export default function RegisterPage() {
           Create your account to track pre-orders, purchases, and message our
           team.
         </p>
+        <div className="mt-8 space-y-5">
+          <GoogleSignInButton
+            redirectPath={redirectTo}
+            disabled={loading}
+            onError={setError}
+          />
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">or</span>
+            </div>
+          </div>
+        </div>
         <form
-          className="mt-8 space-y-5"
+          className="mt-5 space-y-5"
           onSubmit={handleSubmit}
           autoComplete="off"
           data-1p-ignore
@@ -193,7 +217,11 @@ export default function RegisterPage() {
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Already have an account?{" "}
           <Link
-            href="/login"
+            href={
+              redirectTo === "/account?welcome=1"
+                ? "/login"
+                : `/login?redirect=${encodeURIComponent(redirectTo)}`
+            }
             className="font-medium text-brand-purple hover:text-foreground"
           >
             Sign in
@@ -201,5 +229,13 @@ export default function RegisterPage() {
         </p>
       </div>
     </Container>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<Container className="py-16 sm:py-20">{null}</Container>}>
+      <RegisterForm />
+    </Suspense>
   );
 }

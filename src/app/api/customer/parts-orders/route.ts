@@ -85,8 +85,8 @@ export async function GET(req: NextRequest) {
         name: item.part_name,
         slug: item.part_slug,
         sku: item.sku,
-        quantity: item.quantity,
-        unit_price_usd: item.unit_price_usd,
+        quantity: Number(item.quantity) || 1,
+        unit_price_usd: Number(item.unit_price_usd) || 0,
         item_intent:
           item.item_intent === "pre_order" || item.item_intent === "buy"
             ? item.item_intent

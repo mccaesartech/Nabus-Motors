@@ -14,7 +14,9 @@ import {
   GHANA_PHONE_TEL,
   GHANA_WHATSAPP,
 } from "@/lib/data/vehicle-images";
+import { AddToCompareButton } from "@/components/vehicle/add-to-compare-button";
 import { ROUTES } from "@/lib/routes";
+import { recordVehicleEngagement } from "@/lib/vehicle-preferences";
 import { cn } from "@/lib/utils";
 
 interface ContactActionsProps {
@@ -76,13 +78,26 @@ export function ContactActions({ vehicle }: ContactActionsProps) {
         <MessageCircle className="size-4" />
         WhatsApp Inquiry
       </Button>
+      <AddToCompareButton
+        vehicle={vehicle}
+        onToggle={(action) => {
+          if (action === "full") {
+            window.alert("Compare list is full (max 4 vehicles). Remove one to add another.");
+          }
+        }}
+      />
       <Button
         variant={saved ? "outline" : "secondary"}
         className={cn(
           "w-full transition-colors",
           saved && "border-brand-purple/30 text-brand-purple hover:bg-brand-purple/10 hover:text-brand-purple-dark"
         )}
-        onClick={() => toggleSave(vehicle)}
+        onClick={() => {
+          const action = toggleSave(vehicle);
+          if (action === "saved") {
+            recordVehicleEngagement("save", vehicle);
+          }
+        }}
         aria-label={saved ? "Remove from saved vehicles" : "Save vehicle to garage"}
         aria-pressed={saved}
       >

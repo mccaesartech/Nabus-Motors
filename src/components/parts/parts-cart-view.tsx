@@ -18,6 +18,10 @@ import { useCustomerAuth } from "@/context/customer-auth-context";
 import { formatCheckoutPrice } from "@/lib/currency/checkout";
 import { ROUTES } from "@/lib/routes";
 import { saveCheckoutCompleteContext } from "@/lib/checkout/complete-context";
+import {
+  buildCheckoutOrderSummary,
+  buildPreorderPrintSnapshot,
+} from "@/lib/checkout/print-snapshot";
 import { formatVehicleName } from "@/lib/format";
 import { primaryPhotoFor } from "@/lib/data/vehicle-images";
 import { isPreOrderStatus, resolveVehicleCheckoutMode } from "@/lib/vehicles/availability";
@@ -84,7 +88,6 @@ export function PartsCartView() {
   const {
     items,
     itemCount,
-    loaded,
     removePart,
     removeVehicle,
     rekeyVehicle,
@@ -364,10 +367,23 @@ export function PartsCartView() {
       }
     }
 
-    void resolveCart();
+    let idleId: number | undefined;
+    let timerId: ReturnType<typeof setTimeout> | undefined;
+
+    const startLookup = () => {
+      if (!cancelled) void resolveCart();
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+      idleId = window.requestIdleCallback(startLookup, { timeout: 2000 });
+    } else {
+      timerId = setTimeout(startLookup, 100);
+    }
 
     return () => {
       cancelled = true;
+      if (idleId !== undefined) window.cancelIdleCallback(idleId);
+      if (timerId !== undefined) clearTimeout(timerId);
     };
   }, [idKey, items, partItems, vehicleItems, rekeyVehicle]);
 
@@ -486,6 +502,9 @@ export function PartsCartView() {
         inquiryId?: string;
         registrationId?: string;
         vehicleName: string;
+        vehicleSlug?: string;
+        vehiclePriceUsd?: number;
+        downPaymentUsd?: number;
       }
     ) => {
       setCompletedPreorders((prev) => [...prev, vehicleId]);
@@ -500,6 +519,14 @@ export function PartsCartView() {
         phone: phone.trim(),
         vehicles: [{ id: vehicleId, name: payload.vehicleName }],
         message: payload.message,
+        preorder: buildPreorderPrintSnapshot({
+          inquiryId: payload.inquiryId,
+          registrationId: payload.registrationId,
+          vehicleName: payload.vehicleName,
+          vehicleSlug: payload.vehicleSlug,
+          vehiclePriceUsd: payload.vehiclePriceUsd,
+          downPaymentUsd: payload.downPaymentUsd,
+        }),
       });
       router.push(ROUTES.auto.cartComplete);
     },
@@ -678,25 +705,25 @@ export function PartsCartView() {
             name: line.name,
           }));
 
-        if (json.bookAppointment && submittedVehicles.length > 0) {
-          saveCheckoutCompleteContext({
-            source: "checkout",
-            orderId: json.orderId ? String(json.orderId) : undefined,
-            name: name.trim(),
-            email: email.trim(),
-            phone: phone.trim(),
-            vehicles: submittedVehicles,
-            message: json.message ?? "Order submitted successfully.",
-          });
-          router.push(ROUTES.auto.cartComplete);
-          return;
-        }
-
-        setFeedback({
-          ok: true,
-          text: json.message ?? "Order submitted successfully.",
+        const orderId = json.orderId ? String(json.orderId) : crypto.randomUUID();
+        const orderSummary = buildCheckoutOrderSummary({
+          orderId,
+          partLines: displayPartLines,
+          vehicleLines: vehiclesToSubmit,
         });
-        setNotes("");
+
+        saveCheckoutCompleteContext({
+          source: "checkout",
+          orderId: json.orderId ? String(json.orderId) : undefined,
+          order: orderSummary,
+          name: name.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          vehicles: submittedVehicles,
+          message: json.message ?? "Order submitted successfully.",
+        });
+        router.push(ROUTES.auto.cartComplete);
+        return;
       } catch {
         setFeedback({ ok: false, text: "Network error. Please try again." });
       } finally {
@@ -763,14 +790,6 @@ export function PartsCartView() {
     vehicleItems,
     removeVehicle,
   ]);
-
-  if (!loaded) {
-    return (
-      <ul className="divide-y rounded-xl border border-border/70 bg-card shadow-luxury">
-        <CartLineSkeleton />
-      </ul>
-    );
-  }
 
   if (!hasItems) {
     return (

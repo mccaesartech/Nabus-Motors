@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin/auth";
 import { logPlatformActivity } from "@/lib/platform/activity";
+import { notifyCustomerPreorderUpdate } from "@/lib/customer/notifications-server";
+import { notifyCustomer } from "@/lib/notifications/customer-notify";
+import { customRequestStatusLabel } from "@/lib/platform/custom-request";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 
 const ORDER_STATUSES = ["pending", "confirmed", "shipped", "fulfilled", "cancelled"] as const;
@@ -79,6 +82,62 @@ export async function PATCH(req: NextRequest) {
 
   if (error) {
     return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+  }
+
+  if (type === "preorder" && updates.status && data) {
+    const record = data as {
+      user_id?: string | null;
+      name?: string | null;
+      email?: string | null;
+      phone?: string | null;
+      whatsapp_opt_in?: boolean | null;
+      vehicle_name?: string | null;
+      vehicle_title?: string | null;
+      requested_make?: string | null;
+      requested_model?: string | null;
+      requested_year?: string | null;
+      is_custom_request?: boolean;
+      status: string;
+    };
+    const isCustom = record.is_custom_request === true;
+    const customTitle = [record.requested_year, record.requested_make, record.requested_model]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+    const title =
+      record.vehicle_title?.trim() ||
+      record.vehicle_name?.trim() ||
+      customTitle ||
+      (isCustom ? "Your vehicle request" : "Your pre-order");
+    await notifyCustomerPreorderUpdate(supabase, {
+      userId: record.user_id,
+      preorderId: id,
+      title,
+      status: record.status,
+      isCustomRequest: isCustom,
+    });
+
+    const statusLabel = isCustom
+      ? customRequestStatusLabel(record.status)
+      : record.status.replace(/_/g, " ");
+
+    await notifyCustomer({
+      email: record.email?.trim() ?? "",
+      phone: record.phone?.trim() || null,
+      whatsappPreferred:
+        record.whatsapp_opt_in === null || record.whatsapp_opt_in === undefined
+          ? undefined
+          : record.whatsapp_opt_in,
+      customerName: record.name?.trim() || undefined,
+      template: "preorder_status_update",
+      data: {
+        updateTitle: title,
+        statusLabel,
+        isCustomRequest: isCustom ? "true" : "false",
+      },
+      sourceTable: "preorder_inquiries",
+      sourceId: `${id}:${record.status}`,
+    });
   }
 
   if (payment_status && table === "preorder_inquiries") {

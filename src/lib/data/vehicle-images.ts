@@ -232,17 +232,91 @@ export function vehicleImagesFor(vehicle: {
   return [poolPhotoFor(vehicle.slug, vehicle.id, vehicle.bodyType)];
 }
 
+export function resolvePrimaryImageUrl(vehicle: {
+  primary_image_url?: string | null;
+  primaryImageUrl?: string | null;
+  gallery?: VehicleGalleryData | Partial<VehicleGalleryData> | null;
+  images?: string[];
+}): string | undefined {
+  const explicit = (vehicle.primary_image_url ?? vehicle.primaryImageUrl)?.trim();
+  if (explicit && isValidImageUrl(explicit)) return explicit;
+
+  const gallery = resolveVehicleGallery(vehicle);
+  if (gallery.exterior.length > 0) return gallery.exterior[0];
+
+  const flat = flattenGallery(gallery);
+  if (flat.length > 0) return flat[0];
+
+  const legacy = sanitizeUrls(vehicle.images);
+  if (legacy.length > 0) return legacy[0];
+
+  return undefined;
+}
+
+export function resolveAdditionalImages(vehicle: {
+  primary_image_url?: string | null;
+  primaryImageUrl?: string | null;
+  additional_images?: string[] | null;
+  additionalImages?: string[] | null;
+  gallery?: VehicleGalleryData | Partial<VehicleGalleryData> | null;
+  images?: string[];
+}): string[] {
+  const fromColumn = sanitizeUrls(vehicle.additional_images ?? vehicle.additionalImages ?? undefined);
+  if (fromColumn.length > 0) return fromColumn;
+
+  const primary = resolvePrimaryImageUrl(vehicle);
+  const gallery = resolveVehicleGallery(vehicle);
+  const flat = flattenGallery(gallery);
+  if (flat.length > 0) {
+    return flat.filter((url) => url !== primary);
+  }
+
+  const legacy = sanitizeUrls(vehicle.images);
+  if (legacy.length > 1) {
+    return legacy.filter((url) => url !== primary);
+  }
+
+  return [];
+}
+
+export function galleryToPrimaryAndAdditional(vehicle: {
+  gallery?: VehicleGalleryData | Partial<VehicleGalleryData> | null;
+  images?: string[];
+}): { primaryImageUrl: string; additionalImages: string[] } {
+  const primary = resolvePrimaryImageUrl(vehicle) ?? "";
+  return {
+    primaryImageUrl: primary,
+    additionalImages: resolveAdditionalImages(vehicle),
+  };
+}
+
+export function primaryAndAdditionalToGallery(
+  primaryImageUrl: string,
+  additionalImages: string[]
+): VehicleGalleryData {
+  const primary = primaryImageUrl.trim();
+  const additional = sanitizeUrls(additionalImages).filter((url) => url !== primary);
+  return {
+    exterior: primary ? [primary] : [],
+    interior: [],
+    engine: [],
+    other: additional,
+  };
+}
+
 export function primaryPhotoFor(vehicle: {
   slug: string;
   id: string;
   bodyType: BodyType;
+  primary_image_url?: string | null;
+  primaryImageUrl?: string | null;
+  additional_images?: string[] | null;
+  additionalImages?: string[] | null;
   gallery?: VehicleGalleryData | Partial<VehicleGalleryData> | null;
   images?: string[];
 }): string {
-  const gallery = resolveVehicleGallery(vehicle);
-  if (gallery.exterior.length > 0) return gallery.exterior[0];
-  const flat = flattenGallery(gallery);
-  if (flat.length > 0) return flat[0];
+  const resolved = resolvePrimaryImageUrl(vehicle);
+  if (resolved) return resolved;
   return poolPhotoFor(vehicle.slug, vehicle.id, vehicle.bodyType);
 }
 

@@ -12,6 +12,8 @@ import {
   notifyVehicleSaleToLeadsTeam,
   vehicleOrderLeadsLink,
 } from "@/lib/platform/vehicle-sale-notifications";
+import { notifyCustomerOrderSubmitted } from "@/lib/customer/notifications-server";
+import { notifyCustomer } from "@/lib/notifications/customer-notify";
 import type { CartPartLine, CartVehicleLine } from "@/lib/parts/cart-types";
 
 type CheckoutPartItem = CartPartLine & {
@@ -309,6 +311,25 @@ export async function POST(req: NextRequest) {
         totalUsd,
       });
     }
+
+    const orderUserId = checkoutCustomer.userId ?? user?.id ?? null;
+    if (orderUserId) {
+      await notifyCustomerOrderSubmitted(supabase, {
+        userId: orderUserId,
+        orderId: order.id,
+        itemCount: orderItems.length,
+      });
+    }
+
+    await notifyCustomer({
+      email: email.trim(),
+      phone: phone?.trim() || null,
+      customerName: name.trim(),
+      template: "order_submitted",
+      data: { itemCount: String(orderItems.length) },
+      sourceTable: "parts_orders",
+      sourceId: order.id,
+    });
 
     const hasVehicles = vehicleItems.length > 0;
     const hasParts = partItems.length > 0;

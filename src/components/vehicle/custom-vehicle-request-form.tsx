@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CheckCircle2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -74,6 +74,10 @@ export function CustomVehicleRequestForm({
   const [whatsappTouched, setWhatsappTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
+  const [successDetails, setSuccessDetails] = useState<{
+    referenceCode?: string;
+    inquiryId?: string;
+  } | null>(null);
 
   const isGuest = !user;
   const effectiveMake = make === "Other" ? makeOther.trim() : make.trim();
@@ -88,6 +92,7 @@ export function CustomVehicleRequestForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFeedback(null);
+    setSuccessDetails(null);
 
     if (!effectiveMake || !model.trim()) {
       setFeedback({ ok: false, text: "Make and model are required." });
@@ -163,6 +168,10 @@ export function CustomVehicleRequestForm({
       }
 
       setFeedback({ ok: true, text: json.message ?? "Request submitted." });
+      setSuccessDetails({
+        referenceCode: json.referenceCode,
+        inquiryId: json.inquiryId,
+      });
       onSuccess?.({
         message: json.message,
         referenceCode: json.referenceCode,
@@ -174,6 +183,54 @@ export function CustomVehicleRequestForm({
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (successDetails) {
+    const trackHref = successDetails.inquiryId
+      ? `/account?section=vehicle-requests&request=${successDetails.inquiryId}#vehicle-requests`
+      : "/account#vehicle-requests";
+
+    return (
+      <div
+        className={cn(
+          "space-y-6 rounded-xl border border-brand-purple/30 bg-gradient-to-b from-brand-purple/10 to-brand-gold/5 p-6 sm:p-8",
+          className
+        )}
+      >
+        <div className="flex flex-col items-center text-center">
+          <div className="mb-4 flex size-16 items-center justify-center rounded-full bg-green-100 text-green-700">
+            <CheckCircle2 className="size-8" />
+          </div>
+          <h2 className="text-xl font-semibold text-foreground">Request submitted!</h2>
+          {successDetails.referenceCode && (
+            <p className="mt-2 font-mono text-lg font-semibold text-brand-purple">
+              {successDetails.referenceCode}
+            </p>
+          )}
+          {feedback?.text && (
+            <p className="mt-3 max-w-md text-sm text-muted-foreground">{feedback.text}</p>
+          )}
+          <p className="mt-2 text-sm text-muted-foreground">
+            Track status, message our team, or book a visit — all from your account.
+          </p>
+        </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+          <Button
+            render={<Link href={trackHref} />}
+            className="min-h-11 bg-brand-purple text-white hover:bg-brand-purple-dark"
+          >
+            Track in your account
+          </Button>
+          <Button
+            render={<Link href={ROUTES.auto.inventory} />}
+            variant="outline"
+            className="min-h-11"
+          >
+            Browse inventory
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (

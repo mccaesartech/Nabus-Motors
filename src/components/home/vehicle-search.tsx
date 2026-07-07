@@ -16,6 +16,8 @@ import {
 import { makes, modelsByMake, locations } from "@/lib/data/catalog-meta";
 import { buildFilterSearchParams } from "@/lib/vehicles";
 import { ROUTES } from "@/lib/routes";
+import { setLastInventorySearch } from "@/lib/journey-history";
+import { recordSearchPreferences } from "@/lib/vehicle-preferences";
 import { PRICE_FILTER_TIERS, formatFilterPriceLabel } from "@/lib/currency";
 import { useCurrency } from "@/context/currency-context";
 import type { Condition, FuelType, Transmission } from "@/lib/types";
@@ -38,7 +40,7 @@ export function VehicleSearch() {
   const availableModels = make ? modelsByMake[make] ?? [] : [];
 
   function handleSearch() {
-    const params = buildFilterSearchParams({
+    const filters = {
       make: make || undefined,
       model: model || undefined,
       yearMin: year ? Number(year) : undefined,
@@ -48,8 +50,12 @@ export function VehicleSearch() {
       fuelType: (fuelType as FuelType) || undefined,
       condition: (condition as Condition) || undefined,
       location: location || undefined,
-    });
-    router.push(`${ROUTES.auto.inventory}?${params.toString()}`);
+    };
+    const params = buildFilterSearchParams(filters);
+    const url = `${ROUTES.auto.inventory}?${params.toString()}`;
+    setLastInventorySearch(url);
+    recordSearchPreferences(filters);
+    router.push(url);
   }
 
   return (

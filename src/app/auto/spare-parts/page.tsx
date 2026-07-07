@@ -17,6 +17,7 @@ type PageProps = {
     category?: string;
     brand?: string;
     make?: string;
+    model?: string;
   }>;
 };
 
@@ -28,6 +29,7 @@ export default async function SparePartsPage({ searchParams }: PageProps) {
       category: params.category,
       brand: params.brand,
       make: params.make,
+      model: params.model,
     }),
     loadPartCategories(),
     getSiteContent(),
@@ -42,6 +44,7 @@ export default async function SparePartsPage({ searchParams }: PageProps) {
         initialCategory={params.category ?? ""}
         initialBrand={params.brand ?? ""}
         initialMake={params.make ?? ""}
+        initialModel={params.model ?? ""}
         landing={content.sparePartsLanding}
       />
     </Suspense>

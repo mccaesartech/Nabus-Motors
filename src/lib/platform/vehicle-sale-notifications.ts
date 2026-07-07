@@ -3,7 +3,7 @@ import { formatPlatformPrice } from "@/lib/currency";
 import { hasPermission, normalizeRole } from "@/lib/platform/permissions";
 import { platformPath } from "@/lib/platform/paths";
 import { notifyAdminOutbound } from "@/lib/notifications/admin-notify";
-import { getSiteSettings } from "@/lib/platform/site-settings";
+import { getSiteSettings } from "@/lib/platform/site-settings-server";
 
 type LeadsRecipient = {
   user_id: string | null;

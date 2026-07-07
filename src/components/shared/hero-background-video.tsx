@@ -1,12 +1,12 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
-  DEFAULT_HERO_BACKGROUND_EMBED_URL,
   DEFAULT_HERO_BACKGROUND_VIDEO_URL,
   DEFAULT_HERO_POSTER_URL,
 } from "@/lib/constants";
-import { parseEmbedVideoUrl, type ResolvedVideo } from "@/lib/site-content/video";
+import type { ResolvedVideo } from "@/lib/site-content/video";
 import { cn } from "@/lib/utils";
 
 type HeroBackgroundVideoProps = {
@@ -44,7 +44,9 @@ function HeroEmbedVideo({ embedUrl }: { embedUrl: string }) {
       src={embedUrl}
       title="Hero background video"
       className={LANDSCAPE_EMBED_IFRAME_CLASS}
-      allow="autoplay; fullscreen"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      loading="lazy"
+      referrerPolicy="strict-origin-when-cross-origin"
     />
   );
 }
@@ -72,18 +74,23 @@ function HeroPosterFallback({
   const [src, setSrc] = useState(poster);
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt=""
-      aria-hidden
-      className={className}
-      onError={() => {
-        if (src !== DEFAULT_HERO_POSTER_URL) {
-          setSrc(DEFAULT_HERO_POSTER_URL);
-        }
-      }}
-    />
+    <div className={className}>
+      <Image
+        src={src}
+        alt=""
+        aria-hidden
+        fill
+        priority
+        sizes="100vw"
+        decoding="async"
+        className="object-cover object-center"
+        onError={() => {
+          if (src !== DEFAULT_HERO_POSTER_URL) {
+            setSrc(DEFAULT_HERO_POSTER_URL);
+          }
+        }}
+      />
+    </div>
   );
 }
 
@@ -104,8 +111,8 @@ function HeroFileVideo({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [viewportSrc, setViewportSrc] = useState(src);
-  const [videoSrc, setVideoSrc] = useState<string | null>(src);
-  const [embedFallback, setEmbedFallback] = useState<ResolvedVideo | null>(null);
+  const [videoSrc, setVideoSrc] = useState<string | null>(null);
+  const [shouldLoadVideo, setShouldLoadVideo] = useState(false);
   const [showPosterFallback, setShowPosterFallback] = useState(false);
   /** Landscape-encoded frames that should display upright in a portrait hero. */
   const [rotateLandscapeFrames, setRotateLandscapeFrames] = useState(false);
@@ -136,11 +143,21 @@ function HeroFileVideo({
   }, [src, mobileVideoUrl]);
 
   useEffect(() => {
+    const enable = () => setShouldLoadVideo(true);
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(enable, { timeout: 2000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const timer = window.setTimeout(enable, 400);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!shouldLoadVideo) return;
     setVideoSrc(viewportSrc);
-    setEmbedFallback(null);
     setShowPosterFallback(false);
     setRotateLandscapeFrames(false);
-  }, [viewportSrc]);
+  }, [viewportSrc, shouldLoadVideo]);
 
   const attemptPlay = useCallback(() => {
     const video = videoRef.current;
@@ -197,40 +214,37 @@ function HeroFileVideo({
   );
 
   const handleError = () => {
-    if (
-      resolvedFallbackVideoUrl &&
-      videoSrc !== resolvedFallbackVideoUrl
-    ) {
-      setVideoSrc(resolvedFallbackVideoUrl);
+    if (mobileVideoUrl && videoSrc === mobileVideoUrl && src !== mobileVideoUrl) {
+      setVideoSrc(src);
       return;
     }
 
-    const embed =
-      parseEmbedVideoUrl(DEFAULT_HERO_BACKGROUND_EMBED_URL, { background: true }) ?? null;
-    if (embed) {
-      setEmbedFallback(embed);
+    if (resolvedFallbackVideoUrl && videoSrc !== resolvedFallbackVideoUrl) {
+      setVideoSrc(resolvedFallbackVideoUrl);
       return;
     }
 
     setShowPosterFallback(true);
   };
 
-  if (embedFallback && embedFallback.type !== "file") {
-    return <HeroEmbedVideo embedUrl={embedFallback.embedUrl} />;
-  }
-
   if (showPosterFallback) {
     return (
-      <HeroPosterFallback
-        poster={resolvedPoster}
-        className={cn(coverClass, fitClass)}
-      />
+      <div className="absolute inset-0 overflow-hidden bg-brand-charcoal-dark">
+        <HeroPosterFallback
+          poster={resolvedPoster}
+          className={cn(coverClass, fitClass)}
+        />
+      </div>
     );
   }
 
   return (
     <div className="absolute inset-0 overflow-hidden bg-brand-charcoal-dark">
-      {videoSrc ? (
+      <HeroPosterFallback
+        poster={resolvedPoster}
+        className={cn(coverClass, fitClass)}
+      />
+      {shouldLoadVideo && videoSrc ? (
         <video
           ref={videoRef}
           key={videoSrc}
@@ -240,7 +254,7 @@ function HeroFileVideo({
           muted
           loop
           playsInline
-          preload="metadata"
+          preload="none"
           poster={resolvedPoster}
           disablePictureInPicture
           aria-label="Hero background video"

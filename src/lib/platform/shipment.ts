@@ -85,6 +85,9 @@ export type ShipmentTimelineEventRow = {
   location: string | null;
   event_at: string;
   is_customer_visible: boolean;
+  estimated_completion?: string | null;
+  admin_comment?: string | null;
+  attachment_urls?: string[] | null;
   created_at: string;
 };
 

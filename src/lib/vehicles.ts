@@ -1,5 +1,11 @@
 import { CHINESE_MAKES } from "@/lib/data/generate-inventory";
-import type { SortOption, Vehicle, VehicleFilters } from "@/lib/types";
+import { inferVehicleOrigin } from "@/lib/vehicle-preferences";
+import type { CountryOfOrigin, SortOption, Vehicle, VehicleFilters } from "@/lib/types";
+
+function vehicleOrigin(vehicle: Vehicle): CountryOfOrigin {
+  if (vehicle.countryOfOrigin) return vehicle.countryOfOrigin;
+  return inferVehicleOrigin(vehicle);
+}
 
 export function filterVehicles(
   allVehicles: Vehicle[],
@@ -21,6 +27,14 @@ export function filterVehicles(
       filters.chineseBrands &&
       !CHINESE_MAKES.includes(vehicle.make as (typeof CHINESE_MAKES)[number])
     ) {
+      return false;
+    }
+    if (filters.countryOfOrigin && vehicleOrigin(vehicle) !== filters.countryOfOrigin) {
+      return false;
+    }
+    if (filters.financingAvailable && !vehicle.financingAvailable) return false;
+    if (filters.shipmentAvailable && !vehicle.shipmentAvailable) return false;
+    if (filters.customsClearingAvailable && !vehicle.customsClearingAvailable) {
       return false;
     }
     if (filters.location && vehicle.location !== filters.location) return false;
@@ -54,6 +68,11 @@ export function sortVehicles(
         (a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
+    case "most-popular":
+      return sorted.sort((a, b) => {
+        if (a.featured !== b.featured) return a.featured ? -1 : 1;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
     default:
       return sorted;
   }
@@ -79,6 +98,10 @@ export function parseFiltersFromSearchParams(
     condition: get("condition") as VehicleFilters["condition"],
     bodyType: get("bodyType") as VehicleFilters["bodyType"],
     chineseBrands: get("chinese") === "1" || get("chineseBrands") === "1",
+    countryOfOrigin: get("countryOfOrigin") as VehicleFilters["countryOfOrigin"],
+    financingAvailable: get("financing") === "1" ? true : undefined,
+    shipmentAvailable: get("shipment") === "1" ? true : undefined,
+    customsClearingAvailable: get("customs") === "1" ? true : undefined,
     location: get("location"),
     mileageMax: get("mileageMax") ? Number(get("mileageMax")) : undefined,
     status: get("status") as VehicleFilters["status"],

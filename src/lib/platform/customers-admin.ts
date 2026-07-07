@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { formatPlatformPrice } from "@/lib/currency";
 
 export type AdminCustomerListItem = {
   id: string;
@@ -11,6 +12,7 @@ export type AdminCustomerListItem = {
   accountCreatedAt: string | null;
   quotesCount: number;
   preordersCount: number;
+  ordersCount: number;
   shipmentsCount: number;
   deletedAt: string | null;
 };
@@ -41,9 +43,18 @@ export type AdminCustomerShipment = {
   createdAt: string;
 };
 
+export type AdminCustomerOrder = {
+  id: string;
+  status: string;
+  totalLabel: string;
+  itemCount: number;
+  createdAt: string;
+};
+
 export type AdminCustomerDetail = AdminCustomerListItem & {
   recentQuotes: AdminCustomerQuote[];
   recentPreorders: AdminCustomerPreorder[];
+  recentOrders: AdminCustomerOrder[];
   recentShipments: AdminCustomerShipment[];
 };
 
@@ -97,7 +108,9 @@ type PartsOrderRow = {
   name: string;
   phone: string | null;
   status: string;
+  total_usd: number | null;
   created_at: string;
+  parts_order_items?: Array<{ id: string }>;
 };
 
 type ShipmentRow = {
@@ -228,7 +241,9 @@ export async function fetchAdminCustomers(
       .limit(500),
     supabase
       .from("parts_orders")
-      .select("id, user_id, email, name, phone, status, created_at")
+      .select(
+        "id, user_id, email, name, phone, status, total_usd, created_at, parts_order_items ( id )"
+      )
       .order("created_at", { ascending: false })
       .limit(500),
   ]);
@@ -259,6 +274,7 @@ export async function fetchAdminCustomers(
       accountCreatedAt: profile.created_at,
       quotesCount: countByUserAndEmail(quoteRows, profile.id, profileEmail),
       preordersCount: countByUserAndEmail(preorderRows, profile.id, profileEmail),
+      ordersCount: countByUserAndEmail(partsOrderRows, profile.id, profileEmail),
       shipmentsCount: countByUserAndEmail(shipmentRows, profile.id, profileEmail),
       deletedAt: customerDeletedAt(profileEmail, profile.deleted_at, deletedAtByEmail),
     });
@@ -306,6 +322,7 @@ export async function fetchAdminCustomers(
       accountCreatedAt: row.created_at,
       quotesCount: countByUserAndEmail(quoteRows, row.user_id, row.email),
       preordersCount: countByUserAndEmail(preorderRows, row.user_id, row.email),
+      ordersCount: countByUserAndEmail(partsOrderRows, row.user_id, row.email),
       shipmentsCount: countByUserAndEmail(shipmentRows, row.user_id, row.email),
       deletedAt: customerDeletedAt(row.email, null, deletedAtByEmail),
     });
@@ -450,7 +467,9 @@ export async function fetchAdminCustomerDetail(
 
   const partsOrderQuery = supabase
     .from("parts_orders")
-    .select("id, user_id, email, name, phone, status, created_at")
+    .select(
+      "id, user_id, email, name, phone, status, total_usd, created_at, parts_order_items ( id )"
+    )
     .order("created_at", { ascending: false })
     .limit(20);
 
@@ -552,6 +571,7 @@ export async function fetchAdminCustomerDetail(
     ...seed,
     quotesCount: counts?.quotesCount ?? quoteRows.length,
     preordersCount: counts?.preordersCount ?? preorderRows.length,
+    ordersCount: counts?.ordersCount ?? partsOrderRows.length,
     shipmentsCount: counts?.shipmentsCount ?? shipmentRows.length,
     deletedAt,
     recentQuotes: quoteRows.map((q) => ({
@@ -569,6 +589,13 @@ export async function fetchAdminCustomerDetail(
       status: p.status ?? "new",
       vehicleLabel: p.vehicle_name ?? p.vehicle_slug,
       createdAt: p.created_at ?? "",
+    })),
+    recentOrders: partsOrderRows.map((order) => ({
+      id: order.id,
+      status: order.status,
+      totalLabel: formatPlatformPrice(Number(order.total_usd) || 0),
+      itemCount: order.parts_order_items?.length ?? 0,
+      createdAt: order.created_at,
     })),
     recentShipments: shipmentRows.map((s) => ({
       id: s.id,

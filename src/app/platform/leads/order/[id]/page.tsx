@@ -20,6 +20,7 @@ import {
   PrintField,
   PrintSection,
 } from "@/components/platform/printable-record";
+import { buildAdminOrderDocumentHtml } from "@/lib/platform/printable-documents";
 import { useMarkNotificationsOnVisit } from "@/hooks/use-mark-notifications-read";
 import {
   ContactWhatsAppAction,
@@ -35,6 +36,7 @@ import {
   type AdminOrderDetail,
 } from "@/lib/platform/orders-admin";
 import { formatPlatformDateTime } from "@/lib/platform/datetime";
+import type { NotificationFeedbackVariant } from "@/lib/notifications/notification-status";
 
 export default function OrderDetailPage() {
   const router = useRouter();
@@ -48,6 +50,9 @@ export default function OrderDetailPage() {
   const [confirming, setConfirming] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const [resetMessage, setResetMessage] = useState<string | null>(null);
+  const [confirmToast, setConfirmToast] = useState<string | null>(null);
+  const [confirmToastVariant, setConfirmToastVariant] =
+    useState<NotificationFeedbackVariant>("success");
   const [notes, setNotes] = useState("");
 
   const load = useCallback(async () => {
@@ -99,24 +104,38 @@ export default function OrderDetailPage() {
   async function updateOrder(updates: { status?: string; notes?: string }) {
     if (!order) return;
     setSaving(true);
-    await fetch(`/api/admin/orders/${encodeURIComponent(id)}`, {
+    const res = await fetch(`/api/admin/orders/${encodeURIComponent(id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updates),
     });
+    const json = await res.json();
     setSaving(false);
+    if (json.notificationMessage) {
+      setConfirmToast(String(json.notificationMessage));
+      setConfirmToastVariant(
+        (json.notificationVariant as NotificationFeedbackVariant) ?? "success"
+      );
+    }
     void load();
   }
 
   async function confirmOrder() {
     if (!order || order.status === "confirmed") return;
     setConfirming(true);
-    await fetch(`/api/admin/orders/${encodeURIComponent(id)}`, {
+    const res = await fetch(`/api/admin/orders/${encodeURIComponent(id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "confirm" }),
     });
+    const json = await res.json();
     setConfirming(false);
+    if (json.notificationMessage) {
+      setConfirmToast(String(json.notificationMessage));
+      setConfirmToastVariant(
+        (json.notificationVariant as NotificationFeedbackVariant) ?? "success"
+      );
+    }
     void load();
   }
 
@@ -163,6 +182,20 @@ export default function OrderDetailPage() {
       reference={orderRef}
     >
     <div className="space-y-6">
+      {confirmToast ? (
+        <div
+          role="status"
+          className={`rounded-lg border px-4 py-3 text-sm ${
+            confirmToastVariant === "warning"
+              ? "border-amber-500/40 bg-amber-500/10 text-[var(--platform-text-secondary)]"
+              : confirmToastVariant === "neutral"
+                ? "border-[var(--platform-border)] bg-[var(--platform-surface)] text-[var(--platform-text-secondary)]"
+                : "border-[var(--platform-success)]/30 bg-[rgba(16,185,129,0.08)] text-[var(--platform-success)]"
+          }`}
+        >
+          {confirmToast}
+        </div>
+      ) : null}
       <section className="platform-card no-print rounded-xl border border-[var(--platform-accent)]/20 bg-[rgba(139,92,246,0.04)] p-5">
         <p className="text-xs font-semibold uppercase tracking-wide text-[var(--platform-accent)]">
           Follow up
@@ -227,7 +260,12 @@ export default function OrderDetailPage() {
         breadcrumb="Leads"
         backFallbackHref={`${platformPath("leads")}?tab=order`}
         backLabel="Back to leads"
-        actions={<PlatformPrintButton />}
+        actions={
+          <PlatformPrintButton
+            getHtml={() => buildAdminOrderDocumentHtml(order)}
+            downloadFilename={`order-${orderRef}.pdf`}
+          />
+        }
       />
 
       <div className="grid gap-6 lg:grid-cols-2">

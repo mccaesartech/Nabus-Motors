@@ -226,6 +226,13 @@ async function main() {
   console.log(
     "Wrote logo.png, logo-icon.png, logo-purple.png, logo-icon-purple.png, favicon-32.png, apple-touch-icon.png, favicon.ico"
   );
+
+  const { spawnSync } = await import("child_process");
+  const gen = spawnSync("node", ["scripts/generate-print-logo-data.mjs"], {
+    cwd: root,
+    stdio: "inherit",
+  });
+  if (gen.status !== 0) process.exit(gen.status ?? 1);
 }
 
 main().catch((err) => {

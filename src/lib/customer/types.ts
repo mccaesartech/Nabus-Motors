@@ -118,6 +118,14 @@ export function parseCustomerSelection(value: string): {
   return { userId: value };
 }
 
+export type CustomRequestSpecsSummary = {
+  body_type?: string;
+  fuel_type?: string;
+  condition?: string;
+  notes?: string;
+  preferred_timeline?: string;
+};
+
 export type CustomerInquirySummary = {
   id: string;
   type: "contact" | "vehicle" | "preorder" | "finance";
@@ -125,8 +133,17 @@ export type CustomerInquirySummary = {
   status: string;
   created_at: string;
   down_payment_usd?: number;
+  vehicle_price_usd?: number;
   payment_status?: string;
   vehicle_slug?: string;
   is_custom_request?: boolean;
   reference_code?: string;
+  requested_make?: string;
+  requested_model?: string;
+  requested_year?: string;
+  requested_specs?: CustomRequestSpecsSummary;
+  budget_min?: number | null;
+  budget_max?: number | null;
+  matched_vehicle_id?: string | null;
+  matched_vehicle_slug?: string | null;
 };

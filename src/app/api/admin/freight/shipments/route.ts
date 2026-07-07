@@ -383,6 +383,11 @@ export async function PATCH(req: NextRequest) {
       location: body.add_event.location ?? null,
       event_at: body.add_event.event_at ?? new Date().toISOString(),
       is_customer_visible: isCustomerVisible,
+      estimated_completion: body.add_event.estimated_completion ?? null,
+      admin_comment: body.add_event.admin_comment ?? null,
+      attachment_urls: Array.isArray(body.add_event.attachment_urls)
+        ? body.add_event.attachment_urls.map((u: unknown) => String(u).trim()).filter(Boolean)
+        : [],
     });
     if (error) {
       return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
@@ -403,7 +408,17 @@ export async function PATCH(req: NextRequest) {
 
   if (body.update_event?.id) {
     const eventUpdates: Record<string, unknown> = {};
-    for (const key of ["title", "description", "location", "event_at", "event_type", "is_customer_visible"]) {
+    for (const key of [
+      "title",
+      "description",
+      "location",
+      "event_at",
+      "event_type",
+      "is_customer_visible",
+      "estimated_completion",
+      "admin_comment",
+      "attachment_urls",
+    ]) {
       if (body.update_event[key] !== undefined) {
         eventUpdates[key] = body.update_event[key];
       }

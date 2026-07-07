@@ -34,6 +34,9 @@ type CartPreorderPanelProps = {
       inquiryId?: string;
       registrationId?: string;
       vehicleName: string;
+      vehicleSlug?: string;
+      vehiclePriceUsd?: number;
+      downPaymentUsd?: number;
     }
   ) => void;
   onSkip: (vehicleId: string) => void;
@@ -220,6 +223,9 @@ export function CartPreorderPanel({
         inquiryId: json.inquiryId ? String(json.inquiryId) : undefined,
         registrationId: json.registrationId ? String(json.registrationId) : undefined,
         vehicleName: line.name,
+        vehicleSlug: line.slug,
+        vehiclePriceUsd: line.priceUsd,
+        downPaymentUsd: downPaymentUsd(line.priceUsd),
       });
     } catch {
       setFeedback({ ok: false, text: "Network error. Please try again." });

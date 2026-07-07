@@ -6,10 +6,12 @@ import {
 } from "@/lib/site-content/video-display";
 import type { SiteVideoEmbedSettings } from "@/lib/site-content/video-embed";
 import {
+  isDirectVideoUrl,
+  looksLikeEmbedHostUrl,
   parseEmbedVideoUrl,
   resolveVideo,
-  type ResolvedVideo,
 } from "@/lib/site-content/video";
+import { SiteVideoPlayer } from "@/components/shared/site-video-player";
 
 type SiteVideoProps = {
   fileUrl?: string;
@@ -23,46 +25,6 @@ type SiteVideoProps = {
   display?: Partial<SiteVideoDisplaySettings>;
   embed?: Partial<SiteVideoEmbedSettings>;
 };
-
-function VideoPlayer({
-  video,
-  className,
-  background,
-  poster,
-  title,
-}: {
-  video: ResolvedVideo;
-  className?: string;
-  background?: boolean;
-  poster?: string;
-  title?: string;
-}) {
-  if (video.type === "file") {
-    return (
-      <video
-        src={video.url}
-        className={className}
-        autoPlay={background}
-        muted={background}
-        loop={background}
-        playsInline
-        controls={!background}
-        poster={poster}
-        aria-label={title ?? "Video"}
-      />
-    );
-  }
-
-  return (
-    <iframe
-      src={video.embedUrl}
-      className={className}
-      title={title ?? "Embedded video"}
-      allow="autoplay; fullscreen; picture-in-picture"
-      allowFullScreen={!background}
-    />
-  );
-}
 
 export function SiteVideo({
   fileUrl = "",
@@ -88,13 +50,15 @@ export function SiteVideo({
           src={video.embedUrl}
           title={title ?? "Hero background video"}
           className="pointer-events-none absolute left-1/2 top-1/2 h-[56.25vw] min-h-full w-[177.78vh] min-w-full -translate-x-1/2 -translate-y-1/2 opacity-60"
-          allow="autoplay; fullscreen"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          loading="lazy"
+          referrerPolicy="strict-origin-when-cross-origin"
         />
       );
     }
 
     return (
-      <VideoPlayer
+      <SiteVideoPlayer
         video={video}
         className={[bgClass, className].filter(Boolean).join(" ")}
         background={background}
@@ -111,13 +75,29 @@ export function SiteVideo({
   return (
     <div className={wrapperClass}>
       <div className={frameClass}>
-        <VideoPlayer
+        <SiteVideoPlayer
           video={video}
           className={[mediaClass, className].filter(Boolean).join(" ")}
           background={background}
           title={title}
         />
       </div>
+    </div>
+  );
+}
+
+function EmbedUrlError({ title }: { title?: string }) {
+  return (
+    <div
+      className="flex h-full min-h-[12rem] w-full flex-col items-center justify-center gap-2 bg-muted px-4 text-center text-sm text-muted-foreground"
+      role="status"
+    >
+      <p className="font-medium text-foreground">Video unavailable</p>
+      <p>
+        {title
+          ? `We could not embed "${title}". Check that the YouTube or Vimeo link allows embedding.`
+          : "Check that the YouTube or Vimeo link is public and allows embedding."}
+      </p>
     </div>
   );
 }
@@ -135,20 +115,33 @@ export function SiteVideoEmbed({
   display?: Partial<SiteVideoDisplaySettings>;
   embed?: Partial<SiteVideoEmbedSettings>;
 }) {
-  const parsedEmbed = parseEmbedVideoUrl(url, embed);
-  const fileUrl = !parsedEmbed && url.trim() ? url.trim() : "";
+  const trimmed = url.trim();
+  const parsedEmbed = parseEmbedVideoUrl(trimmed, embed);
+  const fileUrl = !parsedEmbed && trimmed && isDirectVideoUrl(trimmed) ? trimmed : "";
   const video =
     parsedEmbed ?? (fileUrl ? { type: "file" as const, url: fileUrl } : null);
-  if (!video) return null;
 
   const frameClass = getVideoFrameClassName(display, "bg-black");
   const mediaClass = getVideoMediaClassName(display, className);
   const wrapperClass = getVideoWrapperClassName(display);
 
+  if (!video) {
+    if (looksLikeEmbedHostUrl(trimmed)) {
+      return (
+        <div className={wrapperClass}>
+          <div className={frameClass}>
+            <EmbedUrlError title={title} />
+          </div>
+        </div>
+      );
+    }
+    return null;
+  }
+
   return (
     <div className={wrapperClass}>
       <div className={frameClass}>
-        <VideoPlayer video={video} className={mediaClass} background={false} title={title} />
+        <SiteVideoPlayer video={video} className={mediaClass} background={false} title={title} />
       </div>
     </div>
   );

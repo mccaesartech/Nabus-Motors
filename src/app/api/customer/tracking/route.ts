@@ -10,7 +10,7 @@ async function loadShipmentEvents(
 ) {
   const { data } = await supabase
     .from("shipment_timeline_events")
-    .select("id, event_type, title, description, location, event_at, is_customer_visible")
+    .select("id, event_type, title, description, location, event_at, is_customer_visible, estimated_completion, admin_comment, attachment_urls")
     .eq("shipment_id", shipmentId)
     .eq("is_customer_visible", true)
     .order("event_at", { ascending: false });

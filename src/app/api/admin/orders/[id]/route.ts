@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin/auth";
 import { notifyCustomer } from "@/lib/notifications/customer-notify";
+import { notifyCustomerOrderConfirmed } from "@/lib/customer/notifications-server";
+import { formatCustomerNotificationFeedback } from "@/lib/notifications/notification-status";
 import { logPlatformActivity } from "@/lib/platform/activity";
 import { fetchAdminOrderDetail } from "@/lib/platform/orders-admin";
 import { createAdminSupabase } from "@/lib/supabase/admin";
@@ -71,7 +73,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     }
 
     const orderRef = id.slice(0, 8).toUpperCase();
-    await notifyCustomer({
+    const notificationResult = await notifyCustomer({
       email: existing.email,
       phone: existing.phone,
       whatsappPreferred: true,
@@ -85,13 +87,28 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       sourceId: id,
     });
 
+    await notifyCustomerOrderConfirmed(supabase, {
+      userId: existing.userId,
+      orderId: id,
+      orderRef,
+    });
+
     await logPlatformActivity(auth.auth, "lead_updated", id, {
       action: "order_confirmed",
       customer_email: existing.email,
     });
 
     const order = await fetchAdminOrderDetail(supabase, id);
-    return NextResponse.json({ ok: true, order });
+    const feedback = formatCustomerNotificationFeedback(notificationResult, {
+      savedPrefix: "Order confirmed",
+    });
+    return NextResponse.json({
+      ok: true,
+      order,
+      notification: notificationResult,
+      notificationMessage: feedback.message,
+      notificationVariant: feedback.variant,
+    });
   }
 
   const updates: Record<string, string> = {};
@@ -136,7 +153,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
 
   if (updates.status === "confirmed" && existing.status !== "confirmed") {
     const orderRef = id.slice(0, 8).toUpperCase();
-    await notifyCustomer({
+    const notificationResult = await notifyCustomer({
       email: existing.email,
       phone: existing.phone,
       whatsappPreferred: true,
@@ -148,6 +165,24 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       },
       sourceTable: "parts_orders",
       sourceId: id,
+    });
+
+    await notifyCustomerOrderConfirmed(supabase, {
+      userId: existing.userId,
+      orderId: id,
+      orderRef,
+    });
+
+    const order = await fetchAdminOrderDetail(supabase, id);
+    const feedback = formatCustomerNotificationFeedback(notificationResult, {
+      savedPrefix: "Order updated",
+    });
+    return NextResponse.json({
+      ok: true,
+      order,
+      notification: notificationResult,
+      notificationMessage: feedback.message,
+      notificationVariant: feedback.variant,
     });
   }
 

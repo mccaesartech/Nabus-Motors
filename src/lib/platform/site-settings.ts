@@ -82,21 +82,6 @@ export function toOperationalSettings(settings: SiteSettings): OperationalSettin
   };
 }
 
-export async function getSiteSettings(): Promise<OperationalSettings> {
-  const supabase = createAdminSupabase();
-  if (!supabase) {
-    return toOperationalSettings(DEFAULT_SITE_SETTINGS as SiteSettings);
-  }
-
-  const { data, error } = await supabase.from("site_settings").select("key, value");
-  if (error) {
-    console.error("site_settings fetch failed:", error.message);
-    return toOperationalSettings(DEFAULT_SITE_SETTINGS as SiteSettings);
-  }
-
-  return toOperationalSettings(mergeSiteSettings(data));
-}
-
 export async function getAdminSiteSettings(): Promise<SiteSettings> {
   const supabase = createAdminSupabase();
   if (!supabase) {

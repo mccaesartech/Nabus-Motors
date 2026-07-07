@@ -3,7 +3,14 @@ export function friendlyAdminDbError(message: string): string {
   const lower = message.toLowerCase();
 
   if (lower.includes("gallery") && lower.includes("schema cache")) {
-    return "Database is missing the gallery column. Run supabase/migrations/012_vehicle_image_categories.sql in the Supabase SQL Editor, then try again.";
+    return "Database is missing vehicle gallery columns. Run supabase/migrations/060_vehicle_gallery_images.sql in the Supabase SQL Editor, then try again.";
+  }
+
+  if (
+    (lower.includes("primary_image_url") || lower.includes("additional_images")) &&
+    lower.includes("schema cache")
+  ) {
+    return "Database is missing vehicle image columns. Run supabase/migrations/060_vehicle_gallery_images.sql in the Supabase SQL Editor, then try again.";
   }
 
   if (lower.includes("site_content") && lower.includes("schema cache")) {

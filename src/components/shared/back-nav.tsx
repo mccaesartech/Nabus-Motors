@@ -73,3 +73,6 @@ export function BackNav({
     </button>
   );
 }
+
+/** Alias for customer-facing pages — same as BackNav. */
+export const PageBackNav = BackNav;

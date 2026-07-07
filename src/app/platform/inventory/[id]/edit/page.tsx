@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/platform/page-header";
 import { CategoryBadges } from "@/components/admin/category-badges";
 import { PlatformVehicleForm } from "@/components/platform/platform-vehicle-form";
 import type { VehicleInput } from "@/lib/admin/vehicle-fields";
+import { parseTrustBadges } from "@/lib/vehicles/trust-badges";
 import { adminLoginPath } from "@/lib/admin/paths";
 import {
   adminErrorMessage,
@@ -32,6 +33,11 @@ export default function EditVehiclePage() {
   const [vehicle, setVehicle] = useState<DbVehicle | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [interestStats, setInterestStats] = useState<{
+    uniqueEmails: number;
+    totalActivities: number;
+    recentActivities: number;
+  } | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/vehicles");
@@ -43,6 +49,17 @@ export default function EditVehiclePage() {
     const found = (json.vehicles as DbVehicle[] | undefined)?.find((v) => v.id === id);
     setVehicle(found ?? null);
     setLoading(false);
+
+    if (found) {
+      fetch(`/api/admin/vehicles/${id}/interest`, { credentials: "same-origin" })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data?.ok && data.stats) setInterestStats(data.stats);
+        })
+        .catch(() => {
+          // non-blocking
+        });
+    }
   }, [id, router]);
 
   useEffect(() => {
@@ -126,6 +143,19 @@ export default function EditVehiclePage() {
         </span>
         <CategoryBadges vehicle={vehicle} variant="platform" />
       </div>
+      {interestStats && (
+        <div className="rounded-lg border border-[var(--platform-border)] bg-[var(--platform-surface)] px-4 py-3 text-sm text-[var(--platform-text)]">
+          <p className="font-medium">Customer interest</p>
+          <p className="mt-1 text-[var(--platform-text-secondary)]">
+            {interestStats.uniqueEmails} unique contact
+            {interestStats.uniqueEmails === 1 ? "" : "s"} · {interestStats.totalActivities}{" "}
+            tracked activit{interestStats.totalActivities === 1 ? "y" : "ies"}
+            {interestStats.recentActivities > 0
+              ? ` · ${interestStats.recentActivities} in the last 30 days`
+              : ""}
+          </p>
+        </div>
+      )}
       <PlatformVehicleForm
         initial={{
           id: vehicle.id,
@@ -148,7 +178,18 @@ export default function EditVehiclePage() {
           featured: formVehicle.featured,
           status: formVehicle.status,
           images: formVehicle.images,
+          primary_image_url: formVehicle.primary_image_url ?? undefined,
+          additional_images: formVehicle.additional_images ?? undefined,
           gallery: formVehicle.gallery,
+          trust_badges: parseTrustBadges(formVehicle.trust_badges),
+          inspection_summary: formVehicle.inspection_summary ?? undefined,
+          warranty_notes: formVehicle.warranty_notes ?? undefined,
+          walkaround_video_url: formVehicle.walkaround_video_url ?? undefined,
+          country_of_origin: (formVehicle.country_of_origin ?? "") as VehicleInput["country_of_origin"],
+          financing_available: formVehicle.financing_available ?? true,
+          shipment_available: formVehicle.shipment_available ?? true,
+          customs_clearing_available: formVehicle.customs_clearing_available ?? true,
+          available_locally: formVehicle.available_locally ?? false,
         }}
         onSave={save}
         onCancel={() => router.push(platformPath("inventory"))}

@@ -1,7 +1,10 @@
 import "server-only";
 import { getAdminSiteSettings } from "@/lib/platform/site-settings";
+import {
+  getTermiiConfig,
+} from "@/lib/notifications/termii-config";
 
-export type WhatsAppProvider = "twilio" | "meta" | "";
+export type WhatsAppProvider = "twilio" | "meta" | "termii" | "";
 
 export type WhatsAppConfig = {
   provider: WhatsAppProvider;
@@ -20,8 +23,12 @@ function normalizeSecret(value: string | undefined): string {
 }
 
 function readEnvProvider(): WhatsAppProvider {
+  const unified = normalizeSecret(process.env.NOTIFICATION_PROVIDER)?.toLowerCase();
+  if (unified === "termii") return "termii";
   const raw = normalizeSecret(process.env.WHATSAPP_PROVIDER)?.toLowerCase();
-  if (raw === "twilio" || raw === "meta") return raw;
+  if (raw === "twilio" || raw === "meta" || raw === "termii") return raw;
+  if (normalizeSecret(process.env.SMS_PROVIDER)?.toLowerCase() === "termii") return "termii";
+  if (normalizeSecret(process.env.TERMII_API_KEY)) return "termii";
   if (normalizeSecret(process.env.TWILIO_ACCOUNT_SID)) return "twilio";
   if (normalizeSecret(process.env.WHATSAPP_ACCESS_TOKEN)) return "meta";
   return "";
@@ -36,16 +43,26 @@ export function readWhatsAppConfigFromEnv(): WhatsAppConfig {
     normalizeSecret(process.env.TWILIO_WHATSAPP_NUMBER);
   const metaAccessToken = normalizeSecret(process.env.WHATSAPP_ACCESS_TOKEN);
   const phoneNumberId = normalizeSecret(process.env.WHATSAPP_PHONE_NUMBER_ID);
+  const termiiApiKey = normalizeSecret(process.env.TERMII_API_KEY);
+  const termiiDevice =
+    normalizeSecret(process.env.TERMII_WHATSAPP_DEVICE_ID) ||
+    normalizeSecret(process.env.TERMII_WHATSAPP_DEVICE) ||
+    normalizeSecret(process.env.TERMII_WHATSAPP_FROM) ||
+    normalizeSecret(process.env.TERMII_SENDER_ID);
 
+  const termiiReady = Boolean(termiiApiKey && termiiDevice);
   const twilioReady = Boolean(twilioAccountSid && twilioAuthToken && twilioFrom);
   const metaReady = Boolean(metaAccessToken && phoneNumberId);
   const configured =
+    (provider === "termii" && termiiReady) ||
     (provider === "twilio" && twilioReady) ||
     (provider === "meta" && metaReady) ||
-    (!provider && (twilioReady || metaReady));
+    (!provider && (termiiReady || twilioReady || metaReady));
 
   return {
-    provider: provider || (twilioReady ? "twilio" : metaReady ? "meta" : ""),
+    provider:
+      provider ||
+      (termiiReady ? "termii" : twilioReady ? "twilio" : metaReady ? "meta" : ""),
     configured,
     phoneNumberId,
     twilioAccountSid,
@@ -70,15 +87,20 @@ export async function getWhatsAppConfig(): Promise<WhatsAppConfig> {
   const twilioAuthToken = settings.twilio_auth_token?.trim() || "";
   const twilioFrom = settings.twilio_whatsapp_from?.trim() || "";
 
+  const termiiConfig = await getTermiiConfig();
+  const termiiReady = termiiConfig.whatsappReady;
   const twilioReady = Boolean(twilioAccountSid && twilioAuthToken && twilioFrom);
   const metaReady = Boolean(metaAccessToken && phoneNumberId);
   const configured =
+    (provider === "termii" && termiiReady) ||
     (provider === "twilio" && twilioReady) ||
     (provider === "meta" && metaReady) ||
-    (!provider && (twilioReady || metaReady));
+    (!provider && (termiiReady || twilioReady || metaReady));
 
   return {
-    provider: provider || (twilioReady ? "twilio" : metaReady ? "meta" : ""),
+    provider:
+      provider ||
+      (termiiReady ? "termii" : twilioReady ? "twilio" : metaReady ? "meta" : ""),
     configured,
     phoneNumberId,
     twilioAccountSid,

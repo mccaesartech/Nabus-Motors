@@ -52,6 +52,7 @@ export function SortBar({ total }: SortBarProps) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="newest">Newest Listed</SelectItem>
+            <SelectItem value="most-popular">Most Popular</SelectItem>
             <SelectItem value="price-asc">Price: Low to High</SelectItem>
             <SelectItem value="price-desc">Price: High to Low</SelectItem>
             <SelectItem value="year-desc">Year: Newest</SelectItem>

@@ -1,12 +1,30 @@
 import type { VehicleInput } from "./vehicle-fields";
-import { galleryFromInput, imagesFromGallery } from "./vehicle-fields";
+import { DEFAULT_TRUST_BADGES } from "@/lib/vehicles/trust-badges";
+import {
+  galleryFromInput,
+  imagesFromGallery,
+  primaryAndAdditionalFromVehicle,
+  syncVehicleImagesFromPrimaryAndAdditional,
+} from "./vehicle-fields";
 
 export function rowFromInput(
   input: VehicleInput,
   slug: string
 ): Record<string, unknown> {
-  const gallery = galleryFromInput(input.gallery, input.images);
-  const images = imagesFromGallery(gallery);
+  const { primaryImageUrl, additionalImages } =
+    input.primary_image_url !== undefined || input.additional_images !== undefined
+      ? {
+          primaryImageUrl: input.primary_image_url ?? "",
+          additionalImages: input.additional_images ?? [],
+        }
+      : primaryAndAdditionalFromVehicle(input);
+
+  const synced = syncVehicleImagesFromPrimaryAndAdditional(
+    primaryImageUrl,
+    additionalImages
+  );
+  const gallery = synced.gallery ?? galleryFromInput(input.gallery, input.images);
+  const images = synced.images ?? imagesFromGallery(gallery);
 
   return {
     slug,
@@ -28,6 +46,8 @@ export function rowFromInput(
       input.description?.trim() ||
       `${input.year} ${input.make} ${input.model} — verified and ready for delivery across Ghana.`,
     featured: Boolean(input.featured),
+    primary_image_url: synced.primary_image_url || null,
+    additional_images: synced.additional_images ?? [],
     images,
     gallery,
     specs: [],
@@ -42,6 +62,15 @@ export function rowFromInput(
       },
     ],
     status: input.status || "available",
+    trust_badges: input.trust_badges ?? DEFAULT_TRUST_BADGES,
+    inspection_summary: input.inspection_summary?.trim() || null,
+    country_of_origin: input.country_of_origin?.trim() || null,
+    financing_available: input.financing_available !== false,
+    shipment_available: input.shipment_available !== false,
+    customs_clearing_available: input.customs_clearing_available !== false,
+    warranty_notes: input.warranty_notes?.trim() || null,
+    walkaround_video_url: input.walkaround_video_url?.trim() || null,
+    available_locally: Boolean(input.available_locally),
   };
 }
 

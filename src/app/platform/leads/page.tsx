@@ -319,12 +319,25 @@ export default function LeadsPage() {
                   return (
                     <tr
                       key={key}
+                      role={isClickable ? "button" : undefined}
+                      tabIndex={isClickable ? 0 : undefined}
                       className={cn(
                         "border-t border-[var(--platform-border)] align-top",
-                        isClickable && "cursor-pointer hover:bg-[rgba(139,92,246,0.04)]"
+                        isClickable &&
+                          "cursor-pointer select-none hover:bg-[rgba(139,92,246,0.04)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--platform-accent)]"
                       )}
                       onClick={() => {
                         if (isClickable && lead.detailLink) router.push(lead.detailLink);
+                      }}
+                      onKeyDown={(e) => {
+                        if (
+                          isClickable &&
+                          lead.detailLink &&
+                          (e.key === "Enter" || e.key === " ")
+                        ) {
+                          e.preventDefault();
+                          router.push(lead.detailLink);
+                        }
                       }}
                     >
                       <td className="px-4 py-3 whitespace-nowrap text-[var(--platform-text-secondary)]">
@@ -483,8 +496,8 @@ export default function LeadsPage() {
                         >
                           <Trash2 className="size-4" />
                         </button>
-                        {(lead.type === "preorder" || lead.type === "order") && lead.detailLink ? (
-                          <div className="mt-2 flex flex-col gap-1">
+                        {lead.detailLink ? (
+                          <div className="flex flex-col gap-1">
                             <Link
                               href={lead.detailLink}
                               className="inline-flex items-center gap-1 text-xs text-[var(--platform-accent)] hover:underline"
@@ -495,7 +508,7 @@ export default function LeadsPage() {
                             <Link
                               href={
                                 lead.email
-                                  ? `/platform/messages?email=${encodeURIComponent(lead.email)}`
+                                  ? `/platform/messages?email=${encodeURIComponent(lead.email)}&name=${encodeURIComponent(lead.name)}`
                                   : "/platform/messages"
                               }
                               className="inline-flex items-center gap-1 text-xs text-[var(--platform-accent)] hover:underline"

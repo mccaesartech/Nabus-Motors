@@ -5,13 +5,14 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronRight, Search, Trash2 } from "lucide-react";
 import { ContactEmailAction, ContactPhoneAction } from "@/components/platform/contact-actions";
+import { CustomerInvoicePrintButton } from "@/components/platform/customer-invoice-print";
 import { CustomerDataTrustNote } from "@/components/forms/customer-data-trust-note";
 import { ConfirmDialog } from "@/components/platform/confirm-dialog";
 import { PageHeader } from "@/components/platform/page-header";
 import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
 import { platformPath } from "@/lib/platform/paths";
-import type { AdminCustomerListItem } from "@/lib/platform/customers-admin";
+import type { AdminCustomerDetail, AdminCustomerListItem } from "@/lib/platform/customers-admin";
 import { PlatformDateTime } from "@/components/platform/platform-datetime";
 
 export default function CustomersPage() {
@@ -25,9 +26,7 @@ export default function CustomersPage() {
   const [deleteTarget, setDeleteTarget] = useState<AdminCustomerListItem | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [detailById, setDetailById] = useState<Record<string, AdminCustomerListItem & {
-    recentQuotes?: Array<{ id: string; referenceCode: string | null; createdAt: string }>;
-  }>>({});
+  const [detailById, setDetailById] = useState<Record<string, AdminCustomerDetail>>({});
   const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null);
 
   const load = useCallback(async (query?: string, includeDeleted?: boolean) => {
@@ -232,7 +231,12 @@ export default function CustomersPage() {
                         <td className="px-4 py-3 tabular-nums">{customer.preordersCount}</td>
                         <td className="px-4 py-3 tabular-nums">{customer.shipmentsCount}</td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <CustomerInvoicePrintButton
+                              customerId={customer.id}
+                              customer={detail}
+                              compact
+                            />
                             <Link
                               href={platformPath(`customers/${encodeURIComponent(customer.id)}`)}
                               className="text-xs text-[var(--platform-accent)] hover:underline"

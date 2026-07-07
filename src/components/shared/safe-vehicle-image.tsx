@@ -1,9 +1,13 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { PLACEHOLDER_IMAGE } from "@/lib/data/vehicle-images";
 import { normalizeMediaUrl } from "@/lib/site-content/media-url";
 import { cn } from "@/lib/utils";
+
+const DEFAULT_SIZES =
+  "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1536px) 33vw, 25vw";
 
 interface SafeVehicleImageProps {
   src?: string;
@@ -13,6 +17,7 @@ interface SafeVehicleImageProps {
   priority?: boolean;
   width?: number;
   height?: number;
+  sizes?: string;
 }
 
 export function SafeVehicleImage({
@@ -23,6 +28,7 @@ export function SafeVehicleImage({
   priority,
   width,
   height,
+  sizes,
 }: SafeVehicleImageProps) {
   const resolved = normalizeMediaUrl(src ?? "") || PLACEHOLDER_IMAGE;
   const [imgSrc, setImgSrc] = useState(resolved);
@@ -42,13 +48,14 @@ export function SafeVehicleImage({
 
   if (!fill && width && height) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
+      <Image
         src={imgSrc}
         alt={alt}
         width={width}
         height={height}
-        loading={priority ? "eager" : "lazy"}
+        sizes={sizes ?? `${width}px`}
+        priority={priority}
+        loading={priority ? undefined : "lazy"}
         decoding="async"
         referrerPolicy="no-referrer"
         className={cn("object-cover", className)}
@@ -58,18 +65,16 @@ export function SafeVehicleImage({
   }
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
+    <Image
       src={imgSrc}
       alt={alt}
-      loading={priority ? "eager" : "lazy"}
+      fill
+      sizes={sizes ?? DEFAULT_SIZES}
+      priority={priority}
+      loading={priority ? undefined : "lazy"}
       decoding="async"
       referrerPolicy="no-referrer"
-      className={cn(
-        fill && "absolute inset-0 h-full w-full",
-        "object-cover",
-        className
-      )}
+      className={cn("object-cover", className)}
       onError={handleError}
     />
   );

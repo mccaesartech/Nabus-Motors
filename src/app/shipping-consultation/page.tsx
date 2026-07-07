@@ -1,6 +1,6 @@
 import { Container } from "@/components/shared/container";
 import { SectionHeader } from "@/components/shared/section-header";
-import { ServiceImageCardGrid } from "@/components/shared/service-image-card";
+import { FreightServiceCards } from "@/components/freight/freight-service-cards";
 import { ShippingConsultationForm } from "@/components/freight/shipping-consultation-form";
 import { getSiteContent } from "@/lib/site-content";
 
@@ -22,14 +22,14 @@ export default async function ShippingConsultationPage() {
         <SectionHeader title={page.heroTitle} description={page.heroSubtitle} />
 
         <div className="mb-10">
-          <ServiceImageCardGrid
+          <FreightServiceCards
             cards={page.cards.map((item) => ({
               id: item.id,
               title: item.title,
               subtitle: item.description,
               image: item.image,
               imageAlt: item.imageAlt,
-              href: item.href || "#consultation-form",
+              href: item.id === "advice" ? undefined : item.href || "#consultation-form",
             }))}
           />
         </div>

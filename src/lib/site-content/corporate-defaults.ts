@@ -535,6 +535,17 @@ export const DEFAULT_FREIGHT_TRACKING_PAGE: FreightTrackingSiteContent = {
       imageAlt: "Cargo vessel at an international port",
     },
     {
+      id: "advice",
+      icon: "MessageCircle",
+      title: "Personalised advice",
+      description:
+        "Speak with our logistics team about timelines, duties, and total landed cost.",
+      cta: "",
+      href: "#advice",
+      image: "/images/services/personalised-advice.jpg",
+      imageAlt: "Freight advisor providing personalised import guidance",
+    },
+    {
       id: "delivery",
       icon: "Truck",
       title: "Delivery coordination",

@@ -24,3 +24,13 @@
 ## After success
 
 Table Editor → **vehicles** should show **75 rows**.
+
+## Performance indexes (required for production speed)
+
+Run **`supabase/migrations/049_performance_indexes.sql`** in the SQL Editor after setup.
+This adds indexes for inventory listings, dashboard stats, and cart lookups.
+Safe to re-run (`IF NOT EXISTS`).
+
+```sql
+-- Copy entire file: supabase/migrations/049_performance_indexes.sql
+```

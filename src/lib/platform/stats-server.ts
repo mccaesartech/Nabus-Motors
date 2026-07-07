@@ -193,7 +193,7 @@ async function computePlatformStats(): Promise<PlatformStatsPayload | null> {
 const getCachedPlatformStats = unstable_cache(
   computePlatformStats,
   ["platform-dashboard-stats"],
-  { revalidate: 45 }
+  { revalidate: 120 }
 );
 
 export async function getPlatformStats(): Promise<PlatformStatsPayload | null> {

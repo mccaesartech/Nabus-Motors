@@ -1,3 +1,5 @@
+import type { VehicleTrustBadges, TrustBadgeKey } from "@/lib/vehicles/trust-badges";
+
 export type BodyType =
   | "SUV"
   | "Sedan"
@@ -13,6 +15,10 @@ export type FuelType = "Petrol" | "Diesel" | "Hybrid" | "Electric" | "Plug-in Hy
 export type Transmission = "Automatic" | "Manual" | "CVT" | "DCT";
 
 export type Condition = "New" | "Used" | "Certified Pre-Owned";
+
+export type CountryOfOrigin = "china" | "japan" | "ghana" | "other";
+
+export type { VehicleTrustBadges, TrustBadgeKey };
 
 export type VehicleAvailabilityStatus =
   | "available"
@@ -74,10 +80,21 @@ export interface Vehicle {
   description: string;
   featured: boolean;
   images: string[];
+  primaryImageUrl?: string;
+  additionalImages?: string[];
   gallery?: VehicleGalleryData;
   specs: VehicleSpec[];
   history: HistoryEvent[];
   status?: VehicleAvailabilityStatus;
+  trustBadges?: VehicleTrustBadges;
+  inspectionSummary?: string | null;
+  countryOfOrigin?: CountryOfOrigin | null;
+  financingAvailable?: boolean;
+  shipmentAvailable?: boolean;
+  customsClearingAvailable?: boolean;
+  warrantyNotes?: string | null;
+  walkaroundVideoUrl?: string | null;
+  availableLocally?: boolean;
   createdAt: string;
 }
 
@@ -95,6 +112,10 @@ export interface VehicleFilters {
   location?: string;
   mileageMax?: number;
   chineseBrands?: boolean;
+  countryOfOrigin?: "china" | "japan";
+  financingAvailable?: boolean;
+  shipmentAvailable?: boolean;
+  customsClearingAvailable?: boolean;
   status?: VehicleAvailabilityStatus;
 }
 
@@ -104,7 +125,8 @@ export type SortOption =
   | "year-desc"
   | "year-asc"
   | "mileage-asc"
-  | "newest";
+  | "newest"
+  | "most-popular";
 
 export interface Testimonial {
   id: string;

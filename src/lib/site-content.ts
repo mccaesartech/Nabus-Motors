@@ -7,7 +7,7 @@ import { cache } from "react";
 export const SITE_CONTENT_CACHE_TAG = "site-content";
 
 /** Time-based revalidation for CMS content (seconds). */
-export const SITE_CONTENT_REVALIDATE_SECONDS = 60;
+export const SITE_CONTENT_REVALIDATE_SECONDS = 120;
 import {
   DEFAULT_HERO_BACKGROUND_VIDEO_URL,
   DEFAULT_HERO_POSTER_URL,

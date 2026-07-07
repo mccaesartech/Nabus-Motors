@@ -13,15 +13,20 @@ import type { Vehicle } from "@/lib/types";
 import { formatMileage, formatVehicleName } from "@/lib/format";
 import { VehiclePriceSection } from "@/components/vehicle/vehicle-price-section";
 import { ContactActions } from "@/components/vehicle/contact-actions";
+import { PriceDropAlert } from "@/components/vehicle/price-drop-alert";
 import { FinancingCalculator } from "@/components/vehicle/financing-calculator";
 import { AvailabilityBadge } from "@/components/vehicle/availability-badge";
+import { LocalAvailabilityBadge } from "@/components/vehicle/local-availability-badge";
+import { VehicleTrustBadges } from "@/components/vehicle/vehicle-trust-badges";
 import { PreorderForm } from "@/components/vehicle/preorder-form";
 import { AddVehicleToCartButton } from "@/components/vehicle/add-vehicle-to-cart-button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useGarage } from "@/hooks/use-garage";
+import { recordVehicleEngagement } from "@/lib/vehicle-preferences";
 import { useCurrency } from "@/context/currency-context";
 import { downPaymentUsd, isPreOrderStatus } from "@/lib/vehicles/availability";
+import { DEFAULT_TRUST_BADGES } from "@/lib/vehicles/trust-badges";
 
 interface VehicleDetailSidebarProps {
   vehicle: Vehicle;
@@ -34,17 +39,28 @@ export function VehicleDetailSidebar({ vehicle }: VehicleDetailSidebarProps) {
 
   useEffect(() => {
     addRecent(vehicle.id);
-  }, [vehicle.id, addRecent]);
+    recordVehicleEngagement("view", vehicle);
+  }, [vehicle, addRecent]);
 
   return (
     <div className="space-y-6">
       <div className="border border-border p-5 shadow-luxury">
         <div className="flex flex-wrap gap-2">
           <AvailabilityBadge status={vehicle.status ?? "available"} />
+          <LocalAvailabilityBadge available={vehicle.availableLocally} />
           {vehicle.featured && <Badge variant="featured">Featured</Badge>}
-          {vehicle.condition === "Certified Pre-Owned" && (
-            <Badge variant="verified">Verified</Badge>
-          )}
+        </div>
+        {vehicle.availableLocally && isPreOrderStatus(vehicle.status) && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            This vehicle is still listed as pre-order, but stock is now available locally in Ghana
+            — purchase without international shipping.
+          </p>
+        )}
+        <div className="mt-2">
+          <VehicleTrustBadges
+            badges={vehicle.trustBadges ?? DEFAULT_TRUST_BADGES}
+            variant="inline"
+          />
         </div>
 
         <h1 className="mt-3 text-xl font-semibold leading-tight">
@@ -119,6 +135,7 @@ export function VehicleDetailSidebar({ vehicle }: VehicleDetailSidebarProps) {
       </div>
 
       <FinancingCalculator price={vehicle.price} />
+      <PriceDropAlert vehicle={vehicle} />
     </div>
   );
 }

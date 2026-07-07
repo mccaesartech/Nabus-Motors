@@ -7,7 +7,6 @@ import { useHashScroll } from "@/hooks/use-hash-scroll";
 import { Package, Search } from "lucide-react";
 import { Container } from "@/components/shared/container";
 import { SectionHeader } from "@/components/shared/section-header";
-import { BackNav } from "@/components/shared/back-nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +16,7 @@ import { ServiceImageCardGrid } from "@/components/shared/service-image-card";
 import { ROUTES } from "@/lib/routes";
 import type { PartCategory, PublishedPart } from "@/lib/data/parts";
 
+import { PartsFitmentWizard } from "@/components/parts/parts-fitment-wizard";
 import type { SparePartsLandingSiteContent } from "@/lib/site-content/corporate-defaults";
 
 type SparePartsCatalogProps = {
@@ -26,6 +26,7 @@ type SparePartsCatalogProps = {
   initialCategory: string;
   initialBrand: string;
   initialMake: string;
+  initialModel: string;
   landing: SparePartsLandingSiteContent;
 };
 
@@ -36,6 +37,7 @@ export function SparePartsCatalog({
   initialCategory,
   initialBrand,
   initialMake,
+  initialModel,
   landing,
 }: SparePartsCatalogProps) {
   const router = useRouter();
@@ -44,15 +46,25 @@ export function SparePartsCatalog({
   const [category, setCategory] = useState(initialCategory);
   const [brand, setBrand] = useState(initialBrand);
   const [make, setMake] = useState(initialMake);
+  const [model, setModel] = useState(initialModel);
 
   useEffect(() => {
     setQ(initialQ);
     setCategory(initialCategory);
     setBrand(initialBrand);
     setMake(initialMake);
-  }, [initialQ, initialCategory, initialBrand, initialMake]);
+    setModel(initialModel);
+  }, [initialQ, initialCategory, initialBrand, initialMake, initialModel]);
 
-  useHashScroll(initialCategory, initialQ, initialBrand, initialMake, parts.length);
+  useHashScroll(initialCategory, initialQ, initialBrand, initialMake, initialModel, parts.length);
+
+  const hasActiveFilters = Boolean(
+    initialQ.trim() ||
+      initialCategory ||
+      initialBrand.trim() ||
+      initialMake.trim() ||
+      initialModel.trim()
+  );
 
   function applyFilters() {
     const params = new URLSearchParams(searchParams.toString());
@@ -64,6 +76,8 @@ export function SparePartsCatalog({
     else params.delete("brand");
     if (make.trim()) params.set("make", make.trim());
     else params.delete("make");
+    if (model.trim()) params.set("model", model.trim());
+    else params.delete("model");
     router.push(`${ROUTES.auto.spareParts}?${params.toString()}`);
   }
 
@@ -72,18 +86,16 @@ export function SparePartsCatalog({
     setCategory("");
     setBrand("");
     setMake("");
+    setModel("");
     router.push(ROUTES.auto.spareParts);
   }
 
   return (
     <Container className="py-12 sm:py-16">
-      <BackNav href={ROUTES.auto.home} label="Back to Auto Division" variant="public" />
-
       <div className="mx-auto max-w-6xl">
         <SectionHeader
           title={landing.title}
           description={landing.subtitle}
-          className="mt-6"
         />
 
         {landing.cards.length > 0 && (
@@ -104,8 +116,10 @@ export function SparePartsCatalog({
           />
         )}
 
+        {!hasActiveFilters && <PartsFitmentWizard className="mt-8" />}
+
         <div className="mb-8 mt-10 rounded-xl border border-border bg-card p-4 shadow-luxury sm:p-6">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="parts-search">Search</Label>
               <div className="relative">
@@ -152,6 +166,15 @@ export function SparePartsCatalog({
                 value={make}
                 onChange={(e) => setMake(e.target.value)}
                 placeholder="e.g. Honda"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="parts-model">Compatible model</Label>
+              <Input
+                id="parts-model"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                placeholder="e.g. CR-V"
               />
             </div>
           </div>

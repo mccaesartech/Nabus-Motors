@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { InquiryData, InquiryTab, UnifiedLead } from "@/lib/platform/types";
+import { leadDetailLink } from "@/lib/platform/lead-detail";
 import {
   type PreorderInquiryRow,
   normalizeVehicle,
@@ -179,12 +180,7 @@ export function unifyLeads(data: InquiryData): UnifiedLead[] {
         createdAt: String(row.created_at ?? ""),
         vehicleTitle: vehicleLabelFromRow(row, tab),
         vehicleImage: preorderRow ? vehicleImageFromRow(preorderRow) : undefined,
-        detailLink:
-          tab === "preorder"
-            ? `/platform/leads/preorder/${String(row.id)}`
-            : tab === "order"
-              ? `/platform/leads/order/${String(row.id)}`
-              : undefined,
+        detailLink: leadDetailLink(tab, String(row.id)),
         paymentStatus:
           tab === "preorder"
             ? (String(row.payment_status ?? "pending") as UnifiedLead["paymentStatus"])

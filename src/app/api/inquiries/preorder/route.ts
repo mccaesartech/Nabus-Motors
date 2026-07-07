@@ -21,6 +21,7 @@ import {
   notifyVehicleSaleToLeadsTeam,
   preorderLeadsLink,
 } from "@/lib/platform/vehicle-sale-notifications";
+import { recordVehicleInterest } from "@/lib/vehicle-interest/server";
 
 export async function POST(req: NextRequest) {
   try {
@@ -212,6 +213,16 @@ export async function POST(req: NextRequest) {
         totalUsd: priceUsd || null,
         registrationId,
       });
+
+      if (resolvedVehicleId) {
+        await recordVehicleInterest(adminSupabase, {
+          vehicleId: resolvedVehicleId,
+          activityType: "preorder_inquiry",
+          userId: linkedUserId,
+          email: trimmedEmail,
+          phone: effectivePhone || null,
+        });
+      }
     }
 
     let passwordResetUrl: string | undefined;

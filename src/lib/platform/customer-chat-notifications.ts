@@ -1,6 +1,9 @@
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 import type { PlatformAuthContext } from "@/lib/admin/auth";
 import { hasPermission, normalizeRole } from "@/lib/platform/permissions";
+import { resolveCustomerContactByUserId } from "@/lib/notifications/customer-contact";
+import { notifyCustomer } from "@/lib/notifications/customer-notify";
+import type { CustomerNotificationPayload } from "@/lib/notifications/notification-status";
 
 const MESSAGE_PREVIEW_LEN = 80;
 
@@ -59,27 +62,52 @@ export async function notifyCustomerOfStaffMessage(
   supabase: SupabaseClient,
   message: MessageRow,
   conversation: ConversationRow
-): Promise<void> {
+): Promise<CustomerNotificationPayload | null> {
   const { sendCustomerStaffMessageEmail } = await import(
     "@/lib/email/customer-message"
   );
 
   const preview = truncatePreview(message.body);
-  await sendCustomerStaffMessageEmail({
-    to: conversation.customer_email,
-    customerName: conversation.customer_name,
-    subject: conversation.subject,
-    preview,
-    staffName: message.sender_name,
+  const contact = await resolveCustomerContactByUserId(supabase, conversation.user_id);
+  const emailTo = conversation.customer_email?.trim() || contact.email;
+
+  let emailSent = false;
+  if (emailTo) {
+    const mail = await sendCustomerStaffMessageEmail({
+      to: emailTo,
+      customerName: conversation.customer_name,
+      subject: conversation.subject,
+      preview,
+      staffName: message.sender_name,
+    });
+    emailSent = mail.emailSent;
+  }
+
+  const notify = await notifyCustomer({
+    email: emailTo,
+    phone: contact.phone,
+    whatsappPreferred: contact.whatsappPreferred,
+    customerName: conversation.customer_name || contact.customerName,
+    template: "staff_message",
+    data: {
+      messageSubject: conversation.subject,
+      messagePreview: preview,
+      staffName: message.sender_name,
+    },
+    sourceTable: "customer_conversation_messages",
+    sourceId: message.id,
+    skipEmail: true,
   });
 
-  await broadcastCustomerChatRealtime(
-    supabase,
-    message,
-    conversation,
-    [],
-    "staff"
-  );
+  return {
+    ...notify,
+    emailSent: emailSent || notify.emailSent,
+    emailStatus: emailSent ? "sent" : notify.emailStatus,
+    channels: [
+      ...notify.channels,
+      ...(emailSent && !notify.channels.includes("email") ? ["email"] : []),
+    ],
+  };
 }
 
 async function subscribeAndSend(

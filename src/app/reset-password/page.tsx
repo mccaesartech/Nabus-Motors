@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Container } from "@/components/shared/container";
 import { Logo } from "@/components/shared/logo";
-import { BackNav } from "@/components/shared/back-nav";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
@@ -73,7 +72,6 @@ function ResetPasswordForm() {
   return (
     <Container className="py-16 sm:py-20">
       <div className="mx-auto max-w-md">
-        <BackNav href="/login" label="Back to sign in" variant="public" className="mb-6" />
         <div className="mb-8 flex justify-center">
           <Logo variant="purple" brand="corporate" height={52} />
         </div>

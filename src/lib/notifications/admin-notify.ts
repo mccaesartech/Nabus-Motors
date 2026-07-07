@@ -3,7 +3,7 @@ import { sendCustomerNotificationEmail } from "@/lib/notifications/customer-emai
 import { toWhatsAppE164 } from "@/lib/notifications/phone";
 import { sendWhatsAppMessage } from "@/lib/notifications/whatsapp-send";
 import type { OperationalSettings } from "@/lib/platform/site-settings";
-import { getSiteSettings } from "@/lib/platform/site-settings";
+import { getSiteSettings } from "@/lib/platform/site-settings-server";
 
 export async function notifyAdminOutbound(params: {
   subject: string;

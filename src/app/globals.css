@@ -196,10 +196,49 @@
   html {
     overflow-x: hidden;
     scroll-behavior: smooth;
+    cursor: default;
   }
   body {
     @apply bg-background text-foreground antialiased;
     overflow-x: hidden;
+  }
+  /* I-beam cursor only on real editable fields */
+  :where(
+    input:not(
+        [type="button"],
+        [type="submit"],
+        [type="reset"],
+        [type="checkbox"],
+        [type="radio"],
+        [type="file"],
+        [type="range"],
+        [type="color"],
+        [type="image"]
+      ),
+    textarea,
+    select,
+    [contenteditable="true"]
+  ) {
+    cursor: text;
+    caret-color: currentColor;
+  }
+  /* Pointer on interactive controls */
+  :where(
+    a,
+    button,
+    summary,
+    label[for],
+    [role="button"],
+    [role="link"],
+    [role="tab"],
+    [role="menuitem"],
+    [role="option"]
+  ) {
+    cursor: pointer;
+  }
+  /* Hide typing caret on static text; copy via drag-select still works */
+  :where(:not(input, textarea, select, [contenteditable="true"])) {
+    caret-color: transparent;
   }
   h1,
   h2,

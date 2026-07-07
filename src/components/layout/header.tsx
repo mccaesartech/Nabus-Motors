@@ -13,6 +13,8 @@ import { useSavedVehicleCount } from "@/hooks/use-garage";
 import { usePartsCartCount } from "@/context/parts-cart-context";
 import { CountrySelector } from "@/components/shared/country-selector";
 import { useCustomerAuth } from "@/context/customer-auth-context";
+import { useCustomerNotificationCount } from "@/context/customer-notifications-context";
+import { NotificationCountBadge } from "@/components/customer/notification-count-badge";
 import { useLockBodyScroll } from "@/hooks/use-lock-body-scroll";
 import { useSwipeToClose } from "@/hooks/use-swipe-to-close";
 import { ROUTES } from "@/lib/routes";
@@ -32,6 +34,7 @@ function HeaderInner({
   const { savedCount } = useSavedVehicleCount();
   const { cartCount } = usePartsCartCount();
   const { user, loading: authLoading } = useCustomerAuth();
+  const notificationCount = useCustomerNotificationCount();
 
   useLockBodyScroll(mobileOpen);
 
@@ -123,7 +126,7 @@ function HeaderInner({
           </div>
 
           <nav
-            className="hidden min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] lg:ml-[var(--header-logo-spacing)] lg:flex xl:gap-1 [&::-webkit-scrollbar]:hidden"
+            className="col-start-2 hidden min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] lg:ml-[var(--header-logo-spacing)] lg:flex xl:gap-1 [&::-webkit-scrollbar]:hidden"
             aria-label="Main"
           >
             <FullPageLink
@@ -143,7 +146,7 @@ function HeaderInner({
             ))}
           </nav>
 
-          <div className="flex min-w-0 shrink-0 items-center gap-1.5 bg-brand-black pl-1 sm:gap-2 sm:pl-2">
+          <div className="col-start-3 flex min-w-0 shrink-0 items-center justify-end gap-1.5 bg-brand-black pl-1 sm:gap-2 sm:pl-2">
             <CountrySelector
               compact
               className="relative z-10 hidden shrink-0 lg:flex"
@@ -154,11 +157,12 @@ function HeaderInner({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-white/80 hover:bg-white/5 hover:text-brand-gold"
+                  className="relative text-white/80 hover:bg-white/5 hover:text-brand-gold"
                   render={<FullPageLink href={ROUTES.corporate.account} />}
                 >
                   <User className="size-3.5" />
                   My Account
+                  <NotificationCountBadge count={notificationCount} />
                 </Button>
               ) : (
                 <>
@@ -312,10 +316,12 @@ function HeaderInner({
               <Button
                 variant="luxury"
                 size="sm"
+                className="relative"
                 render={<FullPageLink href={ROUTES.corporate.account} />}
                 onClick={closeMobile}
               >
                 My Account
+                {notificationCount > 0 && ` (${notificationCount})`}
               </Button>
             ) : (
               <>

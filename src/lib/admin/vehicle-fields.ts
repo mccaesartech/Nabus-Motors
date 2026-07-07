@@ -1,12 +1,24 @@
 import type {
   BodyType,
   Condition,
+  CountryOfOrigin,
   FuelType,
   Transmission,
   VehicleGalleryData,
 } from "@/lib/types";
 import { EMPTY_VEHICLE_GALLERY } from "@/lib/types";
-import { galleryForVehicle, flattenGallery } from "@/lib/data/vehicle-images";
+import {
+  DEFAULT_TRUST_BADGES,
+  type VehicleTrustBadges,
+} from "@/lib/vehicles/trust-badges";
+import {
+  galleryForVehicle,
+  flattenGallery,
+  galleryToPrimaryAndAdditional,
+  primaryAndAdditionalToGallery,
+  resolveAdditionalImages,
+  resolvePrimaryImageUrl,
+} from "@/lib/data/vehicle-images";
 import { locations } from "@/lib/data/catalog-meta";
 
 export type VehicleInput = {
@@ -28,7 +40,18 @@ export type VehicleInput = {
   featured?: boolean;
   status?: string;
   images?: string[];
+  primary_image_url?: string;
+  additional_images?: string[];
   gallery?: VehicleGalleryData;
+  trust_badges?: VehicleTrustBadges;
+  inspection_summary?: string;
+  country_of_origin?: CountryOfOrigin | "";
+  financing_available?: boolean;
+  shipment_available?: boolean;
+  customs_clearing_available?: boolean;
+  warranty_notes?: string;
+  walkaround_video_url?: string;
+  available_locally?: boolean;
 };
 
 export const BODY_TYPES: BodyType[] = [
@@ -73,6 +96,14 @@ export const VEHICLE_STATUS_LABELS: Record<string, string> = {
   sold: "Sold",
 };
 
+export const COUNTRY_OF_ORIGIN_OPTIONS: { value: CountryOfOrigin | ""; label: string }[] = [
+  { value: "", label: "Not specified" },
+  { value: "ghana", label: "Ghana (local stock)" },
+  { value: "china", label: "China" },
+  { value: "japan", label: "Japan" },
+  { value: "other", label: "Other" },
+];
+
 export const LOCATIONS = [...locations];
 
 export function slugify(value: string): string {
@@ -113,7 +144,46 @@ export function emptyVehicleForm(): VehicleInput {
     featured: false,
     status: "available",
     images: [],
+    primary_image_url: "",
+    additional_images: [],
     gallery: { ...EMPTY_VEHICLE_GALLERY },
+    trust_badges: { ...DEFAULT_TRUST_BADGES },
+    inspection_summary: "",
+    country_of_origin: "",
+    financing_available: true,
+    shipment_available: true,
+    customs_clearing_available: true,
+  };
+}
+
+export function primaryAndAdditionalFromVehicle(vehicle: {
+  primary_image_url?: string | null;
+  additional_images?: string[] | null;
+  gallery?: VehicleGalleryData | Partial<VehicleGalleryData> | null;
+  images?: string[];
+}): { primaryImageUrl: string; additionalImages: string[] } {
+  if (vehicle.primary_image_url || (vehicle.additional_images?.length ?? 0) > 0) {
+    return {
+      primaryImageUrl: resolvePrimaryImageUrl(vehicle) ?? "",
+      additionalImages: resolveAdditionalImages(vehicle),
+    };
+  }
+  return galleryToPrimaryAndAdditional(vehicle);
+}
+
+export function syncVehicleImagesFromPrimaryAndAdditional(
+  primaryImageUrl: string,
+  additionalImages: string[]
+): Pick<VehicleInput, "primary_image_url" | "additional_images" | "gallery" | "images"> {
+  const primary = primaryImageUrl.trim();
+  const additional = additionalImages.filter((url) => url.trim() && url !== primary);
+  const gallery = primaryAndAdditionalToGallery(primary, additional);
+  const images = imagesFromGallery(gallery);
+  return {
+    primary_image_url: primary || undefined,
+    additional_images: additional,
+    gallery,
+    images,
   };
 }
 

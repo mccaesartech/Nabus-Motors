@@ -14,11 +14,19 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { makes, modelsByMake } from "@/lib/data/catalog-meta";
 import { buildFilterSearchParams, parseFiltersFromSearchParams } from "@/lib/vehicles";
+import { recordSearchPreferences } from "@/lib/vehicle-preferences";
 import { PRICE_FILTER_TIERS, formatFilterPriceLabel } from "@/lib/currency";
 import { useCurrency } from "@/context/currency-context";
 import { ROUTES } from "@/lib/routes";
 import { CustomVehicleRequestCta } from "@/components/vehicle/custom-vehicle-request-cta";
-import type { BodyType, Condition, FuelType, SortOption, VehicleFilters } from "@/lib/types";
+import type {
+  BodyType,
+  Condition,
+  FuelType,
+  SortOption,
+  Transmission,
+  VehicleFilters,
+} from "@/lib/types";
 
 const currentYear = new Date().getFullYear();
 const FILTER_ANY = "any";
@@ -52,6 +60,7 @@ export function InventoryFilters({ className, onApplied }: InventoryFiltersProps
         }
       });
       const query = buildFilterSearchParams(newFilters, sort);
+      recordSearchPreferences(newFilters);
       startTransition(() => {
         router.push(`${ROUTES.auto.inventory}?${query.toString()}`);
         onApplied?.();
@@ -87,6 +96,97 @@ export function InventoryFilters({ className, onApplied }: InventoryFiltersProps
         <Separator />
 
         <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Availability</Label>
+            <Select
+              value={filterSelectValue(filters.status)}
+              onValueChange={(v) =>
+                updateFilters({
+                  status:
+                    !v || v === FILTER_ANY
+                      ? undefined
+                      : (v as VehicleFilters["status"]),
+                })
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={FILTER_ANY}>Any availability</SelectItem>
+                <SelectItem value="available">Available in Ghana</SelectItem>
+                <SelectItem value="pre_order">Pre-Order</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Country of Origin</Label>
+            <Select
+              value={filterSelectValue(filters.countryOfOrigin)}
+              onValueChange={(v) =>
+                updateFilters({
+                  countryOfOrigin:
+                    !v || v === FILTER_ANY
+                      ? undefined
+                      : (v as NonNullable<VehicleFilters["countryOfOrigin"]>),
+                })
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={FILTER_ANY}>Any origin</SelectItem>
+                <SelectItem value="china">China</SelectItem>
+                <SelectItem value="japan">Japan</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs">Services</Label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={Boolean(filters.financingAvailable)}
+                onChange={(e) =>
+                  updateFilters({
+                    financingAvailable: e.target.checked ? true : undefined,
+                  })
+                }
+                className="size-4 rounded border-border accent-brand-purple"
+              />
+              Financing available
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={Boolean(filters.shipmentAvailable)}
+                onChange={(e) =>
+                  updateFilters({
+                    shipmentAvailable: e.target.checked ? true : undefined,
+                  })
+                }
+                className="size-4 rounded border-border accent-brand-purple"
+              />
+              Shipment available
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={Boolean(filters.customsClearingAvailable)}
+                onChange={(e) =>
+                  updateFilters({
+                    customsClearingAvailable: e.target.checked ? true : undefined,
+                  })
+                }
+                className="size-4 rounded border-border accent-brand-purple"
+              />
+              Customs clearing available
+            </label>
+          </div>
+
           <div className="space-y-1.5">
             <Label className="text-xs">Max Price</Label>
             <Select
@@ -231,6 +331,31 @@ export function InventoryFilters({ className, onApplied }: InventoryFiltersProps
                     </SelectItem>
                   )
                 )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Transmission</Label>
+            <Select
+              value={filterSelectValue(filters.transmission)}
+              onValueChange={(v) =>
+                updateFilters({
+                  transmission:
+                    !v || v === FILTER_ANY ? undefined : (v as Transmission),
+                })
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={FILTER_ANY}>Any transmission</SelectItem>
+                {["Automatic", "Manual", "CVT", "DCT"].map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

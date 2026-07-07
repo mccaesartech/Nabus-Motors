@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { FullPageLink } from "@/components/shared/full-page-link";
 import { cn } from "@/lib/utils";
 import { useCustomerAuth } from "@/context/customer-auth-context";
+import { useCustomerNotificationCount } from "@/context/customer-notifications-context";
+import { NotificationCountBadge } from "@/components/customer/notification-count-badge";
 import { useLockBodyScroll } from "@/hooks/use-lock-body-scroll";
 import { useSwipeToClose } from "@/hooks/use-swipe-to-close";
 import { CORPORATE_NAV_LINKS, ROUTES } from "@/lib/routes";
@@ -24,6 +26,7 @@ export function CorporateHeader({ content, showFreightNav = true }: CorporateHea
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, loading: authLoading } = useCustomerAuth();
+  const notificationCount = useCustomerNotificationCount();
 
   useLockBodyScroll(mobileOpen);
 
@@ -86,7 +89,7 @@ export function CorporateHeader({ content, showFreightNav = true }: CorporateHea
           </FullPageLink>
 
           <nav
-            className="hidden min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] lg:ml-[var(--header-logo-spacing)] lg:flex xl:gap-1 [&::-webkit-scrollbar]:hidden"
+            className="col-start-2 hidden min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] lg:ml-[var(--header-logo-spacing)] lg:flex xl:gap-1 [&::-webkit-scrollbar]:hidden"
             aria-label="Corporate"
           >
             {navLinks.map((link) => (
@@ -107,17 +110,18 @@ export function CorporateHeader({ content, showFreightNav = true }: CorporateHea
             ))}
           </nav>
 
-          <div className="flex min-w-0 shrink-0 items-center gap-1.5 bg-brand-black pl-1 sm:gap-2 sm:pl-2">
+          <div className="col-start-3 flex min-w-0 shrink-0 items-center justify-end gap-1.5 bg-brand-black pl-1 sm:gap-2 sm:pl-2">
             <div className="hidden shrink-0 items-center gap-1.5 lg:flex xl:gap-2">
               {!authLoading && user ? (
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-white/80 hover:bg-white/5 hover:text-brand-gold"
+                  className="relative text-white/80 hover:bg-white/5 hover:text-brand-gold"
                   render={<FullPageLink href={ROUTES.corporate.account} />}
                 >
                   <User className="size-3.5" />
                   My Account
+                  <NotificationCountBadge count={notificationCount} />
                 </Button>
               ) : (
                 <>
@@ -209,10 +213,12 @@ export function CorporateHeader({ content, showFreightNav = true }: CorporateHea
               <Button
                 variant="luxury"
                 size="sm"
+                className="relative"
                 render={<FullPageLink href={ROUTES.corporate.account} />}
                 onClick={closeMobile}
               >
                 My Account
+                {notificationCount > 0 && ` (${notificationCount})`}
               </Button>
             ) : (
               <>

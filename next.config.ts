@@ -24,6 +24,8 @@ const nextConfig: NextConfig = {
       { source: "/sell", destination: "/auto/sell", permanent: true },
       { source: "/financing", destination: "/auto/financing", permanent: true },
       { source: "/garage", destination: "/auto/garage", permanent: true },
+      { source: "/appointments", destination: "/account?section=visit", permanent: false },
+      { source: "/auto/pre-order", destination: "/auto/inventory?status=pre_order", permanent: false },
     ];
   },
   images: {

@@ -5,12 +5,13 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Container } from "@/components/shared/container";
 import { Logo } from "@/components/shared/logo";
-import { BackNav } from "@/components/shared/back-nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
+import { GoogleSignInButton } from "@/components/customer/google-sign-in-button";
 import { useCustomerAuth } from "@/context/customer-auth-context";
+import { authRedirectFromSearchParams } from "@/lib/customer/auth-redirect";
 import { customerLoginErrorMessage } from "@/lib/customer/login-errors";
 import {
   getSessionPreference,
@@ -42,15 +43,11 @@ function LoginForm() {
   const [pendingRedirect, setPendingRedirect] = useState<string | null>(null);
   const registered = searchParams.get("registered") === "1";
   const expired = searchParams.get("expired") === "1";
-  const redirectTo = searchParams.get("redirect") || "/account";
+  const redirectTo = authRedirectFromSearchParams(searchParams);
 
   useEffect(() => {
     if (!authLoading && user && !sessionPreferenceModalOpen && !pendingRedirect) {
-      const safeRedirect =
-        redirectTo.startsWith("/") && !redirectTo.startsWith("//")
-          ? redirectTo
-          : "/account";
-      router.replace(safeRedirect);
+      router.replace(redirectTo);
     }
   }, [authLoading, user, router, redirectTo, sessionPreferenceModalOpen, pendingRedirect]);
 
@@ -98,11 +95,8 @@ function LoginForm() {
       return;
     }
 
-    const safeRedirect =
-      redirectTo.startsWith("/") && !redirectTo.startsWith("//") ? redirectTo : "/account";
-
     if (!hasChosenSessionPreference()) {
-      setPendingRedirect(safeRedirect);
+      setPendingRedirect(redirectTo);
       promptSessionPreference();
       setLoading(false);
       return;
@@ -112,7 +106,7 @@ function LoginForm() {
       await applySessionPreference(chosenPreference);
     }
 
-    router.push(safeRedirect);
+    router.push(redirectTo);
     router.refresh();
     setLoading(false);
   }
@@ -120,7 +114,6 @@ function LoginForm() {
   return (
     <Container className="py-16 sm:py-20">
       <div className="mx-auto max-w-md">
-        <BackNav href="/" label="Back to home" variant="public" className="mb-6" />
         <div className="mb-8 flex justify-center">
           <Logo variant="purple" brand="corporate" height={52} />
         </div>
@@ -139,8 +132,24 @@ function LoginForm() {
             Account created. Sign in to view your registration ID and track pre-orders.
           </p>
         )}
+        <div className="mt-8 space-y-5">
+          <GoogleSignInButton
+            redirectPath={redirectTo}
+            rememberMe={rememberMe}
+            disabled={loading}
+            onError={setError}
+          />
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">or</span>
+            </div>
+          </div>
+        </div>
         <form
-          className="mt-8 space-y-5"
+          className="mt-5 space-y-5"
           onSubmit={handleSubmit}
           autoComplete="off"
           data-1p-ignore
@@ -203,7 +212,11 @@ function LoginForm() {
         <p className="mt-4 text-center text-sm text-muted-foreground">
           Don&apos;t have an account?{" "}
           <Link
-            href="/register"
+            href={
+              redirectTo === "/account"
+                ? "/register"
+                : `/register?redirect=${encodeURIComponent(redirectTo)}`
+            }
             className="font-medium text-brand-purple hover:text-foreground"
           >
             Register

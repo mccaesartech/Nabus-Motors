@@ -12,7 +12,7 @@ import {
 } from "@/lib/notifications/notification-status";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createServerSupabase } from "@/lib/supabase/server";
-import { getSiteSettings } from "@/lib/platform/site-settings";
+import { getSiteSettings } from "@/lib/platform/site-settings-server";
 
 type AppointmentVehicleInput = {
   id?: string;

@@ -9,9 +9,14 @@ import {
 } from "lucide-react";
 import { Container } from "@/components/shared/container";
 import { FullPageLink } from "@/components/shared/full-page-link";
-import { BackNav } from "@/components/shared/back-nav";
 import { VehicleGallery } from "@/components/vehicle/vehicle-gallery";
+import { VehicleWalkaroundVideo } from "@/components/vehicle/vehicle-walkaround-video";
 import { VehicleDetailSidebar } from "@/components/vehicle/vehicle-detail-sidebar";
+import { VehicleInspectionSummary } from "@/components/vehicle/vehicle-inspection-summary";
+import { VehicleWarrantyInfo } from "@/components/vehicle/vehicle-warranty-info";
+import { VehicleOwnershipCosts } from "@/components/vehicle/vehicle-ownership-costs";
+import { VehicleCompatibleParts } from "@/components/vehicle/vehicle-compatible-parts";
+import { RelatedVehiclesSection } from "@/components/vehicle/related-vehicles-section";
 import { fetchVehicleBySlug } from "@/lib/supabase/vehicles";
 import { ROUTES } from "@/lib/routes";
 import { formatMileage, formatVehicleName } from "@/lib/format";
@@ -37,12 +42,6 @@ export async function VehicleDetailPage({ slug }: VehicleDetailPageProps) {
   return (
     <div className="py-10 sm:py-14">
       <Container>
-        <BackNav
-          href={ROUTES.auto.inventory}
-          label="Back to inventory"
-          variant="public"
-          className="mb-4"
-        />
         <nav className="mb-6 hidden text-sm text-muted-foreground sm:block">
           <FullPageLink href={ROUTES.auto.inventory} className="hover:text-foreground">
             Inventory
@@ -54,10 +53,17 @@ export async function VehicleDetailPage({ slug }: VehicleDetailPageProps) {
         <div className="grid gap-10 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <VehicleGallery
+              primaryImageUrl={vehicle.primaryImageUrl}
+              additionalImages={vehicle.additionalImages}
               gallery={vehicle.gallery}
               images={vehicle.images}
+              slug={vehicle.slug}
+              id={vehicle.id}
+              bodyType={vehicle.bodyType}
               alt={formatVehicleName(vehicle)}
             />
+
+            <VehicleWalkaroundVideo vehicle={vehicle} />
 
             <div className="mt-10">
               <h2 className="text-lg font-semibold">Vehicle Specifications</h2>
@@ -109,6 +115,14 @@ export async function VehicleDetailPage({ slug }: VehicleDetailPageProps) {
               </div>
             )}
 
+            <VehicleInspectionSummary vehicle={vehicle} />
+
+            <VehicleWarrantyInfo vehicle={vehicle} />
+
+            <VehicleOwnershipCosts vehicle={vehicle} />
+
+            <VehicleCompatibleParts vehicle={vehicle} />
+
             <div className="mt-10">
               <h2 className="text-lg font-semibold">Description</h2>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
@@ -120,6 +134,7 @@ export async function VehicleDetailPage({ slug }: VehicleDetailPageProps) {
           <VehicleDetailSidebar vehicle={vehicle} />
         </div>
       </Container>
+      <RelatedVehiclesSection vehicle={vehicle} />
     </div>
   );
 }

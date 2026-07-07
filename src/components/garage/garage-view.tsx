@@ -4,7 +4,6 @@ import Link from "next/link";
 import { ArrowRightLeft, Clock, Heart, TrendingDown } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Container } from "@/components/shared/container";
-import { BackNav } from "@/components/shared/back-nav";
 import { VehicleCard } from "@/components/shared/vehicle-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -89,7 +88,6 @@ export function GarageView() {
         </div>
       )}
       <Container>
-        <BackNav href={ROUTES.auto.inventory} label="Back to inventory" variant="public" className="mb-6" />
         <div className="mb-8">
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
             My Garage

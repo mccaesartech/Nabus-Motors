@@ -1,10 +1,12 @@
 import { CorporateAbout, CorporateContactCta, CorporateFaq, CorporateHero, CorporateServices, CorporateStats } from "@/components/corporate/corporate-sections";
+import { StartYourJourney } from "@/components/home/start-your-journey";
 import { Testimonials } from "@/components/home/testimonials";
 import { WhyChooseUs } from "@/components/home/why-choose-us";
+import { WhyBuyFromTrueGoshen } from "@/components/home/why-buy-from-true-goshen";
 import { DeferredSection } from "@/components/shared/deferred-section";
 import { getSiteContent } from "@/lib/site-content";
 
-export const revalidate = 60;
+export const revalidate = 120;
 
 export const metadata = {
   title: "True Goshen Company Limited",
@@ -18,8 +20,10 @@ export default async function CorporateHomePage() {
   return (
     <>
       <CorporateHero content={content.corporateHomepage} />
+      <StartYourJourney />
       <CorporateAbout content={content.corporateHomepage} />
       <CorporateServices content={content.corporateServices} />
+      <WhyBuyFromTrueGoshen variant="compact" />
       <WhyChooseUs content={content.whyChooseUs} />
       <DeferredSection fallback={<div className="min-h-[12rem] border-b border-border bg-brand-black" aria-hidden />}>
         <CorporateStats content={content.corporateStats} />

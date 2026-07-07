@@ -20,6 +20,7 @@ import {
   notifyVehicleSaleToLeadsTeam,
   preorderLeadsLink,
 } from "@/lib/platform/vehicle-sale-notifications";
+import { notifyCustomerCustomRequestSubmitted } from "@/lib/customer/notifications-server";
 import { generateCustomRequestReferenceCode } from "@/lib/platform/custom-request-reference";
 import {
   buildCustomVehicleTitle,
@@ -177,11 +178,23 @@ export async function POST(req: NextRequest) {
 
     if (userId) {
       await linkCustomerPreordersByEmail(userId, trimmedEmail, registrationId);
+    } else if (linkedUserId) {
+      await linkCustomerPreordersByEmail(linkedUserId, trimmedEmail, registrationId);
     }
 
     const inserted = result.data;
     const inquiryId = inserted?.id ? String(inserted.id) : undefined;
     const accountCreated = Boolean(userId && !authUser);
+    const notifyUserId = linkedUserId ?? userId;
+
+    if (inquiryId && adminSupabase && notifyUserId) {
+      await notifyCustomerCustomRequestSubmitted(adminSupabase, {
+        userId: notifyUserId,
+        requestId: inquiryId,
+        referenceCode,
+        vehicleTitle,
+      });
+    }
 
     if (inquiryId && adminSupabase) {
       await notifyVehicleSaleToLeadsTeam(adminSupabase, {

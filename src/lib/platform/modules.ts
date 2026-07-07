@@ -67,6 +67,11 @@ export const SITE_SETTING_KEY_LIST = [
   "twilio_account_sid",
   "twilio_auth_token",
   "twilio_whatsapp_from",
+  "termii_api_key",
+  "termii_sender_id",
+  "termii_whatsapp_device",
+  "termii_base_url",
+  "termii_sms_channel",
 ] as const;
 
 export type SiteSettingKey = (typeof SITE_SETTING_KEY_LIST)[number];
@@ -118,6 +123,11 @@ export const DEFAULT_SITE_SETTINGS: SiteSettingsMap = {
   twilio_account_sid: "",
   twilio_auth_token: "",
   twilio_whatsapp_from: "",
+  termii_api_key: "",
+  termii_sender_id: "",
+  termii_whatsapp_device: "",
+  termii_base_url: "https://api.ng.termii.com",
+  termii_sms_channel: "dnd",
 };
 
 export const SITE_SETTING_KEYS: SiteSettingKey[] = [...SITE_SETTING_KEY_LIST];

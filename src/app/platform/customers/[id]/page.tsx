@@ -8,7 +8,12 @@ import { ContactEmailAction, ContactPhoneAction, ContactWhatsAppAction } from "@
 import { CustomerDataTrustNote } from "@/components/forms/customer-data-trust-note";
 import { ConfirmDialog } from "@/components/platform/confirm-dialog";
 import { PageHeader } from "@/components/platform/page-header";
-import { PlatformPrintButton, PrintableRecord } from "@/components/platform/printable-record";
+import {
+  CustomerInvoicePrintButton,
+  OrderInvoicePrintButton,
+  PreorderInvoicePrintButton,
+} from "@/components/platform/customer-invoice-print";
+import { PrintableRecord } from "@/components/platform/printable-record";
 import { useMarkNotificationsOnVisit } from "@/hooks/use-mark-notifications-read";
 import { EmptyState } from "@/components/platform/empty-state";
 import { adminLoginPath } from "@/lib/admin/paths";
@@ -217,7 +222,7 @@ export default function CustomerProfilePage() {
         backLabel="Back to customers"
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <PlatformPrintButton />
+            <CustomerInvoicePrintButton customerId={customer.id} customer={customer} />
             {canSendReset && customer.userId ? (
               <button
                 type="button"
@@ -330,7 +335,11 @@ export default function CustomerProfilePage() {
 
         <div className="platform-card rounded-xl p-5 lg:col-span-2">
           <h2 className="text-sm font-semibold">Activity summary</h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <div className="mt-4 grid gap-4 sm:grid-cols-4">
+            <div className="rounded-lg border border-[var(--platform-border)] p-4">
+              <p className="text-xs text-[var(--platform-text-secondary)]">Cart orders</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums">{customer.ordersCount}</p>
+            </div>
             <div className="rounded-lg border border-[var(--platform-border)] p-4">
               <p className="text-xs text-[var(--platform-text-secondary)]">Freight quotes</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums">{customer.quotesCount}</p>
@@ -344,6 +353,49 @@ export default function CustomerProfilePage() {
               <p className="mt-1 text-2xl font-semibold tabular-nums">{customer.shipmentsCount}</p>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="platform-card overflow-hidden rounded-xl">
+        <div className="flex items-center gap-2 border-b border-[var(--platform-border)] px-5 py-4">
+          <ShoppingBag className="size-4 text-[var(--platform-accent)]" />
+          <h2 className="text-sm font-semibold">Recent cart orders</h2>
+        </div>
+        <div className="divide-y divide-[var(--platform-border)]">
+          {customer.recentOrders.length === 0 ? (
+            <p className="px-5 py-8 text-sm text-[var(--platform-text-secondary)]">
+              No cart orders yet.
+            </p>
+          ) : (
+            customer.recentOrders.map((order) => (
+              <div
+                key={order.id}
+                className="flex flex-wrap items-start justify-between gap-3 px-5 py-4"
+              >
+                <div>
+                  <p className="font-mono text-sm font-medium">
+                    {order.id.slice(0, 8).toUpperCase()}
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--platform-text-secondary)]">
+                    {order.totalLabel} · {order.itemCount} item{order.itemCount === 1 ? "" : "s"}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--platform-text-secondary)]">
+                    <PlatformDateTime value={order.createdAt} className="text-xs" /> · {order.status}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <OrderInvoicePrintButton orderId={order.id} />
+                  <Link
+                    href={platformPath(`leads/order/${order.id}`)}
+                    className="inline-flex items-center gap-1 text-xs text-[var(--platform-accent)] hover:underline"
+                  >
+                    View order
+                    <ExternalLink className="size-3" />
+                  </Link>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
@@ -401,23 +453,28 @@ export default function CustomerProfilePage() {
               </p>
             ) : (
               customer.recentPreorders.map((preorder) => (
-                <div key={preorder.id} className="px-5 py-4">
-                  <p className="text-sm font-medium">
-                    {preorder.vehicleLabel ?? "Vehicle pre-order"}
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--platform-text-secondary)]">
-                    {preorder.referenceCode ? (
-                      <span className="font-mono">{preorder.referenceCode}</span>
-                    ) : null}
-                    {preorder.referenceCode ? " · " : ""}
-                    <PlatformDateTime value={preorder.createdAt} mode="date" className="text-xs" /> · {preorder.status}
-                  </p>
-                  <Link
-                    href={platformPath(`leads/preorder/${preorder.id}`)}
-                    className="mt-2 inline-block text-xs text-[var(--platform-accent)] hover:underline"
-                  >
-                    View pre-order
-                  </Link>
+                <div key={preorder.id} className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
+                  <div>
+                    <p className="text-sm font-medium">
+                      {preorder.vehicleLabel ?? "Vehicle pre-order"}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--platform-text-secondary)]">
+                      {preorder.referenceCode ? (
+                        <span className="font-mono">{preorder.referenceCode}</span>
+                      ) : null}
+                      {preorder.referenceCode ? " · " : ""}
+                      <PlatformDateTime value={preorder.createdAt} mode="date" className="text-xs" /> · {preorder.status}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <PreorderInvoicePrintButton preorderId={preorder.id} />
+                    <Link
+                      href={platformPath(`leads/preorder/${preorder.id}`)}
+                      className="inline-block text-xs text-[var(--platform-accent)] hover:underline"
+                    >
+                      View pre-order
+                    </Link>
+                  </div>
                 </div>
               ))
             )}

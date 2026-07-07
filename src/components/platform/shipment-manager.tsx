@@ -28,7 +28,9 @@ import {
   applyPresetToForm,
   presetContextFromShipment,
   QUICK_SHIPMENT_EVENT_PRESETS,
+  SHIPMENT_EVENT_PRESETS,
 } from "@/lib/platform/shipment-event-presets";
+import { parseImagesInput } from "@/lib/admin/vehicle-fields";
 import type { NotificationFeedbackVariant } from "@/lib/notifications/notification-status";
 
 type ShipmentManagerProps = {
@@ -69,14 +71,38 @@ export function ShipmentManager({
     notes: "",
     reference_id: "",
   });
-  const [eventForm, setEventForm] = useState({ title: "", description: "" });
+  const [eventForm, setEventForm] = useState({
+    title: "",
+    description: "",
+    admin_comment: "",
+    estimated_completion: "",
+    attachment_urls: "",
+  });
   const [showCustomEventForm, setShowCustomEventForm] = useState(false);
   const [notesDraft, setNotesDraft] = useState("");
   const [canUseAi, setCanUseAi] = useState(false);
 
   function resetEventForm() {
-    setEventForm({ title: "", description: "" });
+    setEventForm({
+      title: "",
+      description: "",
+      admin_comment: "",
+      estimated_completion: "",
+      attachment_urls: "",
+    });
     setShowCustomEventForm(false);
+  }
+
+  function milestoneExtrasFromForm() {
+    const extras: Record<string, unknown> = {};
+    if (eventForm.estimated_completion) {
+      extras.estimated_completion = new Date(eventForm.estimated_completion).toISOString();
+    }
+    const attachments = parseImagesInput(eventForm.attachment_urls);
+    if (attachments.length > 0) {
+      extras.attachment_urls = attachments;
+    }
+    return extras;
   }
 
   function applyNotificationToast(json: {
@@ -94,17 +120,21 @@ export function ShipmentManager({
 
   async function addPresetEvent(presetId: string) {
     if (!detail || !selectedId || saving) return;
-    const preset = QUICK_SHIPMENT_EVENT_PRESETS.find((p) => p.id === presetId);
+    const preset =
+      QUICK_SHIPMENT_EVENT_PRESETS.find((p) => p.id === presetId) ??
+      SHIPMENT_EVENT_PRESETS.find((p) => p.id === presetId);
     if (!preset) return;
 
     const filled = applyPresetToForm(preset, presetContextFromShipment(detail));
     const payload: Record<string, unknown> = {
       add_event: {
+        event_type: preset.id,
         title: filled.title,
         description: filled.description || null,
         location: filled.location || null,
         is_customer_visible: true,
         milestone: true,
+        ...milestoneExtrasFromForm(),
       },
     };
     if (filled.suggestedStatus && filled.suggestedStatus !== detail.status) {
@@ -121,6 +151,7 @@ export function ShipmentManager({
     if (res.ok) {
       const json = await res.json();
       applyNotificationToast(json, `${preset.label} update added.`);
+      setEventForm((f) => ({ ...f, estimated_completion: "", attachment_urls: "" }));
       await loadList();
       await loadDetail(selectedId);
     }
@@ -258,8 +289,10 @@ export function ShipmentManager({
       add_event: {
         title: eventForm.title.trim(),
         description: eventForm.description || null,
+        admin_comment: eventForm.admin_comment.trim() || null,
         location: null,
         is_customer_visible: true,
+        ...milestoneExtrasFromForm(),
       },
     });
     if (ok) {
@@ -501,6 +534,34 @@ export function ShipmentManager({
                 <p className="text-xs text-[var(--platform-text-secondary)]">
                   Pick a milestone to add a customer update — status updates automatically.
                 </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="text-xs text-[var(--platform-text-secondary)]">
+                      Estimated completion (optional)
+                    </label>
+                    <input
+                      type="datetime-local"
+                      className="platform-input mt-1 w-full text-sm"
+                      value={eventForm.estimated_completion}
+                      onChange={(e) =>
+                        setEventForm((f) => ({ ...f, estimated_completion: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-[var(--platform-text-secondary)]">
+                      Attachments (optional)
+                    </label>
+                    <input
+                      className="platform-input mt-1 w-full text-sm"
+                      placeholder="Image or document URLs, comma-separated"
+                      value={eventForm.attachment_urls}
+                      onChange={(e) =>
+                        setEventForm((f) => ({ ...f, attachment_urls: e.target.value }))
+                      }
+                    />
+                  </div>
+                </div>
                 <div className="flex flex-wrap items-center gap-1.5">
                   <ShipmentStatusSelect
                     inline
@@ -520,6 +581,24 @@ export function ShipmentManager({
                     </button>
                   ))}
                 </div>
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-[var(--platform-text-secondary)] hover:text-[var(--platform-text)]">
+                    All import milestones
+                  </summary>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {SHIPMENT_EVENT_PRESETS.map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        className="rounded-full border border-[var(--platform-border)] bg-[var(--platform-bg)] px-2.5 py-1 text-xs text-[var(--platform-text-secondary)] hover:border-[var(--platform-accent)] hover:text-[var(--platform-accent)] disabled:opacity-50"
+                        onClick={() => void addPresetEvent(preset.id)}
+                        disabled={saving}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </details>
                 {!showCustomEventForm ? (
                   <button
                     type="button"
@@ -552,6 +631,15 @@ export function ShipmentManager({
                         }
                       />
                     </details>
+                    <textarea
+                      className="platform-input mt-2 w-full resize-y text-sm"
+                      rows={2}
+                      placeholder="Admin comment (optional — shown on customer timeline)"
+                      value={eventForm.admin_comment}
+                      onChange={(e) =>
+                        setEventForm((f) => ({ ...f, admin_comment: e.target.value }))
+                      }
+                    />
                     <div className="flex gap-2">
                       <button type="submit" disabled={saving} className="platform-btn-primary text-xs">
                         {saving ? "Sending…" : "Send to customer"}
@@ -609,6 +697,12 @@ export function ShipmentManager({
                           {event.description && (
                             <p className="mt-1 text-xs text-[var(--platform-text-secondary)]">
                               {event.description}
+                            </p>
+                          )}
+                          {(event.attachment_urls?.length ?? 0) > 0 && (
+                            <p className="mt-1 text-xs text-[var(--platform-text-secondary)]">
+                              {event.attachment_urls!.length} attachment
+                              {event.attachment_urls!.length === 1 ? "" : "s"}
                             </p>
                           )}
                           <p className="mt-1 text-xs text-[var(--platform-text-secondary)]">

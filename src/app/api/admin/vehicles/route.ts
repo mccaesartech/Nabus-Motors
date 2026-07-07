@@ -21,7 +21,7 @@ import {
   type VehicleInput,
 } from "@/lib/admin/vehicle-fields";
 import { rowFromInput, validateVehicleInput } from "@/lib/admin/vehicle-mapper";
-import { sanitizeGallery } from "@/lib/data/vehicle-images";
+import { sanitizeGallery, primaryAndAdditionalToGallery } from "@/lib/data/vehicle-images";
 import { notifyVehiclePendingApproval } from "@/lib/platform/vehicle-approval-notifications";
 import { notDeletedFilter, softDeleteEntity } from "@/lib/platform/trash";
 import type { VehicleGalleryData } from "@/lib/types";
@@ -30,6 +30,7 @@ import {
   applySoldStatusTransition,
   resolveRequestedSoldStatus,
 } from "@/lib/vehicles/stock-automation";
+import { notifyVehicleLocallyAvailable } from "@/lib/vehicle-interest/server";
 
 const EDITABLE_FIELDS = [
   "make",
@@ -51,6 +52,17 @@ const EDITABLE_FIELDS = [
   "status",
   "images",
   "gallery",
+  "primary_image_url",
+  "additional_images",
+  "trust_badges",
+  "inspection_summary",
+  "country_of_origin",
+  "financing_available",
+  "shipment_available",
+  "customs_clearing_available",
+  "warranty_notes",
+  "walkaround_video_url",
+  "available_locally",
 ] as const;
 
 function pickUpdates(body: Record<string, unknown>) {
@@ -70,10 +82,50 @@ function pickUpdates(body: Record<string, unknown>) {
       ? updates.images.map((s) => String(s).trim()).filter(Boolean)
       : [];
   }
-  if (updates.gallery !== undefined) {
+  if (updates.additional_images !== undefined) {
+    updates.additional_images = Array.isArray(updates.additional_images)
+      ? updates.additional_images.map((s) => String(s).trim()).filter(Boolean)
+      : [];
+  }
+  if (updates.primary_image_url !== undefined) {
+    const primary = String(updates.primary_image_url).trim();
+    updates.primary_image_url = primary || null;
+  }
+  if (
+    updates.primary_image_url !== undefined ||
+    updates.additional_images !== undefined
+  ) {
+    const primary =
+      updates.primary_image_url !== undefined
+        ? String(updates.primary_image_url ?? "").trim()
+        : undefined;
+    const additional = updates.additional_images as string[] | undefined;
+    if (primary !== undefined || additional !== undefined) {
+      const gallery = primaryAndAdditionalToGallery(
+        primary ?? "",
+        additional ?? []
+      );
+      updates.gallery = gallery;
+      updates.images = imagesFromGallery(gallery);
+      if (primary !== undefined) {
+        updates.primary_image_url = primary || null;
+      }
+      if (additional !== undefined) {
+        updates.additional_images = additional;
+      }
+    }
+  } else if (updates.gallery !== undefined) {
     const gallery = sanitizeGallery(updates.gallery as VehicleGalleryData);
     updates.gallery = gallery;
     updates.images = imagesFromGallery(gallery);
+    const primary = gallery.exterior[0] ?? null;
+    updates.primary_image_url = primary;
+    updates.additional_images = [
+      ...gallery.exterior.slice(1),
+      ...gallery.interior,
+      ...gallery.engine,
+      ...gallery.other,
+    ];
   } else if (updates.images !== undefined && !updates.gallery) {
     updates.gallery = sanitizeGallery({
       exterior: updates.images as string[],
@@ -81,6 +133,9 @@ function pickUpdates(body: Record<string, unknown>) {
       engine: [],
       other: [],
     });
+  }
+  if (updates.available_locally !== undefined) {
+    updates.available_locally = Boolean(updates.available_locally);
   }
   return updates;
 }
@@ -118,7 +173,22 @@ function validatePatchUpdates(updates: Record<string, unknown>): string | null {
 
 function isMissingGalleryColumnError(message: string): boolean {
   const lower = message.toLowerCase();
-  return lower.includes("gallery") && lower.includes("schema cache");
+  return (
+    (lower.includes("gallery") ||
+      lower.includes("primary_image_url") ||
+      lower.includes("additional_images")) &&
+    lower.includes("schema cache")
+  );
+}
+
+function stripOptionalVehicleImageColumns<T extends Record<string, unknown>>(row: T): T {
+  const {
+    gallery: _gallery,
+    primary_image_url: _primary,
+    additional_images: _additional,
+    ...rest
+  } = row;
+  return rest as T;
 }
 
 export async function GET() {
@@ -183,8 +253,11 @@ export async function POST(req: NextRequest) {
   let insertResult = await supabase.from("vehicles").insert(row).select().maybeSingle();
 
   if (insertResult.error && isMissingGalleryColumnError(insertResult.error.message)) {
-    const { gallery: _gallery, ...withoutGallery } = row;
-    insertResult = await supabase.from("vehicles").insert(withoutGallery).select().maybeSingle();
+    insertResult = await supabase
+      .from("vehicles")
+      .insert(stripOptionalVehicleImageColumns(row))
+      .select()
+      .maybeSingle();
   }
 
   const { data, error } = insertResult;
@@ -269,7 +342,9 @@ export async function PATCH(req: NextRequest) {
 
   const { data: existing, error: existingError } = await supabase
     .from("vehicles")
-    .select("id, slug, approval_status, pending_changes, year, make, model")
+    .select(
+      "id, slug, approval_status, pending_changes, year, make, model, status, available_locally, local_availability_at"
+    )
     .eq("id", id)
     .maybeSingle();
 
@@ -282,6 +357,13 @@ export async function PATCH(req: NextRequest) {
 
   if (!existing) {
     return NextResponse.json({ ok: false, message: "Vehicle not found." }, { status: 404 });
+  }
+
+  const wasAvailableLocally = Boolean(existing.available_locally);
+  const turningOnLocally =
+    updates.available_locally === true && !wasAvailableLocally;
+  if (turningOnLocally) {
+    updates.local_availability_at = new Date().toISOString();
   }
 
   const stashPendingEdits =
@@ -314,12 +396,16 @@ export async function PATCH(req: NextRequest) {
     if (
       result.error &&
       isMissingGalleryColumnError(result.error.message) &&
-      pendingChanges.gallery !== undefined
+      (pendingChanges.gallery !== undefined ||
+        pendingChanges.primary_image_url !== undefined ||
+        pendingChanges.additional_images !== undefined)
     ) {
-      const { gallery: _gallery, ...withoutGallery } = pendingChanges;
       result = await supabase
         .from("vehicles")
-        .update({ ...pendingMeta, pending_changes: withoutGallery })
+        .update({
+          ...pendingMeta,
+          pending_changes: stripOptionalVehicleImageColumns(pendingChanges),
+        })
         .eq("id", id)
         .select()
         .maybeSingle();
@@ -433,11 +519,16 @@ export async function PATCH(req: NextRequest) {
     .select()
     .maybeSingle();
 
-  if (result.error && updates.gallery !== undefined && isMissingGalleryColumnError(result.error.message)) {
-    const { gallery: _gallery, ...withoutGallery } = updates;
-    patchPayload = withoutGallery;
+  if (
+    result.error &&
+    isMissingGalleryColumnError(result.error.message) &&
+    (updates.gallery !== undefined ||
+      updates.primary_image_url !== undefined ||
+      updates.additional_images !== undefined)
+  ) {
+    patchPayload = stripOptionalVehicleImageColumns(updates);
     warning =
-      "Saved without photo categories — run supabase/migrations/012_vehicle_image_categories.sql in Supabase SQL Editor to enable categorized galleries.";
+      "Saved without gallery images — run supabase/migrations/060_vehicle_gallery_images.sql in Supabase SQL Editor to enable vehicle galleries.";
     result = await supabase
       .from("vehicles")
       .update(patchPayload)
@@ -503,12 +594,29 @@ export async function PATCH(req: NextRequest) {
     await logPlatformActivity(auth.auth, "vehicle_updated", data.slug, { id: data.id });
   }
 
+  let availabilityNotifications: { notified: number; skipped: number } | undefined;
+  if (turningOnLocally && data.local_availability_at) {
+    try {
+      availabilityNotifications = await notifyVehicleLocallyAvailable(supabase, {
+        id: data.id,
+        slug: data.slug,
+        make: data.make,
+        model: data.model,
+        year: data.year,
+        local_availability_at: data.local_availability_at,
+      });
+    } catch (err) {
+      console.error("[vehicles] local availability notify failed:", err);
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     vehicle: data,
     warning,
     autoPreOrder,
     pendingApproval: data.approval_status === "pending_approval",
+    availabilityNotifications,
   });
 }
 

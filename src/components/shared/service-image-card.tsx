@@ -14,11 +14,13 @@ export type ServiceImageCardData = {
   image: string;
   imageAlt: string;
   href?: string;
+  onClick?: () => void;
 };
 
 type ServiceImageCardProps = ServiceImageCardData & {
   className?: string;
   priority?: boolean;
+  onClick?: () => void;
 };
 
 function handleHashNavigation(
@@ -60,6 +62,7 @@ export function ServiceImageCard({
   href,
   className,
   priority = false,
+  onClick,
 }: ServiceImageCardProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -96,6 +99,14 @@ export function ServiceImageCard({
       </div>
     </>
   );
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={cn(cardClass, "text-left")}>
+        {content}
+      </button>
+    );
+  }
 
   if (href) {
     return (

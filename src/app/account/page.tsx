@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useRef, useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { MessageSquare, MessageSquarePlus, Package, Send, Ship, ShoppingCart, CalendarCheck, Car, Truck } from "lucide-react";
+import { MessageSquare, MessageSquarePlus, Package, Send, Ship, ShoppingCart, CalendarCheck, Car, Truck, Search } from "lucide-react";
 import { Container } from "@/components/shared/container";
-import { BackNav } from "@/components/shared/back-nav";
 import { ShipmentTimeline } from "@/components/shared/shipment-timeline";
+import { ImportMilestoneTimeline } from "@/components/shared/import-milestone-timeline";
 import { VisualShipmentTimeline } from "@/components/shared/visual-shipment-timeline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +27,6 @@ import { cn } from "@/lib/utils";
 import { shipmentStatusLabel } from "@/lib/platform/shipment";
 import { formatCargoDisplay } from "@/lib/freight/cargo-options";
 import type { CustomerCartSummary, PartsOrderSummary } from "@/lib/parts/cart-types";
-import { customRequestStatusLabel } from "@/lib/platform/custom-request";
 import { AccountDashboardTiles } from "@/components/account/account-dashboard-tiles";
 import { AccountCartSection } from "@/components/account/account-cart-section";
 import { OrderHistorySection } from "@/components/account/order-history-section";
@@ -35,7 +34,17 @@ import { RecentOrderBanner } from "@/components/account/recent-order-banner";
 import { BookVisitSection } from "@/components/account/book-visit-section";
 import { AccountSectionHeader } from "@/components/account/account-section-header";
 import { AccountEmptyState } from "@/components/account/account-empty-state";
+import { AccountNotificationsSection } from "@/components/account/account-notifications-section";
+import { VehicleRequestsSection } from "@/components/account/vehicle-requests-section";
 import { buildAccountAppointmentContext } from "@/lib/account/appointment-context";
+import {
+  buildPreorderDocumentHtml,
+  type CustomerPrintProfile,
+} from "@/lib/account/printable-documents";
+import { OrderPrintActions } from "@/components/account/order-print-actions";
+import { useCustomerNotifications } from "@/context/customer-notifications-context";
+import { useMarkCustomerNotificationsOnVisit } from "@/hooks/use-mark-customer-notifications-read";
+import { accountMessageLink } from "@/lib/customer/notification-types";
 import type { CustomerAppointmentSummary } from "@/lib/account/types";
 
 type CustomerPreorderTracking = {
@@ -122,6 +131,7 @@ function AccountContent() {
   const { user, profile, displayName, signOut, getAccessToken } = useCustomerAuth();
   const { loading } = useRequireCustomerAuth();
   const { formatPrice } = useCurrency();
+  const { load: reloadNotifications } = useCustomerNotifications();
   const [conversations, setConversations] = useState<CustomerConversation[]>([]);
   const [threadMessages, setThreadMessages] = useState<CustomerChatMessage[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
@@ -144,7 +154,10 @@ function AccountContent() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
+  const [highlightConversationId, setHighlightConversationId] = useState<string | null>(null);
   const threadEndRef = useRef<HTMLDivElement>(null);
+  const replyInputRef = useRef<HTMLTextAreaElement>(null);
+  const deepLinkFocusRef = useRef(false);
 
   const selectedConversation = conversations.find((c) => c.id === selectedConversationId) ?? null;
 
@@ -245,6 +258,16 @@ function AccountContent() {
       void loadData();
     }
   }, [user, loadData]);
+
+  const conversationParam = searchParams.get("conversation");
+  useMarkCustomerNotificationsOnVisit({
+    link: conversationParam ? accountMessageLink(conversationParam) : undefined,
+  });
+
+  useEffect(() => {
+    if (!user) return;
+    void reloadNotifications();
+  }, [user, reloadNotifications]);
 
   useEffect(() => {
     const conv = searchParams.get("conversation");
@@ -409,10 +432,18 @@ function AccountContent() {
   }
 
   const preorders = inquiries.filter((item) => item.type === "preorder");
+  const customRequests = preorders.filter((item) => item.is_custom_request === true);
+  const catalogPreorders = preorders.filter((item) => item.is_custom_request !== true);
   const preorderById = new Map(preorderTracking.map((p) => [p.id, p]));
   const otherInquiries = inquiries.filter((item) => item.type !== "preorder");
   const pendingOrderCount = partsOrders.filter((order) => order.status === "pending").length;
   const cartItemCount = cartSummary?.item_count ?? 0;
+
+  const customerPrintProfile: CustomerPrintProfile = {
+    name: displayName,
+    email: user?.email ?? "",
+    phone: profile?.phone ?? null,
+  };
 
   const appointmentContext = buildAccountAppointmentContext({
     displayName,
@@ -425,24 +456,57 @@ function AccountContent() {
   });
 
   useEffect(() => {
+    if (dataLoading) return;
+
+    const hash = typeof window !== "undefined" ? window.location.hash.slice(1) : "";
+    const conversationId = searchParams.get("conversation");
     const section = searchParams.get("section");
-    if (!section || dataLoading) return;
-    const targetId =
-      section === "orders"
-        ? "my-orders"
-        : section === "cart"
-          ? "my-cart"
-          : section === "visit" || section === "appointments"
-            ? "book-visit"
-            : section === "preorders"
-              ? "my-preorders"
-              : null;
+
+    let targetId: string | null = null;
+    if (hash === "messages" || conversationId) {
+      targetId = "messages";
+      deepLinkFocusRef.current = true;
+    } else if (section === "orders") {
+      targetId = "my-orders";
+    } else if (section === "cart") {
+      targetId = "my-cart";
+    } else if (section === "visit" || section === "appointments") {
+      targetId = "book-visit";
+    } else if (section === "vehicle-requests") {
+      targetId = "vehicle-requests";
+    } else if (section === "preorders") {
+      targetId = "my-preorders";
+    } else if (hash === "vehicle-requests") {
+      targetId = "vehicle-requests";
+    }
+
     if (targetId) {
       requestAnimationFrame(() => {
         document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     }
+
+    if (conversationId) {
+      setHighlightConversationId(conversationId);
+      const timer = window.setTimeout(() => setHighlightConversationId(null), 2500);
+      return () => window.clearTimeout(timer);
+    }
   }, [searchParams, dataLoading]);
+
+  const highlightedRequestId = searchParams.get("request");
+
+  useEffect(() => {
+    if (!deepLinkFocusRef.current || !selectedConversationId || threadLoading) return;
+    const conversationId = searchParams.get("conversation");
+    const hash = typeof window !== "undefined" ? window.location.hash.slice(1) : "";
+    if (hash !== "messages" && !conversationId) return;
+    if (conversationId && conversationId !== selectedConversationId) return;
+
+    deepLinkFocusRef.current = false;
+    requestAnimationFrame(() => {
+      replyInputRef.current?.focus({ preventScroll: true });
+    });
+  }, [selectedConversationId, threadLoading, searchParams]);
 
   if (loading || !user) {
     return (
@@ -455,7 +519,6 @@ function AccountContent() {
   return (
     <Container className="py-12 sm:py-16">
       <div className="mx-auto max-w-4xl space-y-10">
-        <BackNav href="/" label="Back to home" variant="public" />
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold sm:text-3xl">My Account</h1>
@@ -490,6 +553,8 @@ function AccountContent() {
           </p>
         )}
 
+        <AccountNotificationsSection />
+
         <AccountDashboardTiles
           tiles={[
             {
@@ -515,11 +580,19 @@ function AccountContent() {
               href: "#book-visit",
             },
             {
+              id: "vehicle-requests",
+              label: "Vehicle requests",
+              icon: Search,
+              href: "#vehicle-requests",
+              badge: customRequests.length,
+              badgeLabel: "vehicle requests",
+            },
+            {
               id: "preorders",
               label: "My Pre-orders",
               icon: Car,
               href: "#my-preorders",
-              badge: preorders.length,
+              badge: catalogPreorders.length,
               badgeLabel: "pre-orders",
             },
           ]}
@@ -534,7 +607,11 @@ function AccountContent() {
           onBooked={() => void loadData()}
         />
 
-        <OrderHistorySection orders={partsOrders} loading={dataLoading} />
+        <OrderHistorySection
+          orders={partsOrders}
+          customer={customerPrintProfile}
+          loading={dataLoading}
+        />
 
         <AccountCartSection cartSummary={cartSummary} loading={dataLoading} />
 
@@ -592,10 +669,16 @@ function AccountContent() {
                     {expandedShipmentId === shipment.id ? "Hide timeline" : "View timeline"}
                   </button>
                   {expandedShipmentId === shipment.id && (
-                    <ShipmentTimeline
-                      events={shipment.events}
-                      className="mt-4 border-t border-border pt-4"
-                    />
+                    <div className="mt-4 space-y-4 border-t border-border pt-4">
+                      {shipment.reference_type === "preorder" ? (
+                        <ImportMilestoneTimeline
+                          events={shipment.events}
+                          shipmentStatus={shipment.status}
+                        />
+                      ) : (
+                        <ShipmentTimeline events={shipment.events} />
+                      )}
+                    </div>
                   )}
                 </li>
               ))}
@@ -649,28 +732,35 @@ function AccountContent() {
           )}
         </section>
 
+        <VehicleRequestsSection
+          requests={customRequests}
+          conversations={conversations}
+          customer={customerPrintProfile}
+          loading={dataLoading}
+          highlightedRequestId={highlightedRequestId}
+        />
+
         <section id="my-preorders" className="scroll-mt-[calc(var(--header-height)+1rem)] space-y-4">
           <AccountSectionHeader
             icon={<Car className="size-5" />}
             title="My Pre-orders"
-            description="Vehicle pre-orders and custom requests. Each catalog pre-order requires its own 25% down payment."
+            description="Catalog vehicle pre-orders. Each requires its own 25% down payment."
           />
           {dataLoading ? (
             <p className="text-sm text-muted-foreground">Loading pre-orders…</p>
-          ) : preorders.length === 0 ? (
+          ) : catalogPreorders.length === 0 ? (
             <AccountEmptyState
               icon={<Car className="size-7" />}
-              title="No pre-orders yet"
-              description="Pre-order a vehicle from our inventory or submit a custom request for sourcing."
+              title="No catalog pre-orders yet"
+              description="Pre-order a vehicle from our inventory, or submit a custom request if you can't find what you need."
               actionLabel="Browse inventory"
               actionHref={ROUTES.auto.inventory}
             />
           ) : (
             <ul className="divide-y rounded-lg border">
-              {preorders.map((item) => {
+              {catalogPreorders.map((item) => {
                 const tracked = preorderById.get(item.id);
                 const shipment = tracked?.shipment;
-                const isCustom = item.is_custom_request === true;
                 return (
                   <li key={`preorder-${item.id}`} className="flex flex-col gap-3 px-4 py-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -678,10 +768,7 @@ function AccountContent() {
                         <p className="font-medium">{item.title}</p>
                         <p className="text-xs text-muted-foreground">
                           Submitted {item.created_at.slice(0, 10)}
-                          {item.reference_code && (
-                            <> · Ref <span className="font-mono">{item.reference_code}</span></>
-                          )}
-                          {!isCustom && item.down_payment_usd != null && (
+                          {item.down_payment_usd != null && (
                             <> · 25% deposit: {formatPrice(item.down_payment_usd)}</>
                           )}
                         </p>
@@ -695,16 +782,20 @@ function AccountContent() {
                         )}
                       </div>
                       <div className="flex flex-col items-start gap-2 sm:items-end">
-                        {!isCustom && (
-                          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                            {paymentStatusLabel(item.payment_status)}
-                          </span>
-                        )}
-                        <span className="text-xs text-muted-foreground capitalize">
-                          {isCustom
-                            ? customRequestStatusLabel(tracked?.status ?? item.status)
-                            : `Order: ${tracked?.status ?? item.status}`}
+                        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {paymentStatusLabel(item.payment_status)}
                         </span>
+                        <span className="text-xs text-muted-foreground capitalize">
+                          Order: {tracked?.status ?? item.status}
+                        </span>
+                        <OrderPrintActions
+                          getHtml={() =>
+                            buildPreorderDocumentHtml(item, customerPrintProfile, {
+                              orderStatus: tracked?.status ?? item.status,
+                            })
+                          }
+                          printLabel="Print request summary"
+                        />
                         <Button
                           type="button"
                           variant="outline"
@@ -792,7 +883,10 @@ function AccountContent() {
           )}
         </section>
 
-        <section className="space-y-4">
+        <section
+          id="messages"
+          className="scroll-mt-[calc(var(--header-height)+1rem)] space-y-4"
+        >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <AccountSectionHeader
               icon={<MessageSquarePlus className="size-5" />}
@@ -835,7 +929,9 @@ function AccountContent() {
                           "w-full px-3 py-3 text-left text-sm transition-colors hover:bg-muted/50",
                           selectedConversationId === conv.id &&
                             !showNewConversation &&
-                            "bg-brand-purple/5"
+                            "bg-brand-purple/5",
+                          highlightConversationId === conv.id &&
+                            "ring-2 ring-brand-purple ring-inset"
                         )}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -988,6 +1084,7 @@ function AccountContent() {
                     className="flex items-end gap-2 border-t p-4"
                   >
                     <Textarea
+                      ref={replyInputRef}
                       rows={2}
                       value={replyDraft}
                       onChange={(e) => setReplyDraft(e.target.value)}

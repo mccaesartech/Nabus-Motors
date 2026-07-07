@@ -11,6 +11,9 @@ import {
   type CustomerNotificationPayload,
 } from "@/lib/notifications/notification-status";
 import { sendWhatsAppMessage } from "@/lib/notifications/whatsapp-send";
+import { sendTermiiSms } from "@/lib/notifications/termii";
+import { getTermiiConfig, isTermiiProviderEnv } from "@/lib/notifications/termii-config";
+import { getWhatsAppConfig } from "@/lib/notifications/whatsapp-config";
 
 export type NotifyCustomerParams = {
   email?: string;
@@ -40,6 +43,36 @@ function resolveWhatsAppPreferred(
   return defaultWhatsAppOptIn(trimmed);
 }
 
+async function shouldTryTermiiSms(): Promise<boolean> {
+  if (isTermiiProviderEnv()) return true;
+  const [termii, whatsapp] = await Promise.all([getTermiiConfig(), getWhatsAppConfig()]);
+  return termii.smsReady && whatsapp.provider === "termii";
+}
+
+async function tryTermiiSmsFallback(
+  phone: string,
+  body: string,
+  params: NotifyCustomerParams,
+  result: NotifyCustomerResult
+): Promise<void> {
+  if (!(await shouldTryTermiiSms())) return;
+  const termii = await getTermiiConfig();
+  if (!termii.smsReady) return;
+
+  const sms = await sendTermiiSms(phone, body);
+  if (sms.sent) {
+    result.channels.push("sms");
+    await logNotification({
+      sourceTable: params.sourceTable,
+      sourceId: params.sourceId,
+      template: params.template,
+      channel: "sms",
+      status: "sent",
+      recipient: phone,
+      detail: `termii message_id=${sms.messageId ?? "unknown"}`,
+    });
+  }
+}
 async function logNotification(row: {
   sourceTable?: string;
   sourceId?: string;
@@ -96,6 +129,7 @@ export async function notifyCustomer(
   } else if (!whatsappCapable) {
     result.whatsappStatus = "skipped";
     result.whatsappReason = "WhatsApp not sent (customer opted out)";
+    await tryTermiiSmsFallback(phone, content.whatsapp, params, result);
   } else {
     const wa = await sendWhatsAppMessage(phone, content.whatsapp);
     if (wa.sent) {
@@ -137,6 +171,7 @@ export async function notifyCustomer(
         recipient: phone,
         detail: wa.reason,
       });
+      await tryTermiiSmsFallback(phone, content.whatsapp, params, result);
     }
   }
 

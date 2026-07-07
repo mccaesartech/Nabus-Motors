@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -15,10 +16,6 @@ import {
 } from "lucide-react";
 import { PageHeader, StatCard } from "@/components/platform/page-header";
 import { ConfirmDialog } from "@/components/platform/confirm-dialog";
-import {
-  InventoryStatusChart,
-  LeadPipelineChart,
-} from "@/components/platform/dashboard-charts";
 import { StatusBadge } from "@/components/platform/status-badge";
 import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
@@ -32,6 +29,24 @@ import { usePlatformCurrency } from "@/context/platform-currency-context";
 import { usePlatformSession } from "@/components/platform/platform-shell";
 import { PlatformDateTime } from "@/components/platform/platform-datetime";
 
+const ChartSkeleton = () => (
+  <div className="h-48 w-full animate-pulse rounded-lg bg-[var(--platform-bg-secondary)]" />
+);
+
+const InventoryStatusChart = dynamic(
+  () =>
+    import("@/components/platform/dashboard-charts").then(
+      (m) => m.InventoryStatusChart
+    ),
+  { loading: ChartSkeleton, ssr: false }
+);
+
+const LeadPipelineChart = dynamic(
+  () =>
+    import("@/components/platform/dashboard-charts").then((m) => m.LeadPipelineChart),
+  { loading: ChartSkeleton, ssr: false }
+);
+
 export default function PlatformDashboardPage() {
   const router = useRouter();
   const session = usePlatformSession();
@@ -44,44 +59,64 @@ export default function PlatformDashboardPage() {
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [configured, setConfigured] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [tablesLoading, setTablesLoading] = useState(true);
   const [deleteVehicleTarget, setDeleteVehicleTarget] = useState<DbVehicle | null>(null);
   const [deleteToast, setDeleteToast] = useState("");
   const [dismissedTransactionIds, setDismissedTransactionIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
-    const [statsRes, vehiclesRes, inquiriesRes, notificationsRes, dismissalsRes] = await Promise.all([
+    const [statsRes, notificationsRes] = await Promise.all([
       fetch("/api/admin/stats"),
-      fetch("/api/admin/vehicles"),
-      fetch("/api/admin/inquiries"),
       fetch("/api/admin/notifications?limit=5"),
-      fetch("/api/admin/dashboard/transactions"),
     ]);
 
-    if (isAdminAuthError(statsRes) || isAdminAuthError(vehiclesRes) || isAdminAuthError(inquiriesRes)) {
+    if (isAdminAuthError(statsRes)) {
       router.push(adminLoginPath());
       return;
     }
 
-    if (!statsRes.ok || !vehiclesRes.ok || !inquiriesRes.ok) {
-      setLoading(false);
+    if (statsRes.ok) {
+      const statsJson = await statsRes.json();
+      setConfigured(Boolean(statsJson.configured));
+      setStats(statsJson.stats ?? null);
+    }
+
+    if (notificationsRes.ok) {
+      const notificationsJson = await notificationsRes.json();
+      setNotifications(notificationsJson.notifications ?? []);
+    }
+
+    setLoading(false);
+
+    const [vehiclesRes, inquiriesRes, dismissalsRes] = await Promise.all([
+      fetch("/api/admin/vehicles"),
+      fetch("/api/admin/inquiries"),
+      fetch("/api/admin/dashboard/transactions"),
+    ]);
+
+    if (isAdminAuthError(vehiclesRes) || isAdminAuthError(inquiriesRes)) {
+      router.push(adminLoginPath());
       return;
     }
 
-    const statsJson = await statsRes.json();
-    const vehiclesJson = await vehiclesRes.json();
-    const inquiriesJson = await inquiriesRes.json();
-    const notificationsJson = notificationsRes.ok ? await notificationsRes.json() : { notifications: [] };
-    const dismissalsJson = dismissalsRes.ok ? await dismissalsRes.json() : { dismissedVehicleIds: [] };
+    if (vehiclesRes.ok) {
+      const vehiclesJson = await vehiclesRes.json();
+      setConfigured((prev) => prev && Boolean(vehiclesJson.configured));
+      setVehicles(vehiclesJson.vehicles ?? []);
+    }
 
-    setConfigured(
-      Boolean(statsJson.configured && vehiclesJson.configured && inquiriesJson.configured)
-    );
-    setStats(statsJson.stats ?? null);
-    setVehicles(vehiclesJson.vehicles ?? []);
-    setInquiries(inquiriesJson.data ?? {});
-    setNotifications(notificationsJson.notifications ?? []);
-    setDismissedTransactionIds(new Set(dismissalsJson.dismissedVehicleIds ?? []));
-    setLoading(false);
+    if (inquiriesRes.ok) {
+      const inquiriesJson = await inquiriesRes.json();
+      setConfigured((prev) => prev && Boolean(inquiriesJson.configured));
+      setInquiries(inquiriesJson.data ?? {});
+    }
+
+    if (dismissalsRes.ok) {
+      const dismissalsJson = await dismissalsRes.json();
+      setDismissedTransactionIds(new Set(dismissalsJson.dismissedVehicleIds ?? []));
+    }
+
+    setTablesLoading(false);
   }, [router]);
 
   useEffect(() => {
@@ -416,7 +451,9 @@ export default function PlatformDashboardPage() {
                       colSpan={canDeleteTransactions ? 5 : 4}
                       className="px-5 py-8 text-center text-[var(--platform-text-secondary)]"
                     >
-                      No reserved, sold, or confirmed pre-order vehicles yet.
+                      {tablesLoading
+                        ? "Loading recent transactions…"
+                        : "No reserved, sold, or confirmed pre-order vehicles yet."}
                     </td>
                   </tr>
                 ) : (
@@ -481,7 +518,7 @@ export default function PlatformDashboardPage() {
                       colSpan={4}
                       className="px-5 py-8 text-center text-[var(--platform-text-secondary)]"
                     >
-                      No leads captured yet.
+                      {tablesLoading ? "Loading leads…" : "No leads captured yet."}
                     </td>
                   </tr>
                 ) : (

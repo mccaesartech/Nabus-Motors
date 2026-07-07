@@ -109,19 +109,32 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
-    fetch("/api/exchange-rates")
-      .then((res) => res.json())
-      .then((data: { rates?: Record<string, number> }) => {
-        if (cancelled || !data.rates) return;
-        setExchangeRates(data.rates);
-        setRatesLoaded(true);
-      })
-      .catch(() => {
-        if (!cancelled) setRatesLoaded(true);
-      });
+    const loadRates = () => {
+      fetch("/api/exchange-rates")
+        .then((res) => res.json())
+        .then((data: { rates?: Record<string, number> }) => {
+          if (cancelled || !data.rates) return;
+          setExchangeRates(data.rates);
+          setRatesLoaded(true);
+        })
+        .catch(() => {
+          if (!cancelled) setRatesLoaded(true);
+        });
+    };
+
+    let idleId: number | undefined;
+    let timerId: ReturnType<typeof setTimeout> | undefined;
+
+    if (typeof window.requestIdleCallback === "function") {
+      idleId = window.requestIdleCallback(loadRates, { timeout: 3000 });
+    } else {
+      timerId = setTimeout(loadRates, 150);
+    }
 
     return () => {
       cancelled = true;
+      if (idleId !== undefined) window.cancelIdleCallback(idleId);
+      if (timerId !== undefined) clearTimeout(timerId);
     };
   }, []);
 

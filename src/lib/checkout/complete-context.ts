@@ -1,3 +1,6 @@
+import type { CustomerInquirySummary } from "@/lib/customer/types";
+import type { PartsOrderSummary } from "@/lib/parts/cart-types";
+
 export type CheckoutCompleteVehicle = {
   id: string;
   name: string;
@@ -13,6 +16,10 @@ export type CheckoutCompleteContext = {
   phone: string;
   vehicles: CheckoutCompleteVehicle[];
   message?: string;
+  /** Cart order snapshot for immediate PDF/print on the success page. */
+  order?: PartsOrderSummary;
+  /** Pre-order snapshot for immediate PDF/print on the success page. */
+  preorder?: CustomerInquirySummary;
 };
 
 export const CHECKOUT_COMPLETE_STORAGE_KEY = "tg_checkout_complete";

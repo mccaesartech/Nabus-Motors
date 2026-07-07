@@ -6,14 +6,19 @@ import { formatMileage, formatVehicleName } from "@/lib/format";
 import { VehiclePrice } from "@/components/shared/vehicle-price";
 import { Badge } from "@/components/ui/badge";
 import { AvailabilityBadge } from "@/components/vehicle/availability-badge";
+import { VehicleTrustBadges } from "@/components/vehicle/vehicle-trust-badges";
 import { PreorderForm } from "@/components/vehicle/preorder-form";
 import { AddVehicleToCartButton } from "@/components/vehicle/add-vehicle-to-cart-button";
 import { primaryPhotoFor } from "@/lib/data/vehicle-images";
 import { SafeVehicleImage } from "@/components/shared/safe-vehicle-image";
 import { FullPageLink } from "@/components/shared/full-page-link";
 import { useGarage } from "@/hooks/use-garage";
+import { recordVehicleEngagement } from "@/lib/vehicle-preferences";
 import { useCurrency } from "@/context/currency-context";
 import { downPaymentUsd, isPreOrderStatus } from "@/lib/vehicles/availability";
+import { DEFAULT_TRUST_BADGES } from "@/lib/vehicles/trust-badges";
+import { AddToCompareButton } from "@/components/vehicle/add-to-compare-button";
+import { LocalAvailabilityBadge } from "@/components/vehicle/local-availability-badge";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
@@ -49,7 +54,14 @@ export function VehicleCard({
 
   function handleSaveToggle() {
     const action = toggleSave(vehicle);
+    if (action === "saved") {
+      recordVehicleEngagement("save", vehicle);
+    }
     onSaveToggle?.(action);
+  }
+
+  function handleCardClick() {
+    recordVehicleEngagement("click", vehicle);
   }
 
   return (
@@ -63,7 +75,7 @@ export function VehicleCard({
       )}
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-muted">
-        <FullPageLink href={detailHref} className="block overflow-hidden">
+        <FullPageLink href={detailHref} className="block overflow-hidden" onClick={handleCardClick}>
           <SafeVehicleImage
             src={photo}
             alt={formatVehicleName(vehicle)}
@@ -72,33 +84,46 @@ export function VehicleCard({
         </FullPageLink>
         <div className="absolute left-3 top-3 flex flex-col gap-1.5">
           <AvailabilityBadge status={vehicle.status ?? "available"} />
+          <LocalAvailabilityBadge available={vehicle.availableLocally} />
           {vehicle.featured && <Badge variant="featured">Featured</Badge>}
-          {vehicle.condition === "Certified Pre-Owned" && (
-            <Badge variant="verified">Verified</Badge>
-          )}
+          <VehicleTrustBadges
+            badges={vehicle.trustBadges ?? DEFAULT_TRUST_BADGES}
+            variant="card"
+          />
         </div>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            handleSaveToggle();
-          }}
-          className={cn(
-            "absolute right-3 top-3 flex size-8 items-center justify-center rounded-full bg-white/95 shadow-luxury transition-colors duration-200 hover:bg-brand-purple/10",
-            saved
-              ? "text-brand-purple hover:text-brand-purple-dark"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-          aria-label={saved ? "Remove from saved vehicles" : "Save vehicle"}
-          aria-pressed={saved}
-        >
-          <Heart className={cn("size-4", saved && "fill-current")} />
-        </button>
+        <div className="absolute right-3 top-3 flex flex-col gap-2">
+          <AddToCompareButton
+            vehicle={vehicle}
+            variant="icon"
+            onToggle={(action) => {
+              if (action === "full") {
+                window.alert("Compare list is full (max 4 vehicles). Remove one to add another.");
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleSaveToggle();
+            }}
+            className={cn(
+              "flex size-8 items-center justify-center rounded-full bg-white/95 shadow-luxury transition-colors duration-200 hover:bg-brand-purple/10",
+              saved
+                ? "text-brand-purple hover:text-brand-purple-dark"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            aria-label={saved ? "Remove from saved vehicles" : "Save vehicle"}
+            aria-pressed={saved}
+          >
+            <Heart className={cn("size-4", saved && "fill-current")} />
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-1 flex-col p-5">
-        <FullPageLink href={detailHref} className="group/link block">
+        <FullPageLink href={detailHref} className="group/link block" onClick={handleCardClick}>
           <h3 className="text-[15px] font-semibold text-foreground transition-colors duration-200 group-hover/link:text-brand-purple">
             {formatVehicleName(vehicle)}
           </h3>
@@ -137,6 +162,7 @@ export function VehicleCard({
             <FullPageLink
               href={detailHref}
               className="inline-flex h-8 flex-1 items-center justify-center rounded-md bg-primary text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              onClick={handleCardClick}
             >
               View Details
             </FullPageLink>

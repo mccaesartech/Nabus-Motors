@@ -1,14 +1,15 @@
 "use client";
 
 import { Suspense, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { Header, HeaderStatic } from "@/components/layout/header";
 import { CorporateHeader } from "@/components/layout/corporate-header";
 import { DivisionContextBar } from "@/components/layout/division-context-bar";
+import { CustomerBackBar } from "@/components/layout/customer-back-bar";
 import { FreightSubNav } from "@/components/layout/freight-sub-nav";
 import { Footer } from "@/components/layout/footer";
 import { MaintenanceBanner } from "@/components/layout/maintenance-banner";
-import { WhatsAppFloat } from "@/components/layout/whatsapp-float";
 import { ADMIN_PATH } from "@/lib/admin/paths";
 import type { OperationalSettings, SiteSettings } from "@/lib/platform/site-settings";
 import { toOperationalSettings } from "@/lib/platform/site-settings";
@@ -16,6 +17,22 @@ import { DEFAULT_SITE_SETTINGS } from "@/lib/platform/modules";
 import { isAutoDivisionPath, isFreightDivisionPath, ROUTES } from "@/lib/routes";
 import type { SiteContent } from "@/lib/site-content/defaults";
 import { DEFAULT_SITE_CONTENT } from "@/lib/site-content/defaults";
+
+const WhatsAppFloat = dynamic(
+  () =>
+    import("@/components/layout/whatsapp-float").then((m) => ({
+      default: m.WhatsAppFloat,
+    })),
+  { ssr: false }
+);
+
+const CompareFloatingBar = dynamic(
+  () =>
+    import("@/components/compare/compare-floating-bar").then((m) => ({
+      default: m.CompareFloatingBar,
+    })),
+  { ssr: false }
+);
 
 type SiteChromeProps = {
   children: React.ReactNode;
@@ -69,6 +86,7 @@ export function SiteChrome({
       )}
       <main className="min-w-0 flex-1 overflow-x-hidden pt-[var(--header-height)]">
         {useFreightSubNav ? <FreightSubNav /> : <DivisionContextBar />}
+        <CustomerBackBar />
         {children}
       </main>
       <Footer
@@ -77,6 +95,7 @@ export function SiteChrome({
         brand={useAutoHeader ? "auto" : "corporate"}
       />
       <WhatsAppFloat whatsappNumber={operational.whatsapp_number || content.global.whatsappNumber} />
+      {useAutoHeader ? <CompareFloatingBar /> : null}
     </>
   );
 }

@@ -1,8 +1,9 @@
 import { unstable_cache } from "next/cache";
 import { cache as reactCache } from "react";
-import type { Vehicle, VehicleSpec, HistoryEvent, VehicleAvailabilityStatus, VehicleGalleryData } from "@/lib/types";
+import type { Vehicle, VehicleSpec, HistoryEvent, VehicleAvailabilityStatus, VehicleGalleryData, CountryOfOrigin } from "@/lib/types";
+import { parseTrustBadges } from "@/lib/vehicles/trust-badges";
 import { vehicles as mockVehicles } from "@/lib/data/vehicles";
-import { resolveVehicleGallery, flattenGallery } from "@/lib/data/vehicle-images";
+import { resolveVehicleGallery, flattenGallery, resolvePrimaryImageUrl, resolveAdditionalImages } from "@/lib/data/vehicle-images";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
@@ -21,10 +22,38 @@ const FETCH_TIMEOUT_MS = 5000;
 export const PUBLIC_VEHICLES_CACHE_TAG = "public-vehicles";
 
 /** Time-based revalidation for public vehicle listings (seconds). */
-export const PUBLIC_VEHICLES_REVALIDATE_SECONDS = 60;
+export const PUBLIC_VEHICLES_REVALIDATE_SECONDS = 120;
 
 /** After first pending_changes schema error, skip the expensive OR filter. */
 let pendingChangesColumnAvailable: boolean | null = null;
+
+/** After first primary_image_url schema error, use legacy listing select. */
+let vehicleImageColumnsAvailable: boolean | null = null;
+
+/** After first trust/filter column schema error, use legacy listing select. */
+let vehicleTrustColumnsAvailable: boolean | null = null;
+
+function isVehicleTrustColumnsSchemaError(message?: string | null): boolean {
+  if (!message) return false;
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("trust_badges") ||
+    lower.includes("country_of_origin") ||
+    lower.includes("financing_available") ||
+    lower.includes("shipment_available") ||
+    lower.includes("customs_clearing_available") ||
+    lower.includes("available_locally")
+  );
+}
+
+function isVehicleImageColumnsSchemaError(message?: string | null): boolean {
+  if (!message) return false;
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("primary_image_url") ||
+    lower.includes("additional_images")
+  );
+}
 
 /** Same approval filter as public RLS and fetchAllVehicles. */
 export const PUBLIC_LISTING_APPROVAL_OR =
@@ -43,20 +72,55 @@ type PublicListingResult = {
 
 /** Run a public listing query; fall back when pending_changes column is not migrated yet. */
 async function runPublicListingQuery(
-  build: (approvalOr: string) => PromiseLike<PublicListingResult>
+  build: (approvalOr: string, listingSelect: string) => PromiseLike<PublicListingResult>
 ): Promise<PublicListingResult> {
   const approvalOr =
     pendingChangesColumnAvailable === false
       ? PUBLIC_LISTING_APPROVAL_APPROVED_ONLY
       : PUBLIC_LISTING_APPROVAL_OR;
+  const listingSelect = publicListingSelect();
 
-  const primary = await build(approvalOr);
+  const primary = await build(approvalOr, listingSelect);
   if (!primary.error) {
     if (pendingChangesColumnAvailable === null) {
       pendingChangesColumnAvailable = true;
     }
+    if (vehicleImageColumnsAvailable === null) {
+      vehicleImageColumnsAvailable = true;
+    }
     return primary;
   }
+
+  if (isVehicleImageColumnsSchemaError(primary.error.message)) {
+    vehicleImageColumnsAvailable = false;
+    if (listingSelect !== PUBLIC_LISTING_SELECT_LEGACY) {
+      if (process.env.NODE_ENV === "development") {
+        console.warn(
+          "[vehicles] primary_image_url/additional_images columns missing — using legacy listing select"
+        );
+      }
+      const fallback = await build(approvalOr, PUBLIC_LISTING_SELECT_LEGACY);
+      if (!fallback.error) return fallback;
+    }
+  }
+
+  if (isVehicleTrustColumnsSchemaError(primary.error.message)) {
+    vehicleTrustColumnsAvailable = false;
+    const trustFallbackSelect =
+      vehicleImageColumnsAvailable === false
+        ? PUBLIC_LISTING_SELECT_LEGACY
+        : PUBLIC_LISTING_SELECT_WITH_IMAGES_LEGACY_TRUST;
+    if (listingSelect !== trustFallbackSelect) {
+      if (process.env.NODE_ENV === "development") {
+        console.warn(
+          "[vehicles] trust/filter columns missing — using legacy listing select"
+        );
+      }
+      const fallback = await build(approvalOr, trustFallbackSelect);
+      if (!fallback.error) return fallback;
+    }
+  }
+
   if (!isPendingChangesSchemaError(primary.error.message)) {
     return primary;
   }
@@ -71,7 +135,7 @@ async function runPublicListingQuery(
       "[vehicles] pending_changes column missing — using approved-only public filter"
     );
   }
-  return build(PUBLIC_LISTING_APPROVAL_APPROVED_ONLY);
+  return build(PUBLIC_LISTING_APPROVAL_APPROVED_ONLY, listingSelect);
 }
 
 export type VehicleLookupUnresolved = {
@@ -102,6 +166,26 @@ async function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
   ]);
 }
 
+/** Listing/card views — omit heavy JSON columns (specs, history, description, gallery). */
+const PUBLIC_LISTING_SELECT_WITH_IMAGES =
+  "id, slug, make, model, year, trim, price, mileage, fuel_type, transmission, condition, body_type, location, featured, images, primary_image_url, additional_images, status, trust_badges, country_of_origin, financing_available, shipment_available, customs_clearing_available, available_locally, created_at";
+
+const PUBLIC_LISTING_SELECT_LEGACY =
+  "id, slug, make, model, year, trim, price, mileage, fuel_type, transmission, condition, body_type, location, featured, images, status, created_at";
+
+const PUBLIC_LISTING_SELECT_WITH_IMAGES_LEGACY_TRUST =
+  "id, slug, make, model, year, trim, price, mileage, fuel_type, transmission, condition, body_type, location, featured, images, primary_image_url, additional_images, status, created_at";
+
+function publicListingSelect(): string {
+  if (vehicleImageColumnsAvailable === false) {
+    return PUBLIC_LISTING_SELECT_LEGACY;
+  }
+  if (vehicleTrustColumnsAvailable === false) {
+    return PUBLIC_LISTING_SELECT_WITH_IMAGES_LEGACY_TRUST;
+  }
+  return PUBLIC_LISTING_SELECT_WITH_IMAGES;
+}
+
 interface VehicleRow {
   id: string;
   slug: string;
@@ -116,16 +200,27 @@ interface VehicleRow {
   condition: string;
   body_type: string;
   location: string;
-  engine_size: string | null;
-  color: string | null;
-  vin: string | null;
-  description: string | null;
+  engine_size?: string | null;
+  color?: string | null;
+  vin?: string | null;
+  description?: string | null;
   featured: boolean;
   images: string[];
+  primary_image_url?: string | null;
+  additional_images?: string[] | null;
   gallery?: VehicleGalleryData | null;
-  specs: VehicleSpec[];
-  history: HistoryEvent[];
+  specs?: VehicleSpec[];
+  history?: HistoryEvent[];
   status: string;
+  trust_badges?: unknown;
+  inspection_summary?: string | null;
+  country_of_origin?: string | null;
+  financing_available?: boolean | null;
+  shipment_available?: boolean | null;
+  customs_clearing_available?: boolean | null;
+  warranty_notes?: string | null;
+  walkaround_video_url?: string | null;
+  available_locally?: boolean | null;
   created_at: string;
 }
 
@@ -135,6 +230,17 @@ function mapRow(row: VehicleRow): Vehicle {
     images: row.images ?? [],
   });
   const images = flattenGallery(gallery);
+  const primaryImageUrl = resolvePrimaryImageUrl({
+    primary_image_url: row.primary_image_url,
+    gallery,
+    images: row.images ?? [],
+  });
+  const additionalImages = resolveAdditionalImages({
+    primary_image_url: row.primary_image_url,
+    additional_images: row.additional_images,
+    gallery,
+    images: row.images ?? [],
+  });
 
   return {
     id: row.id,
@@ -156,10 +262,21 @@ function mapRow(row: VehicleRow): Vehicle {
     description: row.description ?? "",
     featured: row.featured,
     images,
+    primaryImageUrl,
+    additionalImages,
     gallery,
     specs: row.specs ?? [],
     history: row.history ?? [],
     status: (row.status as VehicleAvailabilityStatus) ?? "available",
+    trustBadges: parseTrustBadges(row.trust_badges),
+    inspectionSummary: row.inspection_summary ?? null,
+    countryOfOrigin: (row.country_of_origin as CountryOfOrigin | null) ?? null,
+    financingAvailable: row.financing_available ?? true,
+    shipmentAvailable: row.shipment_available ?? true,
+    customsClearingAvailable: row.customs_clearing_available ?? true,
+    warrantyNotes: row.warranty_notes ?? null,
+    walkaroundVideoUrl: row.walkaround_video_url ?? null,
+    availableLocally: row.available_locally ?? false,
     createdAt: row.created_at.split("T")[0],
   };
 }
@@ -175,11 +292,11 @@ async function fetchAllVehiclesUncached(): Promise<Vehicle[]> {
 
   try {
     const result = await withTimeout(
-      runPublicListingQuery((approvalOr) =>
+      runPublicListingQuery((approvalOr, listingSelect) =>
         notDeletedFilter(
           supabase
             .from("vehicles")
-            .select("*")
+            .select(listingSelect)
             .in("status", PUBLIC_VEHICLE_STATUSES)
             .or(approvalOr)
         ).order("created_at", { ascending: false })
@@ -215,7 +332,7 @@ const getCachedAllVehicles = unstable_cache(
   }
 );
 
-/** Public inventory listing — cached 60s, busted on admin inventory saves. */
+/** Public inventory listing — cached 120s, busted on admin inventory saves. */
 export const fetchAllVehicles = reactCache(() => getCachedAllVehicles());
 
 export const fetchVehicleBySlug = reactCache(async (slug: string): Promise<Vehicle | null> => {
@@ -236,7 +353,7 @@ export const fetchVehicleBySlug = reactCache(async (slug: string): Promise<Vehic
 
   try {
     const result = await withTimeout(
-      runPublicListingQuery((approvalOr) =>
+      runPublicListingQuery((approvalOr, _listingSelect) =>
         notDeletedFilter(
           supabase
             .from("vehicles")
@@ -405,7 +522,7 @@ async function queryPublicVehiclesByIdentifiers(
   const [idsResult, slugsResult] = await Promise.all([
     ids.length
       ? withTimeout(
-          runPublicListingQuery((approvalOr) =>
+          runPublicListingQuery((approvalOr, _listingSelect) =>
             notDeletedFilter(
               supabase
                 .from("vehicles")
@@ -420,7 +537,7 @@ async function queryPublicVehiclesByIdentifiers(
       : Promise.resolve({ data: null as VehicleRow[] | null, error: null }),
     slugs.length
       ? withTimeout(
-          runPublicListingQuery((approvalOr) =>
+          runPublicListingQuery((approvalOr, _listingSelect) =>
             notDeletedFilter(
               supabase
                 .from("vehicles")
@@ -635,7 +752,7 @@ export async function fetchCheckoutVehiclesByIdentifiers(
 
   const [idsResult, slugsResult] = await Promise.all([
     ids.length
-      ? runPublicListingQuery((approvalOr) =>
+      ? runPublicListingQuery((approvalOr, _listingSelect) =>
           notDeletedFilter(
             supabase
               .from("vehicles")
@@ -650,7 +767,7 @@ export async function fetchCheckoutVehiclesByIdentifiers(
         }))
       : Promise.resolve({ data: null as CheckoutVehicleRecord[] | null, error: null }),
     slugs.length
-      ? runPublicListingQuery((approvalOr) =>
+      ? runPublicListingQuery((approvalOr, _listingSelect) =>
           notDeletedFilter(
             supabase
               .from("vehicles")

@@ -6,6 +6,8 @@ import { VehicleSearch } from "@/components/home/vehicle-search";
 import { CustomVehicleRequestCta } from "@/components/vehicle/custom-vehicle-request-cta";
 import { FeaturedVehicles } from "@/components/home/featured-vehicles";
 import { FeaturedVehiclesSkeleton } from "@/components/home/featured-vehicles-skeleton";
+import { RecommendedVehiclesSection } from "@/components/recommendations/recommended-vehicles-section";
+import { WhyBuyFromTrueGoshen } from "@/components/home/why-buy-from-true-goshen";
 import { WhyChooseUs } from "@/components/home/why-choose-us";
 import { VehicleCategories } from "@/components/home/vehicle-categories";
 import { Testimonials } from "@/components/home/testimonials";
@@ -37,6 +39,8 @@ export default async function AutoHomePage() {
       <Suspense fallback={<FeaturedVehiclesSkeleton />}>
         <FeaturedVehicles />
       </Suspense>
+      <RecommendedVehiclesSection />
+      <WhyBuyFromTrueGoshen />
       <WhyChooseUs content={content.whyChooseUs} />
       <VehicleCategories content={content.browseByCategory} />
       <DeferredSection fallback={<div className="min-h-[16rem] border-t border-border bg-background" aria-hidden />}>

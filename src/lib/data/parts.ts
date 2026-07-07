@@ -41,6 +41,7 @@ export type PartsFilter = {
   category?: string;
   brand?: string;
   make?: string;
+  model?: string;
 };
 
 export async function loadPublishedParts(filter: PartsFilter = {}): Promise<PublishedPart[]> {
@@ -77,6 +78,10 @@ export async function loadPublishedParts(filter: PartsFilter = {}): Promise<Publ
 
   if (filter.make?.trim()) {
     query = query.contains("compatible_makes", [filter.make.trim()]);
+  }
+
+  if (filter.model?.trim()) {
+    query = query.contains("compatible_models", [filter.model.trim()]);
   }
 
   const { data, error } = await query;

@@ -1,6 +1,7 @@
 import "server-only";
 import type { createAdminSupabase } from "@/lib/supabase/admin";
 import { notifyCustomer, type NotifyCustomerResult } from "@/lib/notifications/customer-notify";
+import { notifyCustomerShipmentUpdate } from "@/lib/customer/notifications-server";
 import { shipmentStatusLabel } from "@/lib/platform/shipment";
 
 type AdminSupabase = NonNullable<ReturnType<typeof createAdminSupabase>>;
@@ -154,8 +155,23 @@ export async function notifyShipmentCustomerUpdate(
 ): Promise<ShipmentNotifyResult> {
   const template = options.template ?? "shipment_status_update";
   const contact = await resolveShipmentCustomerContact(supabase, shipment);
+  const statusLabel =
+    options.statusLabel ??
+    (shipment.status ? shipmentStatusLabel(shipment.status) : undefined);
+
+  const queueInAppNotification = async () => {
+    if (!shipment.user_id) return;
+    await notifyCustomerShipmentUpdate(supabase, {
+      userId: shipment.user_id,
+      shipmentId: shipment.id,
+      trackingNumber: shipment.tracking_number,
+      statusLabel,
+      dedupKey: options.dedupKey,
+    });
+  };
 
   if (!contact.email && !contact.phone) {
+    await queueInAppNotification();
     return { attempted: false, reason: "no_contact" };
   }
 
@@ -166,12 +182,11 @@ export async function notifyShipmentCustomerUpdate(
       options.dedupKey,
       SHIPMENT_IDENTICAL_DEDUP_MS
     );
-    if (duplicate) return { attempted: false, reason: "deduped" };
+    if (duplicate) {
+      await queueInAppNotification();
+      return { attempted: false, reason: "deduped" };
+    }
   }
-
-  const statusLabel =
-    options.statusLabel ??
-    (shipment.status ? shipmentStatusLabel(shipment.status) : undefined);
 
   const notification = await notifyCustomer({
     email: contact.email,
@@ -191,6 +206,8 @@ export async function notifyShipmentCustomerUpdate(
   if (options.dedupKey && !options.skipDedup) {
     await logShipmentDedup(supabase, shipment.id, options.dedupKey);
   }
+
+  await queueInAppNotification();
 
   return { attempted: true, notification };
 }

@@ -8,6 +8,7 @@ import { ContactWhatsAppAction } from "@/components/platform/contact-actions";
 import { customerProfileIdForOrder } from "@/lib/platform/orders-admin";
 import { PageHeader } from "@/components/platform/page-header";
 import { PlatformPrintButton, PrintableRecord } from "@/components/platform/printable-record";
+import { buildAdminPreorderDocumentHtml } from "@/lib/platform/printable-documents";
 import { useMarkNotificationsOnVisit } from "@/hooks/use-mark-notifications-read";
 import { ConfirmDialog } from "@/components/platform/confirm-dialog";
 import { PaymentStatusBadge, StatusBadge } from "@/components/platform/status-badge";
@@ -179,6 +180,7 @@ export default function PreorderDetailPage() {
   const followUpIntro = isCustom
     ? `Hi ${inquiry.name}, following up on your custom vehicle request for ${vehicleTitle}.`
     : `Hi ${inquiry.name}, following up on your pre-order for ${vehicleTitle}.`;
+  const printRef = inquiry.reference_code ?? id.slice(0, 8).toUpperCase();
 
   return (
     <PrintableRecord
@@ -195,7 +197,10 @@ export default function PreorderDetailPage() {
         backLabel="Back to leads"
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <PlatformPrintButton />
+            <PlatformPrintButton
+              getHtml={() => buildAdminPreorderDocumentHtml(inquiry)}
+              downloadFilename={`${isCustom ? "custom-request" : "preorder"}-${printRef}.pdf`}
+            />
             <Link
               href={platformPath(
                 `customers/${encodeURIComponent(

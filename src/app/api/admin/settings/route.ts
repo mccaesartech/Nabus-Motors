@@ -6,6 +6,7 @@ import { DEFAULT_SITE_SETTINGS, SITE_SETTING_KEYS, type SiteSettingKey } from "@
 import { mergeSiteSettings } from "@/lib/platform/site-settings";
 import { getAutoSiteUrl, getPublicSiteUrl } from "@/lib/site-url";
 import { getEmailDeliveryHealth } from "@/lib/email/delivery-health";
+import { isTermiiProviderEnv } from "@/lib/notifications/termii-config";
 
 export async function GET() {
   const auth = await requirePermission("settings");
@@ -15,6 +16,11 @@ export async function GET() {
 
   const db = await checkDbHealth();
   const emailDelivery = getEmailDeliveryHealth();
+  const termiiRecommended = isTermiiProviderEnv();
+  const notificationMeta = {
+    recommendedProvider: termiiRecommended ? "termii" : null,
+    termiiEnvConfigured: Boolean(process.env.TERMII_API_KEY?.trim()),
+  };
 
   const supabase = createAdminSupabase();
   if (!supabase) {
@@ -27,6 +33,7 @@ export async function GET() {
         publicSiteUrl: getPublicSiteUrl(),
         autoSiteUrl: getAutoSiteUrl(),
         emailDelivery,
+        notification: notificationMeta,
       },
     });
   }
@@ -44,6 +51,7 @@ export async function GET() {
         publicSiteUrl: getPublicSiteUrl(),
         autoSiteUrl: getAutoSiteUrl(),
         emailDelivery,
+        notification: notificationMeta,
       },
     });
   }

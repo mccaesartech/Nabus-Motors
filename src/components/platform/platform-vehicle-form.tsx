@@ -4,17 +4,27 @@ import { useRef, useState } from "react";
 import {
   BODY_TYPES,
   CONDITIONS,
+  COUNTRY_OF_ORIGIN_OPTIONS,
   emptyVehicleForm,
   FUEL_TYPES,
   galleryFromInput,
-  imagesFromGallery,
+  primaryAndAdditionalFromVehicle,
+  syncVehicleImagesFromPrimaryAndAdditional,
   LOCATIONS,
   TRANSMISSIONS,
   VEHICLE_STATUSES,
   VEHICLE_STATUS_LABELS,
   type VehicleInput,
 } from "@/lib/admin/vehicle-fields";
-import type { VehicleGalleryData, VehicleImageCategory } from "@/lib/types";
+import {
+  DEFAULT_TRUST_BADGES,
+  TRUST_BADGE_KEYS,
+  TRUST_BADGE_LABELS,
+  type VehicleTrustBadges,
+} from "@/lib/vehicles/trust-badges";
+import type { VehicleGalleryData } from "@/lib/types";
+import { EMPTY_VEHICLE_GALLERY } from "@/lib/types";
+import { primaryAndAdditionalToGallery } from "@/lib/data/vehicle-images";
 import { makes } from "@/lib/data/catalog-meta";
 import { formatAdminCurrencyPreviews } from "@/lib/currency";
 import { usePlatformCurrency } from "@/context/platform-currency-context";
@@ -33,33 +43,6 @@ type PlatformVehicleFormProps = {
   onCancel: () => void;
   saving?: boolean;
 };
-
-const GALLERY_CATEGORIES: {
-  key: VehicleImageCategory;
-  label: string;
-  hint: string;
-}[] = [
-  {
-    key: "exterior",
-    label: "Exterior / Outlook",
-    hint: "Main body shots used as the listing hero. Add at least 1 exterior photo.",
-  },
-  {
-    key: "interior",
-    label: "Interior",
-    hint: "Add 2–4 interior photos buyers expect: cabin, seats, dashboard, steering wheel.",
-  },
-  {
-    key: "engine",
-    label: "Engine",
-    hint: "Engine bay and mechanical details buyers want to verify.",
-  },
-  {
-    key: "other",
-    label: "Other",
-    hint: "Optional extras — wheels, trunk, accessories, or additional angles.",
-  },
-];
 
 function Field({
   label,
@@ -119,27 +102,60 @@ export function PlatformVehicleForm({
           status: initial.status ?? "available",
           images: initial.images ?? [],
           gallery: galleryFromInput(initial.gallery, initial.images),
+          trust_badges: initial.trust_badges ?? { ...DEFAULT_TRUST_BADGES },
+          inspection_summary: initial.inspection_summary ?? "",
+          warranty_notes: initial.warranty_notes ?? "",
+          walkaround_video_url: initial.walkaround_video_url ?? "",
+          country_of_origin: initial.country_of_origin ?? "",
+          financing_available: initial.financing_available ?? true,
+          shipment_available: initial.shipment_available ?? true,
+          customs_clearing_available: initial.customs_clearing_available ?? true,
+          available_locally: initial.available_locally ?? false,
         }
       : emptyVehicleForm()
   );
+  const initialImages = primaryAndAdditionalFromVehicle(
+    initial ?? { gallery: EMPTY_VEHICLE_GALLERY, images: [] }
+  );
+  const [primaryImageUrl, setPrimaryImageUrl] = useState(initialImages.primaryImageUrl);
+  const [additionalImages, setAdditionalImages] = useState(initialImages.additionalImages);
   const [gallery, setGallery] = useState<VehicleGalleryData>(() =>
-    galleryFromInput(initial?.gallery, initial?.images)
+    primaryAndAdditionalToGallery(
+      initialImages.primaryImageUrl,
+      initialImages.additionalImages
+    )
   );
   const [error, setError] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
-  const totalPhotos =
-    gallery.exterior.length +
-    gallery.interior.length +
-    gallery.engine.length +
-    gallery.other.length;
+  const totalPhotos = (primaryImageUrl ? 1 : 0) + additionalImages.length;
+
+  function syncGalleryFromImages(primary: string, additional: string[]) {
+    const nextGallery = primaryAndAdditionalToGallery(primary, additional);
+    setGallery(nextGallery);
+    return nextGallery;
+  }
+
+  function updatePrimaryImage(urls: string[]) {
+    const nextPrimary = urls[0] ?? "";
+    setPrimaryImageUrl(nextPrimary);
+    syncGalleryFromImages(nextPrimary, additionalImages);
+  }
+
+  function updateAdditionalImages(urls: string[]) {
+    setAdditionalImages(urls);
+    syncGalleryFromImages(primaryImageUrl, urls);
+  }
+
+  function updateTrustBadge(key: keyof VehicleTrustBadges, checked: boolean) {
+    setForm((prev) => ({
+      ...prev,
+      trust_badges: { ...(prev.trust_badges ?? DEFAULT_TRUST_BADGES), [key]: checked },
+    }));
+  }
 
   function update<K extends keyof VehicleInput>(key: K, value: VehicleInput[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
-  }
-
-  function updateGalleryCategory(key: VehicleImageCategory, urls: string[]) {
-    setGallery((prev) => ({ ...prev, [key]: urls }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -147,11 +163,16 @@ export function PlatformVehicleForm({
     if (saving) return;
     setError("");
     try {
-      const images = imagesFromGallery(gallery);
+      const synced = syncVehicleImagesFromPrimaryAndAdditional(
+        primaryImageUrl,
+        additionalImages
+      );
       await onSave({
         ...form,
-        gallery,
-        images,
+        primary_image_url: synced.primary_image_url,
+        additional_images: synced.additional_images,
+        gallery: synced.gallery,
+        images: synced.images,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save vehicle.");
@@ -420,6 +441,24 @@ export function PlatformVehicleForm({
               request it. Multiple pre-orders per vehicle are allowed.
             </p>
           </Field>
+          <Field
+            label="Local availability"
+            hint="When enabled, interested customers are emailed that this vehicle is in Ghana and can be bought without shipping. Turning off does not send notifications."
+          >
+            <label className="flex items-center gap-2.5 rounded-lg border border-[var(--platform-border)] px-3 py-2.5 text-sm text-[var(--platform-text)]">
+              <input
+                type="checkbox"
+                checked={Boolean(form.available_locally)}
+                onChange={(e) => update("available_locally", e.target.checked)}
+                className="size-4 rounded border-[var(--platform-border)] accent-[var(--platform-accent)]"
+              />
+              <span>
+                {form.available_locally
+                  ? "Now available locally (without shipping)"
+                  : "Not yet available locally"}
+              </span>
+            </label>
+          </Field>
         </div>
         <label className="mt-4 flex items-center gap-2.5 text-sm text-[var(--platform-text)]">
           <input
@@ -432,28 +471,139 @@ export function PlatformVehicleForm({
         </label>
       </Section>
 
-      <Section title="Photos">
+      <Section title="Trust & services">
         <p className="mb-4 text-sm text-[var(--platform-text-secondary)]">
-          Upload real photos of this vehicle for the best listing. Use the AI Editor
-          panel to suggest stock placeholders, or drag and drop your own images below. You have{" "}
-          <span className="font-medium text-[var(--platform-text)]">{totalPhotos}</span> photo
-          {totalPhotos === 1 ? "" : "s"} uploaded
-          {gallery.exterior.length === 0 ? " — add at least 1 exterior shot." : "."}
+          Trust badges appear on inventory cards and vehicle detail pages. Service flags power
+          professional inventory filters.
         </p>
-        <div className="space-y-6">
-          {GALLERY_CATEGORIES.map((category) => (
-            <div
-              key={category.key}
-              className="rounded-lg border border-[var(--platform-border)] bg-[var(--platform-bg)] p-4"
+        <div className="grid gap-4 sm:grid-cols-2">
+          {TRUST_BADGE_KEYS.map((key) => (
+            <label
+              key={key}
+              className="flex items-start gap-2.5 rounded-lg border border-[var(--platform-border)] px-3 py-2.5 text-sm text-[var(--platform-text)]"
             >
-              <VehicleImageUpload
-                label={category.label}
-                hint={category.hint}
-                urls={gallery[category.key]}
-                onUrlsChange={(urls) => updateGalleryCategory(category.key, urls)}
+              <input
+                type="checkbox"
+                checked={Boolean(form.trust_badges?.[key])}
+                onChange={(e) => updateTrustBadge(key, e.target.checked)}
+                className="mt-0.5 size-4 rounded border-[var(--platform-border)] accent-[var(--platform-accent)]"
               />
-            </div>
+              <span>{TRUST_BADGE_LABELS[key]}</span>
+            </label>
           ))}
+        </div>
+        <Field label="Inspection summary" className="mt-4">
+          <textarea
+            value={form.inspection_summary ?? ""}
+            onChange={(e) => update("inspection_summary", e.target.value)}
+            rows={4}
+            className="platform-textarea min-h-[6rem]"
+            placeholder="Brief inspection notes shown on the vehicle detail page…"
+          />
+        </Field>
+        <Field label="Warranty notes" className="mt-4">
+          <textarea
+            value={form.warranty_notes ?? ""}
+            onChange={(e) => update("warranty_notes", e.target.value)}
+            rows={3}
+            className="platform-textarea min-h-[5rem]"
+            placeholder="Optional warranty coverage notes — leave blank to use condition-based defaults"
+          />
+        </Field>
+        <Field
+          label="Walkaround video URL"
+          className="mt-4"
+          hint="YouTube, Vimeo, or direct MP4 link — shown on the vehicle detail page when set"
+        >
+          <input
+            type="url"
+            value={form.walkaround_video_url ?? ""}
+            onChange={(e) => update("walkaround_video_url", e.target.value)}
+            className="platform-input w-full"
+            placeholder="https://youtube.com/watch?v=… or https://…/video.mp4"
+          />
+        </Field>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Field label="Country of origin">
+            <select
+              value={form.country_of_origin ?? ""}
+              onChange={(e) =>
+                update("country_of_origin", e.target.value as VehicleInput["country_of_origin"])
+              }
+              className="platform-select w-full"
+            >
+              {COUNTRY_OF_ORIGIN_OPTIONS.map((option) => (
+                <option key={option.label} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Services available">
+            <div className="space-y-2 rounded-lg border border-[var(--platform-border)] p-3">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.financing_available !== false}
+                  onChange={(e) => update("financing_available", e.target.checked)}
+                  className="size-4 rounded border-[var(--platform-border)] accent-[var(--platform-accent)]"
+                />
+                Financing available
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.shipment_available !== false}
+                  onChange={(e) => update("shipment_available", e.target.checked)}
+                  className="size-4 rounded border-[var(--platform-border)] accent-[var(--platform-accent)]"
+                />
+                Shipment available
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.customs_clearing_available !== false}
+                  onChange={(e) => update("customs_clearing_available", e.target.checked)}
+                  className="size-4 rounded border-[var(--platform-border)] accent-[var(--platform-accent)]"
+                />
+                Customs clearing available
+              </label>
+            </div>
+          </Field>
+        </div>
+      </Section>
+
+      <Section title="Primary image">
+        <p className="mb-4 text-sm text-[var(--platform-text-secondary)]">
+          Main photo shown on inventory cards and as the hero on the vehicle detail page.
+        </p>
+        <div className="rounded-lg border border-[var(--platform-border)] bg-[var(--platform-bg)] p-4">
+          <VehicleImageUpload
+            label="Listing hero photo"
+            hint="Upload one high-quality exterior shot. This stays separate from the gallery below."
+            urls={primaryImageUrl ? [primaryImageUrl] : []}
+            onUrlsChange={updatePrimaryImage}
+            maxImages={1}
+          />
+        </div>
+      </Section>
+
+      <Section title="Additional images">
+        <p className="mb-4 text-sm text-[var(--platform-text-secondary)]">
+          Add as many extra photos as you want — interior, engine bay, wheels, and more. Use the
+          arrow buttons on each thumbnail to reorder. You have{" "}
+          <span className="font-medium text-[var(--platform-text)]">{totalPhotos}</span> photo
+          {totalPhotos === 1 ? "" : "s"} total
+          {!primaryImageUrl ? " — add a primary image above." : "."}
+        </p>
+        <div className="rounded-lg border border-[var(--platform-border)] bg-[var(--platform-bg)] p-4">
+          <VehicleImageUpload
+            label="Gallery photos"
+            hint="Unlimited additional images. Upload files or paste URLs."
+            urls={additionalImages}
+            onUrlsChange={updateAdditionalImages}
+            reorderable
+          />
         </div>
       </Section>
 
@@ -504,6 +654,10 @@ export function PlatformVehicleForm({
           }}
           onApplyGallery={(nextGallery) => {
             setGallery(nextGallery);
+            const { primaryImageUrl: nextPrimary, additionalImages: nextAdditional } =
+              primaryAndAdditionalFromVehicle({ gallery: nextGallery });
+            setPrimaryImageUrl(nextPrimary);
+            setAdditionalImages(nextAdditional);
           }}
         />
       </div>

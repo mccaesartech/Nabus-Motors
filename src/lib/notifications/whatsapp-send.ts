@@ -1,9 +1,10 @@
 import "server-only";
 import { toWhatsAppE164 } from "@/lib/notifications/phone";
+import { sendTermiiWhatsApp } from "@/lib/notifications/termii";
 import { getWhatsAppConfig } from "@/lib/notifications/whatsapp-config";
 
 export type WhatsAppSendResult =
-  | { sent: true; provider: "twilio" | "meta" }
+  | { sent: true; provider: "twilio" | "meta" | "termii" }
   | { sent: false; reason: string; waMeUrl?: string };
 
 async function sendViaTwilio(
@@ -101,6 +102,13 @@ export async function sendWhatsAppMessage(
   }
 
   try {
+    if (config.provider === "termii") {
+      const result = await sendTermiiWhatsApp(phone, body);
+      if (result.sent) {
+        return { sent: true, provider: "termii" };
+      }
+      return { sent: false, reason: result.reason, waMeUrl };
+    }
     if (config.provider === "twilio") {
       return await sendViaTwilio(e164, body, config);
     }

@@ -5,6 +5,7 @@ import { InventoryFilters } from "@/components/inventory/inventory-filters";
 import { SortBar } from "@/components/inventory/sort-bar";
 import { Pagination } from "@/components/inventory/pagination";
 import { CustomVehicleRequestCta } from "@/components/vehicle/custom-vehicle-request-cta";
+import { RecommendedVehiclesSection } from "@/components/recommendations/recommended-vehicles-section";
 import {
   filterVehicles,
   parseFiltersFromSearchParams,
@@ -16,7 +17,7 @@ import type { SortOption } from "@/lib/types";
 
 const PAGE_SIZE = 9;
 
-export const revalidate = 60;
+export const revalidate = 120;
 
 interface InventoryPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -72,6 +73,8 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
           </Suspense>
 
           <div className="min-w-0 flex-1">
+            <RecommendedVehiclesSection variant="inventory" />
+
             <Suspense fallback={null}>
               <SortBar total={filtered.length} />
             </Suspense>

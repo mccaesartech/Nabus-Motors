@@ -16,6 +16,7 @@ import {
 import {
   FreightFormAccountFields,
   FreightSubmitSuccess,
+  LoggedInContactBanner,
   useFreightFormProfile,
 } from "@/components/freight/freight-form-account-fields";
 import { buildCargoPayload } from "@/lib/freight/cargo-options";
@@ -195,27 +196,33 @@ export function FreightQuoteForm({ initialServiceType }: FreightQuoteFormProps) 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-border bg-card p-6 shadow-luxury">
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="freight-name">Full name *</Label>
-          <Input
-            id="freight-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            autoComplete="name"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="freight-email">Email *</Label>
-          <Input
-            id="freight-email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="email"
-          />
-        </div>
+        {isGuest ? (
+          <>
+            <div className="space-y-1.5">
+              <Label htmlFor="freight-name">Full name *</Label>
+              <Input
+                id="freight-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                autoComplete="name"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="freight-email">Email *</Label>
+              <Input
+                id="freight-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
+            </div>
+          </>
+        ) : (
+          <LoggedInContactBanner name={name} email={email} phone={phone} />
+        )}
 
         <FreightFormAccountFields
           isGuest={isGuest}
@@ -226,6 +233,7 @@ export function FreightQuoteForm({ initialServiceType }: FreightQuoteFormProps) 
           confirmPassword={confirmPassword}
           onConfirmPasswordChange={setConfirmPassword}
           phoneId="freight-phone"
+          phoneRequired={isGuest}
         />
 
         <div className="sm:col-span-2">

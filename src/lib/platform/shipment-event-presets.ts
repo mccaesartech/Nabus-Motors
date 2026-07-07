@@ -98,6 +98,24 @@ export const SHIPMENT_EVENT_PRESETS: ShipmentEventPreset[] = [
     suggestedStatus: "pending",
   },
   {
+    id: "vehicle_purchased",
+    label: "Vehicle purchased",
+    title: "Vehicle purchased",
+    location: "{origin_country}",
+    descriptionTemplate:
+      "The vehicle for shipment {tracking_number} has been purchased at origin. Preparing export documentation next.",
+    suggestedStatus: "pending",
+  },
+  {
+    id: "preparing_shipment",
+    label: "Preparing shipment",
+    title: "Preparing shipment",
+    location: "{origin_country}",
+    descriptionTemplate:
+      "We are preparing shipment {tracking_number} for export — documentation and loading arrangements are underway.",
+    suggestedStatus: "booked",
+  },
+  {
     id: "payment_received",
     label: "Payment received",
     title: "Payment received",

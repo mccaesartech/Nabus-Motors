@@ -1,3 +1,9 @@
+import { getPublicSiteUrl } from "@/lib/site-url";
+
+function getVideoEmbedOrigin(): string {
+  return getPublicSiteUrl();
+}
+
 export type SiteVideoEmbedSettings = {
   /** Use modestbranding, nocookie domain, hide annotations */
   embedMinimalBranding: boolean;
@@ -9,7 +15,7 @@ export type SiteVideoEmbedSettings = {
 
 export const DEFAULT_VIDEO_EMBED: SiteVideoEmbedSettings = {
   embedMinimalBranding: true,
-  embedHideControls: true,
+  embedHideControls: false,
   embedHideRelated: true,
 };
 
@@ -24,7 +30,8 @@ export function resolveVideoEmbedSettings(
   return {
     embedMinimalBranding:
       settings?.embedMinimalBranding ?? DEFAULT_VIDEO_EMBED.embedMinimalBranding,
-    embedHideControls: settings?.embedHideControls ?? DEFAULT_VIDEO_EMBED.embedHideControls,
+    embedHideControls:
+      settings?.embedHideControls ?? DEFAULT_VIDEO_EMBED.embedHideControls,
     embedHideRelated: settings?.embedHideRelated ?? DEFAULT_VIDEO_EMBED.embedHideRelated,
   };
 }
@@ -44,10 +51,13 @@ export function buildYouTubeEmbedUrl(videoId: string, context: EmbedBuildContext
     params.set("mute", "1");
     params.set("loop", "1");
     params.set("playlist", videoId);
-    params.set("playsinline", "1");
   }
 
-  params.set("controls", settings.embedHideControls ? "0" : "1");
+  // Required for inline playback on iOS (hero + interactive embeds).
+  params.set("playsinline", "1");
+
+  const hideControls = background && settings.embedHideControls;
+  params.set("controls", hideControls ? "0" : "1");
   params.set("rel", settings.embedHideRelated ? "0" : "1");
 
   if (settings.embedMinimalBranding) {
@@ -55,9 +65,14 @@ export function buildYouTubeEmbedUrl(videoId: string, context: EmbedBuildContext
     params.set("iv_load_policy", "3");
   }
 
-  if (settings.embedHideControls) {
+  if (hideControls) {
     params.set("disablekb", "1");
     params.set("fs", "0");
+  }
+
+  const origin = getVideoEmbedOrigin();
+  if (origin) {
+    params.set("origin", origin);
   }
 
   return `${host}/embed/${videoId}?${params.toString()}`;
@@ -76,14 +91,22 @@ export function buildVimeoEmbedUrl(videoId: string, context: EmbedBuildContext =
     params.set("background", "1");
   }
 
+  params.set("playsinline", "1");
+
   if (settings.embedMinimalBranding) {
     params.set("title", "0");
     params.set("byline", "0");
     params.set("portrait", "0");
   }
 
-  if (settings.embedHideControls && !background) {
+  const hideControls = background && settings.embedHideControls;
+  if (hideControls) {
     params.set("controls", "0");
+  }
+
+  const origin = getVideoEmbedOrigin();
+  if (origin) {
+    params.set("referrer", origin);
   }
 
   return `https://player.vimeo.com/video/${videoId}?${params.toString()}`;

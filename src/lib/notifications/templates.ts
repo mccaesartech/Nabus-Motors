@@ -10,7 +10,11 @@ export type CustomerNotifyTemplate =
   | "appointment_confirmed"
   | "appointment_request_received"
   | "cart_order_confirmed"
-  | "password_reset";
+  | "order_submitted"
+  | "preorder_status_update"
+  | "staff_message"
+  | "password_reset"
+  | "vehicle_available_locally";
 
 type TemplateContent = {
   subject: string;
@@ -24,6 +28,10 @@ function trackingUrl(): string {
 
 function accountUrl(): string {
   return `${getPublicSiteUrl()}/account`;
+}
+
+function vehicleRequestsAccountUrl(): string {
+  return `${getPublicSiteUrl()}/account#vehicle-requests`;
 }
 
 function forgotPasswordUrl(): string {
@@ -81,14 +89,15 @@ export function buildCustomerMessage(
     }
     case "custom_request_submitted": {
       const ref = reference || registrationId;
+      const trackUrl = vehicleRequestsAccountUrl();
       const accountSuffix = passwordResetUrl
-        ? `\n\nYour account is ready. Track requests at ${accountUrl()}\nSet your password: ${passwordResetUrl}`
-        : `\n\nTrack your request in your account: ${accountUrl()}`;
+        ? `\n\nYour account is ready. Track this request at ${trackUrl}\nSet your password: ${passwordResetUrl}`
+        : `\n\nTrack your request anytime: ${trackUrl}`;
       return {
         subject: `Custom vehicle request received${ref ? ` — ${ref}` : ""}`,
         whatsapp: ref
-          ? `True Goshen: We received your custom vehicle request for ${vehicle}. Reference: ${ref}. Our team will review sourcing options and contact you.${passwordResetUrl ? ` Set password: ${passwordResetUrl}` : ""}`
-          : `True Goshen: We received your custom vehicle request for ${vehicle}. Our team will contact you shortly.`,
+          ? `True Goshen: We received your custom vehicle request for ${vehicle}. Reference: ${ref}. Track at ${trackUrl}.${passwordResetUrl ? ` Set password: ${passwordResetUrl}` : ""}`
+          : `True Goshen: We received your custom vehicle request for ${vehicle}. Track at ${trackUrl}. Our team will contact you shortly.`,
         emailText: `Hi ${name},\n\nThank you for your custom vehicle request for ${vehicle}.${ref ? `\n\nReference: ${ref}` : ""}\n\nOur owners and managers will review whether we can source this vehicle and follow up with you.${accountSuffix}\n\nTrue Goshen Auto`,
       };
     }
@@ -136,6 +145,34 @@ export function buildCustomerMessage(
         emailText: `Hi ${name},\n\nYour True Goshen cart order${refPart} is confirmed.${totalPart}\n\nView order history and book a showroom visit in your account:\n${accountUrl()}\n\nOur team will contact you shortly with next steps.\n\nTrue Goshen Company Limited`,
       };
     }
+    case "order_submitted": {
+      const itemCount = data.itemCount?.trim() || "1";
+      return {
+        subject: "Your True Goshen order was received",
+        whatsapp: `True Goshen: We received your order (${itemCount} item(s)). Our team will confirm details shortly. Track: ${accountUrl()}`,
+        emailText: `Hi ${name},\n\nWe received your order with ${itemCount} item(s). Our team will confirm pricing, availability, and next steps shortly.\n\nTrack your order: ${accountUrl()}\n\nTrue Goshen Company Limited`,
+      };
+    }
+    case "preorder_status_update": {
+      const title = data.updateTitle?.trim() || "Your pre-order";
+      const status = data.statusLabel?.trim() || statusLabel || "updated";
+      const trackUrl = data.isCustomRequest === "true" ? vehicleRequestsAccountUrl() : accountUrl();
+      return {
+        subject: `${title} — status update`,
+        whatsapp: `True Goshen: ${title}: status is now ${status}. Track: ${trackUrl}`,
+        emailText: `Hi ${name},\n\n${title}: your status is now ${status}.\n\nTrack in your account: ${trackUrl}\n\nTrue Goshen`,
+      };
+    }
+    case "staff_message": {
+      const subject = data.messageSubject?.trim() || "your inquiry";
+      const preview = data.messagePreview?.trim() || "You have a new message.";
+      const staff = data.staffName?.trim() || "Our team";
+      return {
+        subject: `New message: ${subject}`,
+        whatsapp: `True Goshen: ${staff} replied about "${subject}": ${preview} View: ${accountUrl()}`,
+        emailText: `Hi ${name},\n\n${staff} sent you a message about "${subject}":\n\n${preview}\n\nView and reply in your account: ${accountUrl()}\n\nTrue Goshen`,
+      };
+    }
     case "password_reset": {
       const resetUrl = passwordResetUrl || forgotPasswordUrl();
       const refPart = reference ? ` Your reference: ${reference}.` : "";
@@ -143,6 +180,14 @@ export function buildCustomerMessage(
         subject: "Reset your True Goshen password",
         whatsapp: `True Goshen: Reset your password here: ${resetUrl}.${refPart}`,
         emailText: `Hi ${name},\n\nReset your True Goshen password using this secure link:\n${resetUrl}${reference ? `\n\nYour reference: ${reference}` : ""}\n\nThis link expires soon. If you did not request this, you can ignore this email.\n\nTrue Goshen Company Limited`,
+      };
+    }
+    case "vehicle_available_locally": {
+      const vehicleUrl = data.vehicleUrl?.trim() || "";
+      return {
+        subject: `${vehicle} is now available in Ghana`,
+        whatsapp: `True Goshen: The ${vehicle} you viewed is now available in Ghana — buy without shipping.${vehicleUrl ? ` View: ${vehicleUrl}` : ""}`,
+        emailText: `Hi ${name},\n\nGood news — the ${vehicle} you viewed is now available in Ghana and can be purchased without shipping.\n\nView the vehicle:${vehicleUrl ? `\n${vehicleUrl}` : ""}\n\nTrue Goshen Auto`,
       };
     }
     default:

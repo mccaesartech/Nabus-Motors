@@ -32,7 +32,9 @@ import { formatVehicleName } from "@/lib/format";
 import { GHANA_WHATSAPP } from "@/lib/data/vehicle-images";
 import { defaultWhatsAppOptIn } from "@/lib/notifications/phone";
 import { saveCheckoutCompleteContext } from "@/lib/checkout/complete-context";
+import { buildPreorderPrintSnapshot } from "@/lib/checkout/print-snapshot";
 import { ROUTES } from "@/lib/routes";
+import { recordVehicleEngagement } from "@/lib/vehicle-preferences";
 import { usePartsCart } from "@/context/parts-cart-context";
 import { cn } from "@/lib/utils";
 
@@ -238,11 +240,21 @@ export function PreorderForm({
           },
         ],
         message: json.message,
+        preorder: buildPreorderPrintSnapshot({
+          inquiryId: json.inquiryId ? String(json.inquiryId) : undefined,
+          registrationId: json.registrationId ? String(json.registrationId) : undefined,
+          vehicleName,
+          vehicleSlug: vehicle.slug,
+          vehiclePriceUsd: vehicle.price,
+          downPaymentUsd: downPaymentUsd(vehicle.price),
+        }),
       });
 
       if (isVehicleInCart(vehicle.id)) {
         removeVehicle(vehicle.id);
       }
+
+      recordVehicleEngagement("preorder", vehicle);
 
       setOpen(false);
       resetForm();

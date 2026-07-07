@@ -19,6 +19,7 @@ import {
   type PlatformUserOption,
 } from "@/lib/customer/types";
 import { canOversightCustomerTickets } from "@/lib/platform/permissions";
+import type { NotificationFeedbackVariant } from "@/lib/notifications/notification-status";
 import { cn } from "@/lib/utils";
 import { PlatformDateTime } from "@/components/platform/platform-datetime";
 
@@ -67,6 +68,8 @@ export default function PlatformMessagesPage() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [toastVariant, setToastVariant] = useState<NotificationFeedbackVariant>("success");
   const [showNewChat, setShowNewChat] = useState(false);
   const [newCustomerId, setNewCustomerId] = useState("");
   const [newSubject, setNewSubject] = useState("");
@@ -435,6 +438,11 @@ export default function PlatformMessagesPage() {
       return false;
     }
 
+    if (json.notificationMessage) {
+      setToast(String(json.notificationMessage));
+      setToastVariant((json.notificationVariant as NotificationFeedbackVariant) ?? "success");
+    }
+
     resetComposeFields();
     setShowNewChat(false);
     clearComposeUrlParams(json.conversationId as string);
@@ -494,6 +502,22 @@ export default function PlatformMessagesPage() {
           </button>
         }
       />
+
+      {toast && (
+        <div
+          role="status"
+          className={cn(
+            "rounded-lg border px-4 py-3 text-sm",
+            toastVariant === "warning"
+              ? "border-amber-500/40 bg-amber-500/10 text-[var(--platform-text-secondary)]"
+              : toastVariant === "neutral"
+                ? "border-[var(--platform-border)] bg-[var(--platform-surface)] text-[var(--platform-text-secondary)]"
+                : "border-[var(--platform-success)]/30 bg-[rgba(16,185,129,0.08)] text-[var(--platform-success)]"
+          )}
+        >
+          {toast}
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="relative lg:col-span-2">

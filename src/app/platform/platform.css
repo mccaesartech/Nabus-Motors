@@ -17,6 +17,7 @@
   color: var(--platform-text);
   min-height: 100vh;
   font-family: var(--font-inter), system-ui, sans-serif;
+  cursor: default;
 }
 
 .platform-theme ::selection {
@@ -612,6 +613,8 @@
   color: var(--platform-ai-text);
   user-select: text;
   -webkit-user-select: text;
+  cursor: default;
+  caret-color: transparent;
 }
 
 .platform-ai-bubble ::selection {
@@ -1000,14 +1003,47 @@
   height: 1.5rem;
 }
 
-/* ─── Print layouts for platform records ─────────────────────────────────── */
+/* ─── Print layouts for platform records (fallback if window.print used) ── */
 @media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  img {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   @page {
-    margin: 1.2cm;
+    margin: 12mm;
+    size: A4;
+  }
+
+  html,
+  body,
+  .platform-theme,
+  .platform-theme main,
+  .platform-print-record,
+  .platform-card {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
   }
 
   body {
     background: #fff !important;
+  }
+
+  .platform-theme {
+    display: block !important;
+    background: #fff !important;
+    color: #111 !important;
+    min-height: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+    grid-template-columns: 1fr !important;
   }
 
   .platform-theme aside,
@@ -1015,6 +1051,8 @@
   .platform-topbar,
   .platform-sidebar,
   .platform-db-banner,
+  .platform-back-nav,
+  .platform-scrollbar,
   .no-print,
   .platform-btn-primary,
   .platform-btn-ghost,
@@ -1022,30 +1060,35 @@
   button,
   textarea,
   select,
-  form {
+  form,
+  [role="dialog"] {
     display: none !important;
   }
 
-  .platform-theme {
-    background: #fff !important;
-    color: #111 !important;
-    min-height: auto !important;
+  .platform-theme > div {
+    display: block !important;
+    overflow: visible !important;
+    padding: 0 !important;
   }
 
   .platform-theme main {
     padding: 0 !important;
     margin: 0 !important;
     max-width: none !important;
+    overflow: visible !important;
   }
 
   .platform-card {
-    break-inside: avoid;
+    break-inside: auto;
+    page-break-inside: auto;
     border-color: #ddd !important;
     box-shadow: none !important;
+    overflow: visible !important;
   }
 
   .platform-print-record {
     display: block !important;
+    overflow: visible !important;
   }
 
   .platform-print-header {

@@ -30,6 +30,7 @@ import {
 } from "@/lib/customer/session-preference";
 import { SessionPreferenceModal } from "@/components/customer/session-preference-modal";
 import { CustomerSessionGuard } from "@/components/customer/customer-session-guard";
+import { readPendingVehicleInterest, clearPendingVehicleInterest } from "@/lib/vehicle-interest/client";
 
 type CustomerAuthContextValue = {
   user: User | null;
@@ -104,16 +105,23 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
       const token = await getAccessToken();
       if (!token || !nextUser.email) return;
       try {
+        const vehicleInterestPending = readPendingVehicleInterest();
         await fetch("/api/customer/sync-account", {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(
-            preference ? { sessionPreference: preference } : {}
-          ),
+          body: JSON.stringify({
+            ...(preference ? { sessionPreference: preference } : {}),
+            ...(vehicleInterestPending.length
+              ? { vehicleInterestPending }
+              : {}),
+          }),
         });
+        if (vehicleInterestPending.length) {
+          clearPendingVehicleInterest();
+        }
         await loadProfile(nextUser);
       } catch {
         // Non-blocking — account page will retry via inquiries fetch
@@ -168,7 +176,12 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
         if (mounted) setLoading(false);
       });
       if (data.session?.user) {
-        void syncAccount(data.session.user);
+        const syncLater = () => void syncAccount(data.session!.user);
+        if (typeof window.requestIdleCallback === "function") {
+          window.requestIdleCallback(syncLater, { timeout: 4000 });
+        } else {
+          setTimeout(syncLater, 200);
+        }
         if (shouldShowSessionPreferencePrompt()) {
           setSessionPreferenceModalOpen(true);
         }
@@ -184,7 +197,12 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
 
       if (event === "SIGNED_IN" && nextSession?.user) {
         recordSessionStart();
-        void syncAccount(nextSession.user);
+        const syncLater = () => void syncAccount(nextSession.user);
+        if (typeof window.requestIdleCallback === "function") {
+          window.requestIdleCallback(syncLater, { timeout: 4000 });
+        } else {
+          setTimeout(syncLater, 200);
+        }
         if (shouldShowSessionPreferencePrompt()) {
           setSessionPreferenceModalOpen(true);
         }

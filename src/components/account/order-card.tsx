@@ -8,6 +8,11 @@ import { useCurrency } from "@/context/currency-context";
 import { orderStatusLabel } from "@/lib/parts/order-labels";
 import type { PartsOrderSummary } from "@/lib/parts/cart-types";
 import { orderReferenceId } from "@/lib/account/types";
+import {
+  buildOrderDocumentHtml,
+  type CustomerPrintProfile,
+} from "@/lib/account/printable-documents";
+import { OrderPrintActions } from "@/components/account/order-print-actions";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -68,11 +73,17 @@ function OrderItemRow({ item }: OrderItemRowProps) {
 
 type OrderCardProps = {
   order: PartsOrderSummary;
+  customer: CustomerPrintProfile;
   defaultExpanded?: boolean;
   highlight?: boolean;
 };
 
-export function OrderCard({ order, defaultExpanded = false, highlight = false }: OrderCardProps) {
+export function OrderCard({
+  order,
+  customer,
+  defaultExpanded = false,
+  highlight = false,
+}: OrderCardProps) {
   const { formatPrice } = useCurrency();
   const [expanded, setExpanded] = useState(defaultExpanded);
   const refId = orderReferenceId(order.id);
@@ -101,18 +112,23 @@ export function OrderCard({ order, defaultExpanded = false, highlight = false }:
             <span className="font-medium text-foreground">{formatPrice(order.total_usd)}</span>
           </p>
         </div>
-        <span
-          className={cn(
-            "inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold",
-            order.status === "confirmed"
-              ? "bg-emerald-100 text-emerald-800"
-              : order.status === "pending"
-                ? "bg-brand-purple/10 text-brand-purple"
-                : "bg-muted text-muted-foreground"
-          )}
-        >
-          {orderStatusLabel(order.status)}
-        </span>
+        <div className="flex flex-col items-start gap-2 sm:items-end">
+          <span
+            className={cn(
+              "inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold",
+              order.status === "confirmed"
+                ? "bg-emerald-100 text-emerald-800"
+                : order.status === "pending"
+                  ? "bg-brand-purple/10 text-brand-purple"
+                  : "bg-muted text-muted-foreground"
+            )}
+          >
+            {orderStatusLabel(order.status)}
+          </span>
+          <OrderPrintActions
+            getHtml={() => buildOrderDocumentHtml(order, customer)}
+          />
+        </div>
       </div>
 
       {order.items && order.items.length > 0 && (

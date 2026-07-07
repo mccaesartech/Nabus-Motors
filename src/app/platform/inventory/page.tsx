@@ -520,6 +520,8 @@ export default function InventoryPage() {
                     slug: v.slug,
                     id: v.id,
                     bodyType: display.body_type as BodyType,
+                    primary_image_url: display.primary_image_url,
+                    additional_images: display.additional_images,
                     gallery: display.gallery,
                     images: display.images,
                   });

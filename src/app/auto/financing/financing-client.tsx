@@ -102,7 +102,7 @@ export function FinancingPageClient({ hero }: FinancingPageClientProps) {
                 description="Estimate your monthly payment before applying."
                 className="mb-6"
               />
-              <FinancingCalculator price={35000} />
+              <FinancingCalculator price={35000} collapsible={false} />
             </div>
 
             <div>
