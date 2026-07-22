@@ -52,7 +52,7 @@ export function PlatformCurrencySelector({
     >
       <DropdownMenuTrigger
         className={cn(
-          "inline-flex h-9 max-w-[11rem] items-center justify-between gap-1.5 rounded-md border border-[var(--platform-border)] bg-[var(--platform-card)] px-2.5 text-xs text-[var(--platform-text)] transition-colors outline-none hover:border-[#c4b5fd] focus-visible:border-[var(--platform-accent)] focus-visible:ring-2 focus-visible:ring-[rgba(139,92,246,0.25)]",
+          "inline-flex h-9 max-w-[4.5rem] items-center justify-between gap-1 rounded-md border border-[var(--platform-border)] bg-[var(--platform-card)] px-1.5 text-xs text-[var(--platform-text)] transition-colors outline-none hover:border-[#c4b5fd] focus-visible:border-[var(--platform-accent)] focus-visible:ring-2 focus-visible:ring-[rgba(139,92,246,0.25)] sm:max-w-[11rem] sm:gap-1.5 sm:px-2.5",
           className
         )}
         aria-label="Display currency"

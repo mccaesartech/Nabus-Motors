@@ -1,9 +1,26 @@
 export const RELOAD_KEY = "tg-reload-attempts";
 export const BUILD_KEY = "tg-build-id";
 export const BUILD_RELOAD_KEY = "tg-build-reloaded-for";
-export const SW_CLEANUP_KEY = "tg-sw-cleanup";
+/** Bump when cleanup policy changes so one more pass runs after deploy. */
+export const SW_CLEANUP_KEY = "tg-sw-legacy-cleanup-v3";
+const SERWIST_SCRIPT_MARKER = "/serwist/";
 const MAX_RELOAD_ATTEMPTS = 2;
 let reloadPending = false;
+
+function registrationScriptUrl(
+  registration: ServiceWorkerRegistration
+): string {
+  return (
+    registration.active?.scriptURL ||
+    registration.waiting?.scriptURL ||
+    registration.installing?.scriptURL ||
+    ""
+  );
+}
+
+function isSerwistRegistration(registration: ServiceWorkerRegistration): boolean {
+  return registrationScriptUrl(registration).includes(SERWIST_SCRIPT_MARKER);
+}
 
 function failureMessage(reason: unknown): string {
   if (reason instanceof Error) return reason.message;
@@ -129,7 +146,11 @@ export function checkBuildVersion(): boolean {
   return false;
 }
 
-/** Remove legacy service workers that can pin old bundles after deploys. */
+/**
+ * Remove legacy (non-Serwist) service workers that can pin old bundles.
+ * Never unregister `/serwist/sw.js` — that raced with PWA registration and
+ * caused one reload flash per session after install.
+ */
 export async function unregisterStaleServiceWorkers(): Promise<boolean> {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
     return false;
@@ -143,9 +164,7 @@ export async function unregisterStaleServiceWorkers(): Promise<boolean> {
 
   try {
     const registrations = await navigator.serviceWorker.getRegistrations();
-    if (registrations.length === 0) return false;
-
-    await Promise.all(registrations.map((reg) => reg.unregister()));
+    const legacy = registrations.filter((reg) => !isSerwistRegistration(reg));
 
     try {
       sessionStorage.setItem(SW_CLEANUP_KEY, "1");
@@ -153,7 +172,18 @@ export async function unregisterStaleServiceWorkers(): Promise<boolean> {
       // ignore
     }
 
-    if (navigator.serviceWorker.controller) {
+    if (legacy.length === 0) return false;
+
+    const controlledByLegacy = legacy.some(
+      (reg) =>
+        navigator.serviceWorker.controller &&
+        registrationScriptUrl(reg) ===
+          navigator.serviceWorker.controller.scriptURL
+    );
+
+    await Promise.all(legacy.map((reg) => reg.unregister()));
+
+    if (controlledByLegacy) {
       return reloadForStaleCache();
     }
   } catch {

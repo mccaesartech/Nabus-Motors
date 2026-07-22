@@ -10,7 +10,12 @@ import {
   type ReactNode,
 } from "react";
 import { countUnreadByNavHref } from "@/lib/platform/sidebar-notifications";
+import {
+  countUnreadAdminNotifications,
+  mergeLoadedAdminNotifications,
+} from "@/lib/platform/notification-read-state";
 import { useNotificationRealtime } from "@/lib/platform/realtime";
+import { useAfterIdle } from "@/hooks/use-after-idle";
 import type { AdminNotification } from "@/lib/platform/types";
 
 type RealtimeSession = {
@@ -47,29 +52,37 @@ function matchesCriteria(
   return true;
 }
 
-export function AdminNotificationsProvider({ children }: { children: ReactNode }) {
+type AdminNotificationsProviderProps = {
+  children: ReactNode;
+  /** Server-resolved session — avoids /api/admin/session waterfall on shell mount. */
+  realtimeSession?: RealtimeSession | null;
+};
+
+export function AdminNotificationsProvider({
+  children,
+  realtimeSession = null,
+}: AdminNotificationsProviderProps) {
+  const idleReady = useAfterIdle(1500);
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [session, setSession] = useState<RealtimeSession | null>(null);
+  const [session, setSession] = useState<RealtimeSession | null>(realtimeSession);
+
+  useEffect(() => {
+    if (realtimeSession) {
+      setSession(realtimeSession);
+    }
+  }, [realtimeSession]);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/notifications?limit=50");
     if (!res.ok) return;
     const json = await res.json();
-    setNotifications(json.notifications ?? []);
-    setUnreadCount(json.unreadCount ?? 0);
-  }, []);
-
-  useEffect(() => {
-    void fetch("/api/admin/session")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json) => {
-        if (!json?.user) return;
-        setSession({
-          type: json.user.type,
-          userId: json.user.userId ?? undefined,
-        });
-      });
+    const incoming = (json.notifications ?? []) as AdminNotification[];
+    setNotifications((previous) => {
+      const merged = mergeLoadedAdminNotifications(previous, incoming);
+      setUnreadCount(countUnreadAdminNotifications(merged));
+      return merged;
+    });
   }, []);
 
   useNotificationRealtime({
@@ -84,14 +97,15 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
       }
     },
     onRefresh: load,
-    enabled: Boolean(session),
+    enabled: Boolean(session) && idleReady,
   });
 
   useEffect(() => {
+    if (!idleReady) return;
     void load();
     const interval = window.setInterval(() => void load(), POLL_MS);
     return () => window.clearInterval(interval);
-  }, [load]);
+  }, [idleReady, load]);
 
   const markRead = useCallback(async (id: string) => {
     const now = new Date().toISOString();
@@ -104,11 +118,12 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
     });
 
     try {
-      await fetch("/api/admin/notifications", {
+      const res = await fetch("/api/admin/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       });
+      if (!res.ok) void load();
     } catch {
       void load();
     }
@@ -132,11 +147,12 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
       }
 
       try {
-        await fetch("/api/admin/notifications", {
+        const res = await fetch("/api/admin/notifications", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(options),
         });
+        if (!res.ok) void load();
       } catch {
         void load();
       }
@@ -150,11 +166,12 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
     setUnreadCount(0);
 
     try {
-      await fetch("/api/admin/notifications", {
+      const res = await fetch("/api/admin/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ all: true }),
       });
+      if (!res.ok) void load();
     } catch {
       void load();
     }

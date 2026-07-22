@@ -4,9 +4,8 @@ import {
   sendCustomerPasswordReset,
 } from "@/lib/customer/password-reset";
 import { resolveWhatsAppPreferred } from "@/lib/notifications/customer-notify";
-import { formatCustomerNotificationFeedback } from "@/lib/notifications/notification-status";
-import { WHATSAPP_NUMBER, whatsappUrl } from "@/lib/constants";
 import { createAdminSupabase } from "@/lib/supabase/admin";
+import { consumeRateLimit, requestIp } from "@/lib/security/rate-limit";
 
 const GENERIC_SUCCESS =
   "If an account exists with that email or phone, we've sent password reset instructions.";
@@ -47,6 +46,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const rateLimit = consumeRateLimit(
+      "customer-password-reset",
+      `${requestIp(req.headers)}:${identifier.toLowerCase()}`,
+      { limit: 5, windowMs: 15 * 60_000 }
+    );
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { ok: true, message: GENERIC_SUCCESS },
+        {
+          status: 429,
+          headers: { "Retry-After": String(rateLimit.retryAfterSeconds) },
+        }
+      );
+    }
+
     const account = await lookupCustomerAccount(identifier);
 
     if (!account?.email) {
@@ -70,12 +84,6 @@ export async function POST(req: NextRequest) {
     });
 
     if (!result.ok) {
-      const ref = account.referenceCode ? ` Reference: ${account.referenceCode}.` : "";
-      const supportWhatsApp = whatsappUrl(
-        `Hi, I need help resetting my True Goshen password.${ref}`,
-        WHATSAPP_NUMBER
-      );
-
       if (result.error?.includes("Could not generate reset link")) {
         await logSkippedRecovery(
           account,
@@ -84,42 +92,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true, message: GENERIC_SUCCESS });
       }
 
-      console.warn("[forgot-password] delivery failed:", {
-        email: recoveryEmail,
-        error: result.error,
-        notification: result.notification,
-      });
-
-      return NextResponse.json({
-        ok: true,
-        message: `We found your account but couldn't deliver the reset email to ${recoveryEmail}. ${result.error ?? "Check spam or contact support."} If you're the site owner testing Resend, verify your domain at resend.com/domains — @resend.dev only delivers to the Resend account email.`,
-        deliveryFailed: true,
-        supportWhatsApp,
-        emailAttempted: recoveryEmail,
-        emailError: result.error ?? result.notification?.emailReason,
-        channels: result.notification?.channels ?? [],
-      });
+      console.warn("[forgot-password] delivery failed; account and provider detail omitted");
+      return NextResponse.json({ ok: true, message: GENERIC_SUCCESS });
     }
 
-    const feedback = formatCustomerNotificationFeedback(result.notification, {
-      savedPrefix: "Password reset link sent",
-      recipientEmail: recoveryEmail,
-    });
-
-    const exactStatus = result.emailSent
-      ? `Email sent to ${recoveryEmail}.`
-      : feedback.message;
-
-    return NextResponse.json({
-      ok: true,
-      message: `${GENERIC_SUCCESS} ${exactStatus}`,
-      emailSent: result.emailSent,
-      emailSentTo: recoveryEmail,
-      whatsappSent: result.whatsappSent,
-      emailDeliveryMethod: result.emailDeliveryMethod,
-    });
-  } catch (error) {
-    console.error("[forgot-password] unexpected error:", error);
+    return NextResponse.json({ ok: true, message: GENERIC_SUCCESS });
+  } catch {
+    console.error("[forgot-password] unexpected error; request detail omitted");
     return NextResponse.json(
       { ok: false, message: "Could not process request. Please try again." },
       { status: 500 }

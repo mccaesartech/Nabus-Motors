@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCustomerFromAuthHeader } from "@/lib/customer/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import type { CustomerAppointmentSummary } from "@/lib/account/types";
+import { userOrEmailFilter } from "@/lib/security/postgrest-filter";
 
 export async function GET(req: NextRequest) {
   const user = await getCustomerFromAuthHeader(req.headers.get("authorization"));
@@ -21,7 +22,7 @@ export async function GET(req: NextRequest) {
     .select(
       "id, status, preferred_date, preferred_time, branch, created_at, order_id, vehicle_id, vehicle_ids"
     )
-    .or(`user_id.eq.${user.id},email.ilike.${email}`)
+    .or(userOrEmailFilter(user.id, email))
     .order("created_at", { ascending: false })
     .limit(20);
 

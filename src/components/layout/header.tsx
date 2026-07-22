@@ -17,6 +17,7 @@ import { useCustomerNotificationCount } from "@/context/customer-notifications-c
 import { NotificationCountBadge } from "@/components/customer/notification-count-badge";
 import { useLockBodyScroll } from "@/hooks/use-lock-body-scroll";
 import { useSwipeToClose } from "@/hooks/use-swipe-to-close";
+import { InstallCustomerAppButton } from "@/components/pwa/install-customer-app-button";
 import { ROUTES } from "@/lib/routes";
 import type { SiteContent } from "@/lib/site-content/defaults";
 
@@ -83,7 +84,7 @@ function HeaderInner({
 
   const navLinkClassName = (href: string) =>
     cn(
-      "relative shrink-0 whitespace-nowrap px-2 py-2 text-[13px] font-medium tracking-wide transition-colors duration-200 lg:px-2.5 xl:px-3",
+      "relative shrink-0 whitespace-nowrap px-2 py-2 text-sm font-medium tracking-wide transition-colors duration-200 lg:px-2.5 xl:px-3",
       isActive(href)
         ? "text-white after:absolute after:bottom-0 after:left-0 after:h-px after:w-full after:bg-brand-cta-gold"
         : "text-white/80 hover:text-white hover:after:absolute hover:after:bottom-0 hover:after:left-0 hover:after:h-px hover:after:w-full hover:after:bg-white/40"
@@ -92,7 +93,7 @@ function HeaderInner({
   return (
     <header
       className={cn(
-        "fixed top-0 inset-x-0 z-50 w-full border-b border-white/10 bg-brand-black transition-shadow duration-300",
+        "fixed top-0 inset-x-0 z-50 w-full border-b border-white/10 bg-brand-primary transition-shadow duration-300",
         scrolled && "shadow-luxury"
       )}
     >
@@ -146,13 +147,14 @@ function HeaderInner({
             ))}
           </nav>
 
-          <div className="col-start-3 flex min-w-0 shrink-0 items-center justify-end gap-1.5 bg-brand-black pl-1 sm:gap-2 sm:pl-2">
+          <div className="col-start-3 flex min-w-0 shrink-0 items-center justify-end gap-1.5 bg-brand-primary pl-1 sm:gap-2 sm:pl-2">
             <CountrySelector
               compact
               className="relative z-10 hidden shrink-0 lg:flex"
             />
 
             <div className="hidden shrink-0 items-center gap-1.5 lg:flex xl:gap-2">
+              <InstallCustomerAppButton />
               {!authLoading && user ? (
                 <Button
                   variant="ghost"
@@ -217,10 +219,11 @@ function HeaderInner({
 
             <button
               type="button"
-              className="inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-white/20 text-white lg:hidden"
+              className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md border border-white/20 text-white lg:hidden"
               onClick={() => setMobileOpen(!mobileOpen)}
               aria-label={mobileOpen ? "Close menu" : "Open menu"}
               aria-expanded={mobileOpen}
+              aria-controls="mobile-nav"
             >
               {mobileOpen ? <X className="size-4" /> : <Menu className="size-4" />}
             </button>
@@ -231,8 +234,8 @@ function HeaderInner({
       <button
         type="button"
         aria-label="Close menu"
-        aria-hidden={!mobileOpen}
         tabIndex={mobileOpen ? 0 : -1}
+        inert={!mobileOpen ? true : undefined}
         className={cn(
           "fixed inset-0 z-40 bg-black/55 transition-opacity duration-200 supports-backdrop-filter:backdrop-blur-[2px] lg:hidden",
           mobileOpen
@@ -245,7 +248,7 @@ function HeaderInner({
       <aside
         id="mobile-nav"
         aria-label="Mobile navigation"
-        aria-hidden={!mobileOpen}
+        inert={!mobileOpen ? true : undefined}
         className={cn(
           "fixed inset-y-0 right-0 z-[45] flex w-[min(100vw-3rem,19rem)] flex-col border-l border-white/10 bg-brand-charcoal shadow-xl transition-transform duration-300 ease-out will-change-transform lg:hidden",
           mobileOpen ? "translate-x-0" : "pointer-events-none translate-x-full"
@@ -257,7 +260,7 @@ function HeaderInner({
           <button
             type="button"
             onClick={closeMobile}
-            className="inline-flex size-9 items-center justify-center rounded-md border border-white/20 text-white"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-white/20 text-white"
             aria-label="Close menu"
           >
             <X className="size-4" />
@@ -312,6 +315,7 @@ function HeaderInner({
               <span className="text-xs text-white/60">Country</span>
               <CountrySelector />
             </div>
+            <InstallCustomerAppButton display="compact" onAfterClick={closeMobile} />
             {!authLoading && user ? (
               <Button
                 variant="luxury"

@@ -12,21 +12,29 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { makes, modelsByMake } from "@/lib/data/catalog-meta";
+import { makes, modelsByMake, locations } from "@/lib/data/catalog-meta";
+import {
+  applyFulfillmentExclusivity,
+  BODY_TYPE_OPTIONS,
+  CONDITION_OPTIONS,
+  FUEL_TYPE_OPTIONS,
+  FULFILLMENT_MODES,
+  MILEAGE_FILTER_TIERS,
+  MILEAGE_UNIT,
+  STATUS_FILTER_OPTIONS,
+  TRANSMISSION_OPTIONS,
+  TRUST_BADGE_FILTER_OPTIONS,
+} from "@/lib/vehicles/filter-config";
+import { resolveFulfillmentMode } from "@/lib/vehicles/fulfillment";
 import { buildFilterSearchParams, parseFiltersFromSearchParams } from "@/lib/vehicles";
 import { recordSearchPreferences } from "@/lib/vehicle-preferences";
 import { PRICE_FILTER_TIERS, formatFilterPriceLabel } from "@/lib/currency";
 import { useCurrency } from "@/context/currency-context";
 import { ROUTES } from "@/lib/routes";
 import { CustomVehicleRequestCta } from "@/components/vehicle/custom-vehicle-request-cta";
-import type {
-  BodyType,
-  Condition,
-  FuelType,
-  SortOption,
-  Transmission,
-  VehicleFilters,
-} from "@/lib/types";
+import type { BodyType, Condition, FuelType, SortOption, Transmission, VehicleFilters } from "@/lib/types";
+import type { FulfillmentMode } from "@/lib/types";
+import type { TrustBadgeKey } from "@/lib/vehicles/trust-badges";
 
 const currentYear = new Date().getFullYear();
 const FILTER_ANY = "any";
@@ -49,13 +57,18 @@ export function InventoryFilters({ className, onApplied }: InventoryFiltersProps
   const params = Object.fromEntries(searchParams.entries());
   const filters = parseFiltersFromSearchParams(params);
   const sort = (params.sort as SortOption) || "newest";
+  const fulfillmentMode = resolveFulfillmentMode(filters);
 
   const updateFilters = useCallback(
     (updates: Partial<VehicleFilters>) => {
-      const newFilters = { ...filters, ...updates };
+      let newFilters = { ...filters, ...updates };
+      if (updates.fulfillmentMode !== undefined) {
+        newFilters = applyFulfillmentExclusivity(newFilters, updates.fulfillmentMode ?? "all");
+      }
       Object.keys(newFilters).forEach((key) => {
         const k = key as keyof VehicleFilters;
-        if (newFilters[k] === undefined || newFilters[k] === "") {
+        const val = newFilters[k];
+        if (val === undefined || val === "" || (Array.isArray(val) && val.length === 0)) {
           delete newFilters[k];
         }
       });
@@ -70,18 +83,24 @@ export function InventoryFilters({ className, onApplied }: InventoryFiltersProps
   );
 
   const clearFilters = () => {
-    const query = filters.status
-      ? buildFilterSearchParams({ status: filters.status }).toString()
-      : "";
     startTransition(() => {
-      router.push(
-        query ? `${ROUTES.auto.inventory}?${query}` : ROUTES.auto.inventory
-      );
+      router.push(ROUTES.auto.inventory);
       onApplied?.();
     });
   };
 
   const availableModels = filters.make ? modelsByMake[filters.make] ?? [] : [];
+  const showServiceAddons =
+    fulfillmentMode === "import_ship" || fulfillmentMode === "all";
+
+  const toggleTrustBadge = (key: TrustBadgeKey, checked: boolean) => {
+    const current = new Set(filters.trustBadges ?? []);
+    if (checked) current.add(key);
+    else current.delete(key);
+    updateFilters({
+      trustBadges: current.size ? [...current] : undefined,
+    });
+  };
 
   return (
     <aside className={className}>
@@ -96,26 +115,53 @@ export function InventoryFilters({ className, onApplied }: InventoryFiltersProps
         <Separator />
 
         <div className="space-y-4">
+          <fieldset className="space-y-2">
+            <legend className="text-xs font-medium">Fulfillment mode</legend>
+            {FULFILLMENT_MODES.map((mode) => (
+              <label key={mode.value} className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="fulfillment"
+                  checked={fulfillmentMode === mode.value}
+                  onChange={() =>
+                    updateFilters({
+                      fulfillmentMode: mode.value as FulfillmentMode,
+                    })
+                  }
+                  className="size-4 border-border accent-brand-purple"
+                />
+                {mode.label}
+              </label>
+            ))}
+          </fieldset>
+
           <div className="space-y-1.5">
             <Label className="text-xs">Availability</Label>
             <Select
-              value={filterSelectValue(filters.status)}
+              value={filterSelectValue(
+                fulfillmentMode === "pre_order_only" ? FILTER_ANY : filters.status
+              )}
               onValueChange={(v) =>
                 updateFilters({
+                  fulfillmentMode: "all",
                   status:
                     !v || v === FILTER_ANY
                       ? undefined
                       : (v as VehicleFilters["status"]),
                 })
               }
+              disabled={fulfillmentMode === "pre_order_only"}
             >
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={FILTER_ANY}>Any availability</SelectItem>
-                <SelectItem value="available">Available in Ghana</SelectItem>
-                <SelectItem value="pre_order">Pre-Order</SelectItem>
+                {STATUS_FILTER_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -144,47 +190,92 @@ export function InventoryFilters({ className, onApplied }: InventoryFiltersProps
             </Select>
           </div>
 
+          <div className="space-y-1.5">
+            <Label className="text-xs">Location</Label>
+            <Select
+              value={filterSelectValue(filters.location)}
+              onValueChange={(v) =>
+                updateFilters({
+                  location: !v || v === FILTER_ANY ? undefined : v,
+                })
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={FILTER_ANY}>Any location</SelectItem>
+                {locations.map((loc) => (
+                  <SelectItem key={loc} value={loc}>
+                    {loc}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={Boolean(filters.chineseBrands)}
+              onChange={(e) =>
+                updateFilters({
+                  chineseBrands: e.target.checked ? true : undefined,
+                })
+              }
+              className="size-4 rounded border-border accent-brand-purple"
+            />
+            Chinese brands only
+          </label>
+
+          {showServiceAddons && (
+            <div className="space-y-2">
+              <Label className="text-xs">Import services</Label>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                Optional add-ons for import listings. Leave unchecked to include all.
+              </p>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={Boolean(filters.financingAvailable)}
+                  onChange={(e) =>
+                    updateFilters({
+                      financingAvailable: e.target.checked ? true : undefined,
+                    })
+                  }
+                  className="size-4 rounded border-border accent-brand-purple"
+                />
+                Financing available
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={Boolean(filters.customsClearingAvailable)}
+                  onChange={(e) =>
+                    updateFilters({
+                      customsClearingAvailable: e.target.checked ? true : undefined,
+                    })
+                  }
+                  className="size-4 rounded border-border accent-brand-purple"
+                />
+                Customs clearing available
+              </label>
+            </div>
+          )}
+
           <div className="space-y-2">
-            <Label className="text-xs">Services</Label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={Boolean(filters.financingAvailable)}
-                onChange={(e) =>
-                  updateFilters({
-                    financingAvailable: e.target.checked ? true : undefined,
-                  })
-                }
-                className="size-4 rounded border-border accent-brand-purple"
-              />
-              Financing available
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={Boolean(filters.shipmentAvailable)}
-                onChange={(e) =>
-                  updateFilters({
-                    shipmentAvailable: e.target.checked ? true : undefined,
-                  })
-                }
-                className="size-4 rounded border-border accent-brand-purple"
-              />
-              Shipment available
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={Boolean(filters.customsClearingAvailable)}
-                onChange={(e) =>
-                  updateFilters({
-                    customsClearingAvailable: e.target.checked ? true : undefined,
-                  })
-                }
-                className="size-4 rounded border-border accent-brand-purple"
-              />
-              Customs clearing available
-            </label>
+            <Label className="text-xs">Trust indicators</Label>
+            {TRUST_BADGE_FILTER_OPTIONS.map((badge) => (
+              <label key={badge.key} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={filters.trustBadges?.includes(badge.key) ?? false}
+                  onChange={(e) => toggleTrustBadge(badge.key, e.target.checked)}
+                  className="size-4 rounded border-border accent-brand-purple"
+                />
+                {badge.label}
+              </label>
+            ))}
           </div>
 
           <div className="space-y-1.5">
@@ -299,9 +390,9 @@ export function InventoryFilters({ className, onApplied }: InventoryFiltersProps
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={FILTER_ANY}>Any mileage</SelectItem>
-                {[15000, 30000, 50000, 75000, 100000].map((m) => (
+                {MILEAGE_FILTER_TIERS.map((m) => (
                   <SelectItem key={m} value={String(m)}>
-                    Under {m.toLocaleString()} mi
+                    Under {m.toLocaleString()} {MILEAGE_UNIT}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -324,13 +415,11 @@ export function InventoryFilters({ className, onApplied }: InventoryFiltersProps
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={FILTER_ANY}>Any fuel type</SelectItem>
-                {["Petrol", "Diesel", "Hybrid", "Electric", "Plug-in Hybrid"].map(
-                  (f) => (
-                    <SelectItem key={f} value={f}>
-                      {f}
-                    </SelectItem>
-                  )
-                )}
+                {FUEL_TYPE_OPTIONS.map((f) => (
+                  <SelectItem key={f} value={f}>
+                    {f}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -351,7 +440,7 @@ export function InventoryFilters({ className, onApplied }: InventoryFiltersProps
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={FILTER_ANY}>Any transmission</SelectItem>
-                {["Automatic", "Manual", "CVT", "DCT"].map((t) => (
+                {TRANSMISSION_OPTIONS.map((t) => (
                   <SelectItem key={t} value={t}>
                     {t}
                   </SelectItem>
@@ -375,13 +464,11 @@ export function InventoryFilters({ className, onApplied }: InventoryFiltersProps
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={FILTER_ANY}>Any body type</SelectItem>
-                {["SUV", "Sedan", "Luxury", "Truck", "Commercial", "Electric"].map(
-                  (b) => (
-                    <SelectItem key={b} value={b}>
-                      {b}
-                    </SelectItem>
-                  )
-                )}
+                {BODY_TYPE_OPTIONS.map((b) => (
+                  <SelectItem key={b} value={b}>
+                    {b}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -401,7 +488,7 @@ export function InventoryFilters({ className, onApplied }: InventoryFiltersProps
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={FILTER_ANY}>Any condition</SelectItem>
-                {["New", "Used", "Certified Pre-Owned"].map((c) => (
+                {CONDITION_OPTIONS.map((c) => (
                   <SelectItem key={c} value={c}>
                     {c}
                   </SelectItem>

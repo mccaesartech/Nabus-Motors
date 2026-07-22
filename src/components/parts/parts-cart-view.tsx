@@ -881,6 +881,7 @@ export function PartsCartView() {
                   <div className="flex flex-col items-end gap-2 sm:shrink-0">
                     <CartQuantityStepper
                       quantity={line.quantity}
+                      min={0}
                       onDecrease={() =>
                         setVehicleQuantity(line.vehicleId, line.quantity - 1)
                       }
@@ -1017,6 +1018,7 @@ export function PartsCartView() {
                 <div className="flex flex-col items-end gap-2 sm:shrink-0">
                   <CartQuantityStepper
                     quantity={line.quantity}
+                    min={0}
                     onDecrease={() => setPartQuantity(line.partId, line.quantity - 1)}
                     onIncrease={() => setPartQuantity(line.partId, line.quantity + 1)}
                     max={

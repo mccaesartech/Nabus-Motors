@@ -59,7 +59,7 @@ export function VehicleCategories({ content }: VehicleCategoriesProps) {
         )}
 
         {!video && backgroundImage && (
-          <div className="relative mb-10 aspect-[21/9] overflow-hidden rounded-lg">
+          <div className="relative mb-10 aspect-[21/9] overflow-hidden rounded-lg" aria-hidden>
             <SafeVehicleImage
               src={backgroundImage}
               alt=""

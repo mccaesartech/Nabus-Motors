@@ -32,7 +32,7 @@ export default async function AboutPage() {
 
   return (
     <>
-      <section className="relative bg-brand-black py-20 sm:py-24">
+      <section className="relative bg-brand-primary py-20 sm:py-24">
         <Container>
           <p className="text-xs font-medium uppercase tracking-[0.2em] text-white/70">
             {about.eyebrow}
@@ -40,7 +40,7 @@ export default async function AboutPage() {
           <h1 className="mt-4 max-w-xl text-3xl font-semibold text-white sm:text-4xl">
             {about.heroTitle}
           </h1>
-          <p className="mt-4 max-w-2xl text-base leading-relaxed text-text-secondary">
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-on-dark-secondary">
             {about.heroSubtitle}
           </p>
         </Container>

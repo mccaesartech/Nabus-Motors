@@ -22,7 +22,8 @@ export type PlatformPermission =
   | "settings"
   | "site_content"
   | "activity"
-  | "trash";
+  | "trash"
+  | "account_lifecycle";
 
 export const ROLE_LABELS: Record<PlatformRole, string> = {
   owner: "Owner",
@@ -56,6 +57,7 @@ const ROLE_PERMISSIONS: Record<PlatformRole, ReadonlySet<PlatformPermission>> = 
     "site_content",
     "activity",
     "trash",
+    "account_lifecycle",
   ]),
   super_admin: new Set([
     "dashboard",
@@ -78,6 +80,7 @@ const ROLE_PERMISSIONS: Record<PlatformRole, ReadonlySet<PlatformPermission>> = 
     "site_content",
     "activity",
     "trash",
+    "account_lifecycle",
   ]),
   manager: new Set([
     "dashboard",
@@ -94,6 +97,7 @@ const ROLE_PERMISSIONS: Record<PlatformRole, ReadonlySet<PlatformPermission>> = 
     "documents",
     "site_content",
     "trash",
+    "account_lifecycle",
   ]),
   staff: new Set([
     "dashboard",
@@ -129,6 +133,49 @@ export function hasPermission(role: PlatformRole, permission: PlatformPermission
   return ROLE_PERMISSIONS[role]?.has(permission) ?? false;
 }
 
+/**
+ * Installing the authenticated platform PWA is an account convenience, not an
+ * administrative permission. Every recognized platform role may use it.
+ */
+export function canInstallPlatformApp(role: PlatformRole): boolean {
+  return PLATFORM_ROLES.includes(role);
+}
+
+export const ALL_PLATFORM_PERMISSIONS: PlatformPermission[] = [
+  "dashboard",
+  "inventory",
+  "inventory_edit",
+  "inventory_approve",
+  "customers",
+  "sales",
+  "finance",
+  "leads",
+  "freight",
+  "parts",
+  "messages",
+  "emails",
+  "team_messages",
+  "documents",
+  "reports",
+  "users",
+  "settings",
+  "site_content",
+  "activity",
+  "trash",
+  "account_lifecycle",
+];
+
+export function buildSessionPermissions(
+  role: PlatformRole
+): Record<PlatformPermission, boolean> {
+  return Object.fromEntries(
+    ALL_PLATFORM_PERMISSIONS.map((permission) => [
+      permission,
+      hasPermission(role, permission),
+    ])
+  ) as Record<PlatformPermission, boolean>;
+}
+
 export function canManageUsers(role: PlatformRole): boolean {
   return hasPermission(role, "users");
 }
@@ -161,28 +208,41 @@ export function canOversightCustomerTickets(
   );
 }
 
+import { platformPathPrefix } from "./paths";
+
+const PLATFORM_PREFIX = platformPathPrefix();
+
 export function permissionForPath(pathname: string): PlatformPermission | null {
-  if (pathname.startsWith("/platform/finance")) return "finance";
-  if (pathname.startsWith("/platform/freight")) return "freight";
-  if (pathname.startsWith("/platform/parts")) return "parts";
-  if (pathname.startsWith("/platform/appointments")) return "leads";
-  if (pathname.startsWith("/platform/tracking")) return "leads";
-  if (pathname.startsWith("/platform/users")) return "users";
-  if (pathname.startsWith("/platform/site-content")) return "site_content";
-  if (pathname.startsWith("/platform/settings")) return "settings";
-  if (pathname.startsWith("/platform/reports")) return "reports";
-  if (pathname.startsWith("/platform/trash")) return "trash";
-  if (pathname === "/platform/inventory/new") return "inventory_edit";
-  if (/^\/platform\/inventory\/[^/]+\/edit\/?$/.test(pathname)) return "inventory_edit";
-  if (pathname.startsWith("/platform/inventory")) return "inventory";
-  if (pathname.startsWith("/platform/customers")) return "customers";
-  if (pathname.startsWith("/platform/sales")) return "sales";
-  if (pathname.startsWith("/platform/leads")) return "leads";
-  if (pathname.startsWith("/platform/team-chat")) return "team_messages";
-  if (pathname.startsWith("/platform/messages")) return "messages";
-  if (pathname.startsWith("/platform/emails")) return "emails";
-  if (pathname.startsWith("/platform/documents")) return "documents";
-  if (pathname.startsWith("/platform/dashboard") || pathname === "/platform") {
+  if (!pathname.startsWith(PLATFORM_PREFIX)) return null;
+
+  if (pathname.startsWith(`${PLATFORM_PREFIX}/finance`)) return "finance";
+  if (pathname.startsWith(`${PLATFORM_PREFIX}/freight`)) return "freight";
+  if (pathname.startsWith(`${PLATFORM_PREFIX}/parts`)) return "parts";
+  if (pathname.startsWith(`${PLATFORM_PREFIX}/appointments`)) return "leads";
+  if (pathname.startsWith(`${PLATFORM_PREFIX}/tracking`)) return "leads";
+  if (pathname.startsWith(`${PLATFORM_PREFIX}/users`)) return "users";
+  if (pathname.startsWith(`${PLATFORM_PREFIX}/site-content`)) return "site_content";
+  if (pathname.startsWith(`${PLATFORM_PREFIX}/settings`)) return "settings";
+  if (pathname.startsWith(`${PLATFORM_PREFIX}/reports`)) return "reports";
+  if (pathname.startsWith(`${PLATFORM_PREFIX}/trash`)) return "trash";
+  if (pathname.startsWith(`${PLATFORM_PREFIX}/account-lifecycle`)) return "account_lifecycle";
+  if (pathname === `${PLATFORM_PREFIX}/inventory/new`) return "inventory_edit";
+  if (new RegExp(`^${PLATFORM_PREFIX}/inventory/[^/]+/edit/?$`).test(pathname)) {
+    return "inventory_edit";
+  }
+  if (pathname.startsWith(`${PLATFORM_PREFIX}/inventory/movements`)) return "inventory";
+  if (pathname.startsWith(`${PLATFORM_PREFIX}/inventory`)) return "inventory";
+  if (pathname.startsWith(`${PLATFORM_PREFIX}/customers`)) return "customers";
+  if (pathname.startsWith(`${PLATFORM_PREFIX}/sales`)) return "sales";
+  if (pathname.startsWith(`${PLATFORM_PREFIX}/leads`)) return "leads";
+  if (pathname.startsWith(`${PLATFORM_PREFIX}/team-chat`)) return "team_messages";
+  if (pathname.startsWith(`${PLATFORM_PREFIX}/messages`)) return "messages";
+  if (pathname.startsWith(`${PLATFORM_PREFIX}/emails`)) return "emails";
+  if (pathname.startsWith(`${PLATFORM_PREFIX}/documents`)) return "documents";
+  if (
+    pathname.startsWith(`${PLATFORM_PREFIX}/dashboard`) ||
+    pathname === PLATFORM_PREFIX
+  ) {
     return "dashboard";
   }
   return null;
@@ -209,8 +269,9 @@ export function navPermissionForHref(href: string): PlatformPermission {
     settings: "settings",
     "site-content": "site_content",
     trash: "trash",
+    "account-lifecycle": "account_lifecycle",
   };
-  const segment = href.replace("/platform/", "").split("/")[0];
+  const segment = href.replace(`${PLATFORM_PREFIX}/`, "").split("/")[0];
   return map[segment] ?? "dashboard";
 }
 
@@ -242,6 +303,7 @@ export function getRolePermissionsTable(): Array<{
     "site_content",
     "activity",
     "trash",
+    "account_lifecycle",
   ];
 
   return permissions.map((permission) => ({

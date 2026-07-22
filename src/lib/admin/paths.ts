@@ -1,3 +1,5 @@
+import { platformDashboardPath } from "@/lib/platform/paths";
+
 /** Public admin path segment — keep in sync with ADMIN_PATH env on server */
 export const ADMIN_PATH = "admin";
 
@@ -6,5 +8,5 @@ export function adminLoginPath() {
 }
 
 export function adminDashboardPath() {
-  return "/platform/dashboard";
+  return platformDashboardPath();
 }

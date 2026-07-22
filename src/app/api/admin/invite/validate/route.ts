@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { hashToken } from "@/lib/platform/password";
+import { isPlatformInviteExpired } from "@/lib/platform/invite-ttl";
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token")?.trim();
@@ -28,7 +29,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "This invitation was already used." }, { status: 410 });
   }
 
-  if (new Date(invite.expires_at).getTime() < Date.now()) {
+  if (isPlatformInviteExpired(invite.expires_at)) {
     return NextResponse.json({ ok: false, message: "This invitation has expired." }, { status: 410 });
   }
 

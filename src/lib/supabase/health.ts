@@ -74,6 +74,11 @@ export async function checkDbHealth(): Promise<DbHealthStatus> {
   }
 
   const reachableCount = Object.values(tables).filter(Boolean).length;
+  const criticalOk =
+    tables.vehicles === true &&
+    tables.site_content === true &&
+    tables.site_settings === true;
+  const missing = PROBE_TABLES.filter((t) => !tables[t]);
 
   return {
     ...base,
@@ -83,8 +88,10 @@ export async function checkDbHealth(): Promise<DbHealthStatus> {
     error:
       reachableCount === 0
         ? (firstError ?? "Could not reach any backend tables.")
-        : reachableCount < PROBE_TABLES.length
-          ? `Partial connectivity — run migrations 028–034. ${firstError ?? ""}`.trim()
-          : null,
+        : !criticalOk
+          ? `Core tables unavailable (${missing.join(", ")}). ${firstError ?? ""}`.trim()
+          : missing.length > 0
+            ? `Optional tables unavailable: ${missing.join(", ")}. Some modules may be limited.`
+            : null,
   };
 }

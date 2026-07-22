@@ -98,6 +98,18 @@ export function ActiveFiltersSummary({
   if (filters.status !== "all") active.push(filters.status.replace("_", " "));
   if (filters.featured === "yes") active.push("Featured");
   if (filters.featured === "no") active.push("Not featured");
+  if (filters.fulfillmentMode !== "all") {
+    active.push(
+      filters.fulfillmentMode === "in_ghana"
+        ? "In Ghana now"
+        : filters.fulfillmentMode === "import_ship"
+          ? "Import / ship"
+          : "Pre-order only"
+    );
+  }
+  if (filters.availableLocally === "yes") active.push("Locally available");
+  if (filters.availableLocally === "no") active.push("Not local");
+  if (filters.financingAvailable === "yes") active.push("Financing");
 
   if (active.length === 0) return null;
 

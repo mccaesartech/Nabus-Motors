@@ -6,18 +6,21 @@ import { useRouter } from "next/navigation";
 import {
   Bell,
   Building2,
-  Database,
+  Download,
   ExternalLink,
-  Mail,
-  MessageCircle,
   Package,
   Save,
   Share2,
+  Shield,
   Ship,
   Truck,
   Wrench,
 } from "lucide-react";
 import { PageHeader } from "@/components/platform/page-header";
+import { CargoOptionsEditor } from "@/components/platform/cargo-options-editor";
+import { SecuritySettings } from "@/components/platform/security-settings";
+import { InstallAdminAppCard } from "@/components/pwa/install-admin-app-card";
+import { InstallAdminAppBanner } from "@/components/pwa/install-admin-app-banner";
 import { adminLoginPath } from "@/lib/admin/paths";
 import {
   adminErrorMessage,
@@ -30,27 +33,6 @@ import { DEFAULT_SITE_SETTINGS, type SiteSettingKey } from "@/lib/platform/modul
 type SettingsMeta = {
   publicSiteUrl: string;
   autoSiteUrl: string;
-  emailDelivery?: {
-    resendConfigured: boolean;
-    fromAddress: string;
-    fromDomain: string | null;
-    isResendSandbox: boolean;
-    setupGuideUrl: string;
-    warning: string | null;
-  };
-  notification?: {
-    recommendedProvider: "termii" | null;
-    termiiEnvConfigured: boolean;
-  };
-};
-
-type DbHealth = {
-  configured: boolean;
-  connected: boolean;
-  latencyMs: number | null;
-  serviceRolePresent: boolean;
-  tables: Record<string, boolean>;
-  error: string | null;
 };
 
 function SettingsSection({
@@ -65,7 +47,7 @@ function SettingsSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="platform-card space-y-4 rounded-xl p-6">
+    <section className="platform-card min-w-0 space-y-4 rounded-xl p-4 sm:p-6">
       <div className="flex items-start gap-3 border-b border-[var(--platform-border)] pb-4">
         <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-[rgba(107,33,168,0.12)] text-[var(--platform-accent)]">
           <Icon className="size-5" />
@@ -135,7 +117,6 @@ export default function SettingsPage() {
   const router = useRouter();
   const [settings, setSettings] = useState(DEFAULT_SITE_SETTINGS);
   const [meta, setMeta] = useState<SettingsMeta | null>(null);
-  const [dbHealth, setDbHealth] = useState<DbHealth | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
@@ -147,16 +128,8 @@ export default function SettingsPage() {
       return;
     }
     const json = await res.json();
-    const merged = { ...DEFAULT_SITE_SETTINGS, ...(json.settings ?? {}) };
-    if (
-      json.meta?.notification?.recommendedProvider === "termii" &&
-      !merged.whatsapp_api_provider
-    ) {
-      merged.whatsapp_api_provider = "termii";
-    }
-    setSettings(merged);
+    setSettings({ ...DEFAULT_SITE_SETTINGS, ...(json.settings ?? {}) });
     setMeta(json.meta ?? null);
-    setDbHealth(json.db ?? null);
     setLoading(false);
   }, [router]);
 
@@ -205,7 +178,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 max-w-full space-y-6">
       <PageHeader
         title="Settings"
         description="Operational configuration — contact details, notifications, freight defaults, and system flags."
@@ -217,6 +190,8 @@ export default function SettingsPage() {
           </button>
         }
       />
+
+      <InstallAdminAppBanner />
 
       <div className="rounded-lg border border-[var(--platform-border)] bg-[rgba(107,33,168,0.06)] px-4 py-3 text-sm text-[var(--platform-text-secondary)]">
         For marketing copy, hero text, and page images, use{" "}
@@ -233,85 +208,6 @@ export default function SettingsPage() {
       {toast && (
         <div className="rounded-lg border border-[var(--platform-success)]/30 bg-[rgba(16,185,129,0.08)] px-4 py-3 text-sm text-[var(--platform-success)]">
           {toast}
-        </div>
-      )}
-
-      {meta?.emailDelivery?.isResendSandbox && meta.emailDelivery.warning && (
-        <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-950">
-          <div className="flex items-start gap-3">
-            <Mail className="mt-0.5 size-5 shrink-0 text-red-700" />
-            <div className="min-w-0 space-y-2">
-              <p className="font-semibold">Resend sandbox detected — customer emails will not arrive</p>
-              <p>{meta.emailDelivery.warning}</p>
-              <p className="text-red-900">
-                Current sender: <code className="rounded bg-red-100 px-1">{meta.emailDelivery.fromAddress}</code>
-              </p>
-              <a
-                href={meta.emailDelivery.setupGuideUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 font-medium text-red-800 underline"
-              >
-                Verify domain at Resend
-                <ExternalLink className="size-3.5" />
-              </a>
-              <p className="text-xs text-red-800">
-                Until your domain is verified, use Supabase Auth SMTP (Authentication → SMTP Settings)
-                or copy reset links from the customer profile and send via WhatsApp.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {dbHealth && (
-        <div
-          className={`rounded-lg border px-4 py-3 text-sm ${
-            dbHealth.connected && !dbHealth.error
-              ? "border-[var(--platform-success)]/30 bg-[rgba(16,185,129,0.08)] text-[var(--platform-text)]"
-              : "border-amber-500/40 bg-amber-500/10 text-[var(--platform-text)]"
-          }`}
-        >
-          <div className="flex items-start gap-3">
-            <Database className="mt-0.5 size-5 shrink-0 text-[var(--platform-accent)]" />
-            <div className="min-w-0 flex-1 space-y-2">
-              <p className="font-medium">
-                Database{" "}
-                {dbHealth.connected && !dbHealth.error ? "connected" : "needs attention"}
-                {dbHealth.latencyMs != null ? ` · ${dbHealth.latencyMs}ms` : ""}
-              </p>
-              {!dbHealth.configured && (
-                <p className="text-[var(--platform-text-secondary)]">
-                  Set NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, and
-                  SUPABASE_SERVICE_ROLE_KEY in Vercel (or .env.local).
-                </p>
-              )}
-              {dbHealth.configured && !dbHealth.serviceRolePresent && (
-                <p className="text-[var(--platform-text-secondary)]">
-                  SUPABASE_SERVICE_ROLE_KEY is missing — CMS and admin writes may not persist.
-                </p>
-              )}
-              {dbHealth.error && (
-                <p className="text-[var(--platform-text-secondary)]">{dbHealth.error}</p>
-              )}
-              {dbHealth.tables && (
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {Object.entries(dbHealth.tables).map(([table, ok]) => (
-                    <span
-                      key={table}
-                      className={`rounded px-2 py-0.5 font-mono text-xs ${
-                        ok
-                          ? "bg-[rgba(16,185,129,0.15)] text-[var(--platform-success)]"
-                          : "bg-[rgba(239,68,68,0.12)] text-[var(--platform-danger)]"
-                      }`}
-                    >
-                      {table}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
         </div>
       )}
 
@@ -569,154 +465,18 @@ export default function SettingsPage() {
                 onChange={(e) => update("freight_quote_notification_email", e.target.value)}
               />
             </Field>
-            <Field
-              label="Cargo description options"
-              hint="JSON array shown on freight quote and consultation forms. Each entry needs value, label, and optional sizes."
-              className="sm:col-span-2"
-            >
-              <textarea
-                className="platform-input min-h-[14rem] w-full resize-y font-mono text-xs"
+            <div className="sm:col-span-2">
+              <CargoOptionsEditor
                 value={settings.freight_cargo_options}
-                onChange={(e) => update("freight_cargo_options", e.target.value)}
-                spellCheck={false}
+                onChange={(json) => update("freight_cargo_options", json)}
               />
-            </Field>
+            </div>
             <Field label="General notification email">
               <input
                 type="email"
                 className="platform-input w-full"
                 value={settings.notification_email}
                 onChange={(e) => update("notification_email", e.target.value)}
-              />
-            </Field>
-          </div>
-        </SettingsSection>
-
-        <SettingsSection
-          icon={MessageCircle}
-          title="Customer WhatsApp API"
-          description="Automatic WhatsApp messages to customers on bookings. Env vars override these settings. Without API keys, wa.me links are logged for manual follow-up."
-        >
-          {meta?.notification?.recommendedProvider === "termii" && (
-            <div className="rounded-lg border border-[var(--platform-accent)]/30 bg-[rgba(107,33,168,0.08)] px-4 py-3 text-sm text-[var(--platform-text)]">
-              <p className="font-medium text-[var(--platform-accent)]">Termii recommended</p>
-              <p className="mt-1 text-[var(--platform-text-secondary)]">
-                Server env has <code className="rounded bg-[var(--platform-bg-secondary)] px-1">NOTIFICATION_PROVIDER=termii</code>{" "}
-                or <code className="rounded bg-[var(--platform-bg-secondary)] px-1">WHATSAPP_PROVIDER=termii</code>.
-                {meta.notification.termiiEnvConfigured
-                  ? " Termii credentials are set in Vercel — env vars take priority over the fields below."
-                  : " Add your Termii credentials below or set TERMII_* env vars in Vercel."}
-              </p>
-            </div>
-          )}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field
-              label="Provider"
-              hint="termii (Ghana), twilio, or meta (Meta Cloud API). Leave blank to auto-detect from credentials."
-            >
-              <select
-                className="platform-input w-full"
-                value={settings.whatsapp_api_provider}
-                onChange={(e) => update("whatsapp_api_provider", e.target.value)}
-              >
-                <option value="">Auto-detect from credentials</option>
-                <option value="termii">
-                  Termii (WhatsApp + SMS){meta?.notification?.recommendedProvider === "termii" ? " — recommended" : ""}
-                </option>
-                <option value="twilio">Twilio WhatsApp</option>
-                <option value="meta">Meta WhatsApp Cloud API</option>
-              </select>
-            </Field>
-            <Field label="Termii SMS channel" hint="dnd for transactional; generic for promotional">
-              <select
-                className="platform-input w-full"
-                value={settings.termii_sms_channel || "dnd"}
-                onChange={(e) => update("termii_sms_channel", e.target.value)}
-              >
-                <option value="dnd">DND (transactional)</option>
-                <option value="generic">Generic</option>
-              </select>
-            </Field>
-            <Field label="Termii API key" className="sm:col-span-2" hint="Or set TERMII_API_KEY in Vercel">
-              <input
-                type="password"
-                className="platform-input w-full font-mono text-sm"
-                value={settings.termii_api_key}
-                onChange={(e) => update("termii_api_key", e.target.value)}
-                placeholder="TLxxxxxxxx…"
-                autoComplete="off"
-              />
-            </Field>
-            <Field label="Termii sender ID" hint="Alphanumeric sender for SMS (max 11 chars)">
-              <input
-                className="platform-input w-full font-mono text-sm"
-                value={settings.termii_sender_id}
-                onChange={(e) => update("termii_sender_id", e.target.value)}
-                placeholder="TrueGoshen"
-              />
-            </Field>
-            <Field label="Termii WhatsApp device" hint="Device ID or phone for WhatsApp channel">
-              <input
-                className="platform-input w-full font-mono text-sm"
-                value={settings.termii_whatsapp_device}
-                onChange={(e) => update("termii_whatsapp_device", e.target.value)}
-                placeholder="23490126727"
-              />
-            </Field>
-            <Field label="Termii base URL" className="sm:col-span-2" hint="Default: https://api.ng.termii.com">
-              <input
-                className="platform-input w-full font-mono text-sm"
-                value={settings.termii_base_url}
-                onChange={(e) => update("termii_base_url", e.target.value)}
-                placeholder="https://api.ng.termii.com"
-              />
-            </Field>
-            <div className="sm:col-span-2 border-t border-[var(--platform-border)] pt-4">
-              <p className="mb-3 text-xs font-medium uppercase tracking-wide text-[var(--platform-text-secondary)]">
-                Twilio / Meta (alternative providers)
-              </p>
-            </div>
-            <Field label="Meta phone number ID" hint="Required for Meta Cloud API">
-              <input
-                className="platform-input w-full font-mono text-sm"
-                value={settings.whatsapp_phone_number_id}
-                onChange={(e) => update("whatsapp_phone_number_id", e.target.value)}
-                placeholder="123456789012345"
-              />
-            </Field>
-            <Field label="Meta access token" className="sm:col-span-2" hint="Or set WHATSAPP_ACCESS_TOKEN in Vercel">
-              <input
-                type="password"
-                className="platform-input w-full font-mono text-sm"
-                value={settings.whatsapp_api_access_token}
-                onChange={(e) => update("whatsapp_api_access_token", e.target.value)}
-                placeholder="EAAxxxx…"
-                autoComplete="off"
-              />
-            </Field>
-            <Field label="Twilio Account SID">
-              <input
-                className="platform-input w-full font-mono text-sm"
-                value={settings.twilio_account_sid}
-                onChange={(e) => update("twilio_account_sid", e.target.value)}
-                placeholder="ACxxxxxxxx"
-              />
-            </Field>
-            <Field label="Twilio Auth Token">
-              <input
-                type="password"
-                className="platform-input w-full font-mono text-sm"
-                value={settings.twilio_auth_token}
-                onChange={(e) => update("twilio_auth_token", e.target.value)}
-                autoComplete="off"
-              />
-            </Field>
-            <Field label="Twilio WhatsApp sender" className="sm:col-span-2" hint="E.g. +14155238886 or whatsapp:+14155238886">
-              <input
-                className="platform-input w-full font-mono text-sm"
-                value={settings.twilio_whatsapp_from}
-                onChange={(e) => update("twilio_whatsapp_from", e.target.value)}
-                placeholder="+14155238886"
               />
             </Field>
           </div>
@@ -763,6 +523,22 @@ export default function SettingsPage() {
               </select>
             </Field>
           </div>
+        </SettingsSection>
+
+        <SettingsSection
+          icon={Shield}
+          title="Security"
+          description="Passkeys, backup recovery codes, and password for your team account."
+        >
+          <SecuritySettings />
+        </SettingsSection>
+
+        <SettingsSection
+          icon={Download}
+          title="Install Admin App"
+          description="Add the platform dashboard to your home screen for quick, app-like access."
+        >
+          <InstallAdminAppCard />
         </SettingsSection>
 
         <SettingsSection

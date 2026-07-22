@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/admin/auth";
+import { enhanceUploadImage } from "@/lib/images/enhance-upload";
 import { createAdminSupabase } from "@/lib/supabase/admin";
+import { mediaBytesMatchMime } from "@/lib/security/media-signature";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const BUCKET = "vehicle-images";
@@ -74,12 +76,32 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { mime, ext } = resolved;
-  const path = `listings/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+  const { mime } = resolved;
   const buffer = Buffer.from(await file.arrayBuffer());
+  if (!mediaBytesMatchMime(buffer, mime)) {
+    return NextResponse.json(
+      { ok: false, message: "File content does not match the declared image type." },
+      { status: 400 }
+    );
+  }
 
-  const { error } = await supabase.storage.from(BUCKET).upload(path, buffer, {
-    contentType: mime,
+  const enhanced = await enhanceUploadImage(buffer, mime);
+  let uploadBuffer: Buffer = Buffer.from(enhanced.buffer);
+  let uploadMime = enhanced.mime;
+  let uploadExt = enhanced.ext;
+  if (enhanced.enhanced && !mediaBytesMatchMime(uploadBuffer, uploadMime)) {
+    console.warn(
+      "[vehicles/upload-image] Enhanced bytes failed MIME check; storing original."
+    );
+    uploadBuffer = buffer;
+    uploadMime = mime;
+    uploadExt = resolved.ext;
+  }
+
+  const path = `listings/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${uploadExt}`;
+
+  const { error } = await supabase.storage.from(BUCKET).upload(path, uploadBuffer, {
+    contentType: uploadMime,
     upsert: false,
   });
 

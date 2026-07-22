@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
+import { recordExpenseMovement } from "@/lib/platform/inventory-movements/record";
 import { notDeletedFilter, softDeleteEntity } from "@/lib/platform/trash";
 
 const EMPTY_SUMMARY = {
@@ -95,6 +96,17 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
   }
+
+  await recordExpenseMovement(
+    supabase,
+    {
+      id: data.id,
+      description: data.description,
+      amount_usd: data.amount_usd,
+      expense_date: data.expense_date,
+    },
+    auth.auth
+  );
 
   return NextResponse.json({ ok: true, expense: data });
 }

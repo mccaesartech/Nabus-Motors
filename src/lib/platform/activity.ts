@@ -7,6 +7,7 @@ export type ActivityAction =
   | "invite_sent"
   | "invite_accepted"
   | "user_updated"
+  | "user_password_set"
   | "user_removed"
   | "vehicle_created"
   | "vehicle_submitted"

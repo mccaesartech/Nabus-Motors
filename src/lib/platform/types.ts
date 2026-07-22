@@ -22,6 +22,12 @@ export type PlatformStats = {
   newVehicle: number;
   pendingFinance: number;
   pendingAppraisal: number;
+  leadPipelineNew?: number;
+  leadPipelineContacted?: number;
+  leadPipelineQualified?: number;
+  leadPipelineWon?: number;
+  leadPipelineLost?: number;
+  leadPipelineTotal?: number;
   newsletter: number;
   totalLeads: number;
   estimatedRevenue: number;
@@ -60,6 +66,8 @@ export type DbVehicle = {
   color?: string | null;
   vin?: string | null;
   description?: string | null;
+  /** Public detail-page specs (Seating, Drivetrain, Horsepower, Range, …). */
+  specs?: { label: string; value: string }[] | null;
   featured: boolean;
   status: string;
   approval_status?: string;
@@ -136,6 +144,16 @@ export type UnifiedLead = {
   isCustomRequest?: boolean;
   referenceCode?: string;
 };
+
+export type DashboardRecentTransaction = Pick<
+  DbVehicle,
+  "id" | "year" | "make" | "model" | "price" | "status" | "created_at"
+>;
+
+export type DashboardChartVehicle = Pick<
+  DbVehicle,
+  "id" | "year" | "make" | "model" | "price" | "status" | "body_type" | "created_at"
+>;
 
 export function leadTypeLabel(type: UnifiedLead["type"], isCustom?: boolean): string {
   if (type === "preorder") return isCustom ? "Pre-Order · Custom" : "Pre-Order";

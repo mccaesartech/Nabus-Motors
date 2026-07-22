@@ -6,6 +6,12 @@ import {
   type AdminNotification,
 } from "@/lib/platform/notifications";
 import { getAdminSiteSettings, toOperationalSettings } from "@/lib/platform/site-settings";
+import {
+  adminNotificationRecipientScope,
+  dismissAdminNotificationKeys,
+  dismissAllEphemeralAdminNotifications,
+  isEphemeralAdminNotificationId,
+} from "@/lib/platform/notification-read-state";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin();
@@ -74,6 +80,7 @@ export async function PATCH(req: NextRequest) {
     type?: string;
   };
   const now = new Date().toISOString();
+  const scope = adminNotificationRecipientScope(auth.auth);
 
   if (all) {
     let query = supabase
@@ -90,6 +97,8 @@ export async function PATCH(req: NextRequest) {
     if (error) {
       return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
     }
+
+    await dismissAllEphemeralAdminNotifications(supabase, scope);
 
     return NextResponse.json({ ok: true });
   }
@@ -119,7 +128,12 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  if (!id || id === "low-stock") {
+  if (!id) {
+    return NextResponse.json({ ok: false, message: "Missing id" }, { status: 400 });
+  }
+
+  if (isEphemeralAdminNotificationId(id)) {
+    await dismissAdminNotificationKeys(supabase, scope, [id]);
     return NextResponse.json({ ok: true });
   }
 

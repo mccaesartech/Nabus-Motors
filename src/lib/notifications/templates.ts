@@ -14,7 +14,10 @@ export type CustomerNotifyTemplate =
   | "preorder_status_update"
   | "staff_message"
   | "password_reset"
-  | "vehicle_available_locally";
+  | "vehicle_available_locally"
+  | "account_deletion_scheduled"
+  | "account_deletion_cancelled"
+  | "account_deletion_completed";
 
 type TemplateContent = {
   subject: string;
@@ -188,6 +191,31 @@ export function buildCustomerMessage(
         subject: `${vehicle} is now available in Ghana`,
         whatsapp: `True Goshen: The ${vehicle} you viewed is now available in Ghana — buy without shipping.${vehicleUrl ? ` View: ${vehicleUrl}` : ""}`,
         emailText: `Hi ${name},\n\nGood news — the ${vehicle} you viewed is now available in Ghana and can be purchased without shipping.\n\nView the vehicle:${vehicleUrl ? `\n${vehicleUrl}` : ""}\n\nTrue Goshen Auto`,
+      };
+    }
+    case "account_deletion_scheduled": {
+      const retentionDays = data.retentionDays?.trim() || "30";
+      const scheduledDate = data.scheduledDeletionDate?.trim() || "the end of your retention period";
+      const restoreUrl = data.restoreUrl?.trim() || accountUrl();
+      return {
+        subject: "Your True Goshen account deletion is scheduled",
+        whatsapp: `True Goshen: We received your account deletion request. Personal data was removed immediately. Business records are retained until ${scheduledDate} (${retentionDays} days). You cannot sign in during this period. To cancel: ${restoreUrl}`,
+        emailText: `Hi ${name},\n\nWe received your request to delete your True Goshen account.\n\nWhat happens now:\n- Your login has been deactivated immediately\n- Personal data (saved vehicles, cart, messages, preferences) has been removed\n- Business records (orders, invoices, shipments, appointments) are retained for legal and operational purposes\n- Permanent anonymization is scheduled for ${scheduledDate} (${retentionDays}-day retention)\n\nDuring the retention period you may contact support or visit ${restoreUrl} to cancel deletion.\n\nAfter ${scheduledDate}, remaining records will be anonymized and cannot be recovered.\n\nTrue Goshen Company Limited`,
+      };
+    }
+    case "account_deletion_cancelled": {
+      return {
+        subject: "Your True Goshen account deletion was cancelled",
+        whatsapp: `True Goshen: Your account deletion request was cancelled. You can sign in again at ${accountUrl()}. Update your profile if needed.`,
+        emailText: `Hi ${name},\n\nYour account deletion request has been cancelled. You can sign in again at ${accountUrl()}.\n\nPersonal settings removed during the request will need to be reconfigured.\n\nTrue Goshen Company Limited`,
+      };
+    }
+    case "account_deletion_completed": {
+      const scheduledDate = data.scheduledDeletionDate?.trim() || "";
+      return {
+        subject: "Your True Goshen account has been permanently anonymized",
+        whatsapp: `True Goshen: Your account retention period${scheduledDate ? ` ending ${scheduledDate}` : ""} has passed. Personal data has been permanently anonymized. Business records are retained in anonymized form.`,
+        emailText: `Hi,\n\nYour True Goshen account retention period has ended. Personal identifiers have been permanently anonymized. Required business records are retained in anonymized form for legal and operational purposes.\n\nThis action cannot be undone.\n\nTrue Goshen Company Limited`,
       };
     }
     default:

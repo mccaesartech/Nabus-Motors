@@ -3,15 +3,18 @@ import {
   ADMIN_COOKIE,
   PLATFORM_USER_COOKIE,
   adminDashboardPath,
+  isAdminSessionSecretConfigured,
 } from "@/lib/admin/config";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { hashPassword, hashToken } from "@/lib/platform/password";
+import { isPlatformInviteExpired } from "@/lib/platform/invite-ttl";
 import { logPlatformActivity } from "@/lib/platform/activity";
 import { normalizeRole } from "@/lib/platform/permissions";
 import {
   buildPlatformSessionCookieValue,
   PLATFORM_SESSION_TTL_SEC,
 } from "@/lib/platform/session";
+import { consumeRateLimit, requestIp } from "@/lib/security/rate-limit";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -26,6 +29,12 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
+  if (!isAdminSessionSecretConfigured()) {
+    return NextResponse.json(
+      { ok: false, message: "Server authentication is not configured." },
+      { status: 503 }
+    );
+  }
 
   const supabase = createAdminSupabase();
   if (!supabase) {
@@ -33,6 +42,21 @@ export async function POST(req: NextRequest) {
   }
 
   const tokenHash = await hashToken(token);
+  const rateLimit = consumeRateLimit(
+    "admin-invite-accept",
+    `${requestIp(req.headers)}:${tokenHash.slice(0, 16)}`,
+    { limit: 5, windowMs: 15 * 60_000 }
+  );
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { ok: false, message: "Too many activation attempts. Try again later." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rateLimit.retryAfterSeconds) },
+      }
+    );
+  }
+
   const { data: invite, error: inviteError } = await supabase
     .from("platform_user_invites")
     .select("id, user_id, expires_at, accepted_at")
@@ -43,8 +67,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "Invalid invitation." }, { status: 404 });
   }
 
-  if (invite.accepted_at || new Date(invite.expires_at).getTime() < Date.now()) {
-    return NextResponse.json({ ok: false, message: "Invitation is no longer valid." }, { status: 410 });
+  if (invite.accepted_at) {
+    return NextResponse.json({ ok: false, message: "This invitation was already used." }, { status: 410 });
+  }
+
+  if (isPlatformInviteExpired(invite.expires_at)) {
+    return NextResponse.json(
+      { ok: false, message: "This invitation has expired. Ask your admin to send a new invite." },
+      { status: 410 }
+    );
   }
 
   const passwordHash = await hashPassword(password);

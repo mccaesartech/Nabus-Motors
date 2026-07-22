@@ -88,6 +88,19 @@ function isCargoTypeOption(value: unknown): value is CargoTypeOption {
   return true;
 }
 
+export function slugifyCargoValue(label: string): string {
+  return label
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 48);
+}
+
+export function serializeCargoOptions(options: CargoTypeOption[]): string {
+  return JSON.stringify(options, null, 2);
+}
+
 export function parseCargoOptions(raw: string | undefined | null): CargoTypeOption[] {
   if (!raw?.trim()) return DEFAULT_CARGO_TYPES;
   try {

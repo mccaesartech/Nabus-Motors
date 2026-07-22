@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 type AccountSectionHeaderProps = {
-  icon: ReactNode;
+  icon?: ReactNode;
   title: string;
   description?: string;
   action?: ReactNode;
@@ -19,9 +19,11 @@ export function AccountSectionHeader({
   return (
     <div className={cn("flex flex-wrap items-start justify-between gap-3", className)}>
       <div className="flex items-start gap-3">
-        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-brand-purple/20 bg-gradient-to-br from-brand-purple/10 to-brand-gold/10 text-brand-purple shadow-sm">
-          {icon}
-        </div>
+        {icon ? (
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-brand-purple/20 bg-gradient-to-br from-brand-purple/10 to-brand-gold/10 text-brand-purple shadow-sm">
+            {icon}
+          </div>
+        ) : null}
         <div>
           <h2 className="text-lg font-semibold text-foreground">{title}</h2>
           {description && (

@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/platform/page-header";
 import { CategoryBadges } from "@/components/admin/category-badges";
 import { PlatformVehicleForm } from "@/components/platform/platform-vehicle-form";
 import type { VehicleInput } from "@/lib/admin/vehicle-fields";
+import { extractSpecFormFields } from "@/lib/admin/vehicle-specs";
 import { parseTrustBadges } from "@/lib/vehicles/trust-badges";
 import { adminLoginPath } from "@/lib/admin/paths";
 import {
@@ -108,6 +109,7 @@ export default function EditVehiclePage() {
   const formVehicle = isEditPending
     ? mergeVehicleWithPending(vehicle, vehicle.pending_changes)
     : vehicle;
+  const specFields = extractSpecFormFields(formVehicle.specs ?? []);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -174,6 +176,11 @@ export default function EditVehiclePage() {
           engine_size: formVehicle.engine_size ?? undefined,
           color: formVehicle.color ?? undefined,
           vin: formVehicle.vin ?? undefined,
+          seating_capacity: specFields.seating_capacity,
+          drivetrain: specFields.drivetrain ?? undefined,
+          horsepower: specFields.horsepower ?? undefined,
+          range: specFields.range ?? undefined,
+          specs: formVehicle.specs ?? [],
           description: formVehicle.description ?? undefined,
           featured: formVehicle.featured,
           status: formVehicle.status,
@@ -186,9 +193,9 @@ export default function EditVehiclePage() {
           warranty_notes: formVehicle.warranty_notes ?? undefined,
           walkaround_video_url: formVehicle.walkaround_video_url ?? undefined,
           country_of_origin: (formVehicle.country_of_origin ?? "") as VehicleInput["country_of_origin"],
-          financing_available: formVehicle.financing_available ?? true,
-          shipment_available: formVehicle.shipment_available ?? true,
-          customs_clearing_available: formVehicle.customs_clearing_available ?? true,
+          financing_available: formVehicle.financing_available ?? false,
+          shipment_available: formVehicle.shipment_available ?? false,
+          customs_clearing_available: formVehicle.customs_clearing_available ?? false,
           available_locally: formVehicle.available_locally ?? false,
         }}
         onSave={save}

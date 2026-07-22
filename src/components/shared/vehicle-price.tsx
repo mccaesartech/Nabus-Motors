@@ -10,5 +10,5 @@ interface VehiclePriceProps {
 
 export function VehiclePrice({ usdAmount, className }: VehiclePriceProps) {
   const { formatPrice } = useCurrency();
-  return <span className={className}>{formatPrice(usdAmount)}</span>;
+  return <span className={cn("tabular-nums", className)}>{formatPrice(usdAmount)}</span>;
 }

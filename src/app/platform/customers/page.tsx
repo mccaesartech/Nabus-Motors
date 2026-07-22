@@ -149,7 +149,7 @@ export default function CustomersPage() {
       ) : null}
 
       <div className="platform-card overflow-hidden rounded-xl">
-        <div className="overflow-x-auto">
+        <div className="max-h-[min(70vh,48rem)] overflow-auto">
           <table className="platform-table w-full text-left text-sm">
             <thead>
               <tr className="text-xs text-[var(--platform-text-secondary)]">

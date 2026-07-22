@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/admin/auth";
+import { enhanceUploadImage } from "@/lib/images/enhance-upload";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { normalizeMediaUrl } from "@/lib/site-content/media-url";
+import { mediaBytesMatchMime } from "@/lib/security/media-signature";
 
 const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 const VIDEO_MAX_BYTES = 50 * 1024 * 1024;
@@ -128,13 +130,42 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { mime, ext, kind } = resolved;
-  const folder = kind === "video" ? "site-content/videos" : "site-content";
-  const path = `${folder}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+  const { mime, kind } = resolved;
   const buffer = Buffer.from(await file.arrayBuffer());
+  if (!mediaBytesMatchMime(buffer, mime)) {
+    return NextResponse.json(
+      { ok: false, message: "File content does not match the declared media type." },
+      { status: 400 }
+    );
+  }
 
-  const { error } = await supabase.storage.from(BUCKET).upload(path, buffer, {
-    contentType: mime,
+  let uploadBuffer: Buffer = buffer;
+  let uploadMime = mime;
+  let uploadExt = resolved.ext;
+
+  if (kind === "image") {
+    const enhanced = await enhanceUploadImage(buffer, mime);
+    uploadBuffer = Buffer.from(enhanced.buffer);
+    uploadMime = enhanced.mime;
+    uploadExt = enhanced.ext;
+    if (
+      enhanced.enhanced &&
+      !mediaBytesMatchMime(uploadBuffer, uploadMime)
+    ) {
+      console.warn(
+        "[site-content/upload] Enhanced bytes failed MIME check; storing original."
+      );
+      uploadBuffer = buffer;
+      uploadMime = mime;
+      uploadExt = resolved.ext;
+    }
+  }
+
+  const folder = kind === "video" ? "site-content/videos" : "site-content";
+  const path = `${folder}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${uploadExt}`;
+
+  const { error } = await supabase.storage.from(BUCKET).upload(path, uploadBuffer, {
+    contentType: uploadMime,
     upsert: false,
   });
 

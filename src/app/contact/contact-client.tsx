@@ -47,10 +47,10 @@ export function ContactPageClient({ contact, footer }: ContactPageClientProps) {
 
   return (
     <>
-      <section className="bg-brand-black py-16 sm:py-20">
+      <section className="bg-brand-primary py-16 sm:py-20">
         <Container>
           <h1 className="text-3xl font-semibold text-white sm:text-4xl">{contact.heroTitle}</h1>
-          <p className="mt-4 max-w-lg text-base text-text-secondary">{contact.heroSubtitle}</p>
+          <p className="mt-4 max-w-lg text-base text-on-dark-secondary">{contact.heroSubtitle}</p>
         </Container>
       </section>
 

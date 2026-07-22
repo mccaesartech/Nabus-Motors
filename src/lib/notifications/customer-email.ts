@@ -78,10 +78,9 @@ export async function sendCustomerNotificationEmail(params: {
         if (body) message = body.slice(0, 200);
       }
       console.warn("[customer-email] Resend failed:", {
-        to: params.to,
-        from,
         status: response.status,
-        message,
+        recipientOmitted: true,
+        providerDetailOmitted: true,
       });
       return { emailSent: false, emailError: message };
     }
@@ -94,16 +93,14 @@ export async function sendCustomerNotificationEmail(params: {
       // Non-JSON success body
     }
 
-    console.info("[customer-email] Resend accepted:", {
-      to: params.to,
-      from,
-      resendId: resendId ?? "unknown",
+    console.info("[customer-email] Resend accepted; recipient omitted", {
+      hasProviderId: Boolean(resendId),
     });
 
     return { emailSent: true, resendId };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Email send failed";
-    console.warn("[customer-email] Resend request error:", { to: params.to, from, message });
+    console.warn("[customer-email] Resend request error; request detail omitted");
     return { emailSent: false, emailError: message };
   }
 }

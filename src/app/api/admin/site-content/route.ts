@@ -36,7 +36,8 @@ function normalizeSectionForSave(
           section === "shippingConsultation" ||
           section === "corporateServicesPage" ||
           section === "corporateDivisions" ||
-          section === "freightTracking"
+          section === "freightTracking" ||
+          section === "startYourJourney"
         ? "cards"
         : null;
 
@@ -44,7 +45,7 @@ function normalizeSectionForSave(
     const items = content[cardsKey];
     if (!Array.isArray(items)) return content;
 
-    return {
+    const normalizedCards = {
       ...content,
       [cardsKey]: items.map((item) => {
         if (!item || typeof item !== "object" || Array.isArray(item)) {
@@ -66,9 +67,31 @@ function normalizeSectionForSave(
         return { ...row, image };
       }),
     };
+
+    if (section === "startYourJourney" && isPlainObject(content.advisor)) {
+      const advisor = content.advisor as Record<string, unknown>;
+      const rawImage =
+        asTrimmedString(advisor.image) || asTrimmedString(advisor.imageUrl);
+      const normalized = normalizeMediaUrl(rawImage);
+      const image = isValidImageUrl(normalized)
+        ? normalized
+        : isValidImageUrl(rawImage)
+          ? rawImage
+          : normalized;
+      return {
+        ...normalizedCards,
+        advisor: { ...advisor, image },
+      };
+    }
+
+    return normalizedCards;
   }
 
   return content;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export async function GET() {

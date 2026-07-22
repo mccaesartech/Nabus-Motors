@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
 
@@ -5,7 +6,12 @@ type FullPageLinkProps = ComponentProps<"a"> & {
   href: string;
 };
 
-/** Full document navigation — avoids fragile App Router soft-nav chunk failures. */
+/**
+ * Primary-nav link. Historically forced full document navigations to dodge
+ * stale-chunk failures after deploys; ChunkReloadHandler + the cache-recovery
+ * inline script now auto-reload on chunk errors, so client-side navigation
+ * (with prefetching) is safe and much faster.
+ */
 export function FullPageLink({
   href,
   className,
@@ -13,8 +19,8 @@ export function FullPageLink({
   ...props
 }: FullPageLinkProps) {
   return (
-    <a href={href} className={cn(className)} {...props}>
+    <Link href={href} className={cn(className)} {...props}>
       {children}
-    </a>
+    </Link>
   );
 }

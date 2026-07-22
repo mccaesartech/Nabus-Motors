@@ -6,13 +6,17 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Check, Download, Plus, Search, X } from "lucide-react";
 import { PageHeader } from "@/components/platform/page-header";
 import { ConfirmDialog } from "@/components/platform/confirm-dialog";
-import { ApprovalStatusBadge, StatusBadge } from "@/components/platform/status-badge";
+import { ApprovalStatusBadge } from "@/components/platform/status-badge";
+import { VehicleStatusControl } from "@/components/platform/vehicle-status-control";
+import { VEHICLE_STATUS_LABELS } from "@/lib/admin/vehicle-fields";
+import { cn } from "@/lib/utils";
 import {
   ActiveFiltersSummary,
   CategoryBadges,
   mergeFilters,
 } from "@/components/admin/category-badges";
 import { SafeVehicleImage } from "@/components/shared/safe-vehicle-image";
+import { VehicleColorSwatch } from "@/components/shared/vehicle-color-swatch";
 import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
 import { platformPath } from "@/lib/platform/paths";
@@ -25,12 +29,17 @@ import {
 import { formatAdminCurrencyPreviews } from "@/lib/currency";
 import { usePlatformCurrency } from "@/context/platform-currency-context";
 import { primaryPhotoFor } from "@/lib/data/vehicle-images";
+import { resolveExteriorColor } from "@/lib/vehicles/vehicle-colors";
 import type { BodyType } from "@/lib/types";
 import type { DbVehicle } from "@/lib/platform/types";
 import { PlatformDateTime } from "@/components/platform/platform-datetime";
 import { downloadCsv, exportVehiclesCsv } from "@/lib/platform/data";
 import { usePlatformSession } from "@/components/platform/platform-shell";
 import { adminErrorMessage, parseAdminResponse } from "@/lib/admin/client";
+import {
+  VirtualTableBody,
+  VirtualTableScroll,
+} from "@/components/platform/virtual-table-body";
 import {
   hasPendingEdits,
   isPubliclyListed,
@@ -75,6 +84,14 @@ export default function InventoryPage() {
     return "all";
   });
   const [actingOnId, setActingOnId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bulkStatus, setBulkStatus] = useState("");
+  const [statusConfirmTarget, setStatusConfirmTarget] = useState<{
+    id: string;
+    name: string;
+    status: string;
+    bulk?: boolean;
+  } | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/vehicles");
@@ -126,9 +143,9 @@ export default function InventoryPage() {
 
   const filtered = useMemo(() => {
     let list = applyInventoryFilters(vehicles, filters, search);
-    if (listingTab === "available") {
+    if (listingTab === "available" && filters.fulfillmentMode === "all") {
       list = list.filter((v) => v.status === "available");
-    } else if (listingTab === "pre_order") {
+    } else if (listingTab === "pre_order" && filters.fulfillmentMode === "all") {
       list = list.filter((v) => v.status === "pre_order");
     }
     if (approvalFilter !== "all") {
@@ -141,7 +158,7 @@ export default function InventoryPage() {
     });
   }, [vehicles, filters, search, approvalFilter, listingTab]);
 
-  const chips = useMemo(() => buildFilterChips(vehicles), [vehicles]);
+  const chips = useMemo(() => buildFilterChips(vehicles, filters), [vehicles, filters]);
 
   const activeChipId = useMemo(() => {
     const match = chips.find(
@@ -165,9 +182,16 @@ export default function InventoryPage() {
     filters.transmission !== "all" ||
     filters.fuelType !== "all" ||
     filters.featured !== "all" ||
-    filters.brandOrigin !== "all";
+    filters.brandOrigin !== "all" ||
+    filters.fulfillmentMode !== "all" ||
+    filters.availableLocally !== "all" ||
+    filters.financingAvailable !== "all";
 
-  async function updateVehicleStatus(id: string, status: string, successMessage: string) {
+  async function updateVehicleStatus(
+    id: string,
+    status: string,
+    successMessage?: string
+  ): Promise<boolean> {
     setActingOnId(id);
     const res = await fetch("/api/admin/vehicles", {
       method: "PATCH",
@@ -177,15 +201,90 @@ export default function InventoryPage() {
     const json = await parseAdminResponse(res);
     setActingOnId(null);
     if (!res.ok || !json.ok) {
-      setToast(adminErrorMessage(json, "Could not update vehicle status."));
+      if (successMessage !== undefined) {
+        setToast(adminErrorMessage(json, "Could not update vehicle status."));
+      }
+      return false;
+    }
+    if (successMessage !== undefined) {
+      const autoNote =
+        json.autoPreOrder && status === "sold"
+          ? " Listing moved to pre-order — last unit of this model."
+          : "";
+      setToast(`${successMessage}${autoNote}`);
+    }
+    return true;
+  }
+
+  function requestStatusChange(
+    id: string,
+    name: string,
+    status: string,
+    currentStatus: string
+  ) {
+    if (status === currentStatus) return;
+    if (status === "sold") {
+      setStatusConfirmTarget({ id, name, status });
       return;
     }
-    const autoNote =
-      json.autoPreOrder && status === "sold"
-        ? " Listing moved to pre-order — last unit of this model."
-        : "";
-    setToast(`${successMessage}${autoNote}`);
-    load();
+    const label = VEHICLE_STATUS_LABELS[status] ?? status;
+    void updateVehicleStatus(id, status, `${name} marked as ${label}.`).then((ok) => {
+      if (ok) void load();
+    });
+  }
+
+  async function applyBulkStatus(status: string) {
+    if (!status || selectedIds.size === 0) return;
+    if (status === "sold") {
+      setStatusConfirmTarget({
+        id: "",
+        name: `${selectedIds.size} vehicle${selectedIds.size === 1 ? "" : "s"}`,
+        status,
+        bulk: true,
+      });
+      setBulkStatus("");
+      return;
+    }
+    const ids = [...selectedIds];
+    let failed = 0;
+    for (const id of ids) {
+      const ok = await updateVehicleStatus(id, status);
+      if (!ok) failed++;
+    }
+    await load();
+    if (failed === 0) {
+      setSelectedIds(new Set());
+      setBulkStatus("");
+      setToast(
+        `Updated ${ids.length} vehicle${ids.length === 1 ? "" : "s"} to ${VEHICLE_STATUS_LABELS[status] ?? status}.`
+      );
+    } else {
+      setToast(`Updated ${ids.length - failed} of ${ids.length} vehicles. Some updates failed.`);
+    }
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllVisible() {
+    const visibleIds = filtered.map((v) => v.id);
+    const allSelected =
+      visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        visibleIds.forEach((id) => next.delete(id));
+      } else {
+        visibleIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
   }
 
   async function deleteVehicle(id: string, name: string) {
@@ -244,7 +343,7 @@ export default function InventoryPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 max-w-full space-y-6">
       <PageHeader
         title="Vehicle inventory"
         description={
@@ -326,9 +425,23 @@ export default function InventoryPage() {
               onClick={() => {
                 setListingTab(tab.id);
                 if (tab.id === "all") {
-                  setFilters((f) => ({ ...f, status: "all" }));
+                  setFilters((f) => ({
+                    ...f,
+                    status: "all",
+                    fulfillmentMode: "all",
+                  }));
+                } else if (tab.id === "available") {
+                  setFilters((f) => ({
+                    ...f,
+                    status: "available",
+                    fulfillmentMode: "all",
+                  }));
                 } else {
-                  setFilters((f) => ({ ...f, status: tab.id }));
+                  setFilters((f) => ({
+                    ...f,
+                    status: "all",
+                    fulfillmentMode: "pre_order_only",
+                  }));
                 }
               }}
               className="platform-filter-chip flex-1 justify-center sm:flex-none"
@@ -413,15 +526,67 @@ export default function InventoryPage() {
         <div className="space-y-1">
           <label className="text-xs font-medium text-[var(--platform-text-secondary)]">Status</label>
           <select
-            value={filters.status}
-            onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}
+            value={filters.fulfillmentMode !== "all" ? "all" : filters.status}
+            onChange={(e) => {
+              const status = e.target.value;
+              setFilters((f) => ({
+                ...f,
+                fulfillmentMode: "all",
+                status,
+              }));
+              if (status === "available") setListingTab("available");
+              else if (status === "pre_order") setListingTab("pre_order");
+              else if (status === "all") setListingTab("all");
+            }}
             className="platform-select w-full"
+            disabled={filters.fulfillmentMode !== "all"}
           >
             <option value="all">All statuses</option>
-            <option value="available">Available</option>
+            <option value="available">Buy now</option>
             <option value="pre_order">Pre-Order</option>
             <option value="reserved">Reserved</option>
             <option value="sold">Sold</option>
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-[var(--platform-text-secondary)]">Fulfillment</label>
+          <select
+            value={filters.fulfillmentMode}
+            onChange={(e) => {
+              const mode = e.target.value as InventoryFilters["fulfillmentMode"];
+              setFilters((prev) => {
+                if (mode === "pre_order_only") setListingTab("pre_order");
+                else if (mode === "all" && prev.status === "all") setListingTab("all");
+                return {
+                  ...prev,
+                  fulfillmentMode: mode,
+                  status: mode === "all" ? prev.status : "all",
+                };
+              });
+            }}
+            className="platform-select w-full"
+          >
+            <option value="all">All fulfillment</option>
+            <option value="in_ghana">In Ghana now</option>
+            <option value="import_ship">Import / ship</option>
+            <option value="pre_order_only">Pre-order only</option>
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-[var(--platform-text-secondary)]">Local stock</label>
+          <select
+            value={filters.availableLocally}
+            onChange={(e) =>
+              setFilters((f) => ({
+                ...f,
+                availableLocally: e.target.value as InventoryFilters["availableLocally"],
+              }))
+            }
+            className="platform-select w-full"
+          >
+            <option value="all">Any</option>
+            <option value="yes">Locally available</option>
+            <option value="no">Not local</option>
           </select>
         </div>
         <div className="space-y-1">
@@ -467,10 +632,46 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      <div className="platform-card overflow-hidden rounded-xl">
-        <div className="max-h-[min(70vh,48rem)] overflow-auto">
+      <div className="platform-card min-w-0 max-w-full overflow-hidden rounded-xl">
+        {canEdit && selectedIds.size > 0 && (
+          <div className="flex flex-wrap items-center gap-3 border-b border-[var(--platform-border)] bg-[rgba(59,130,246,0.06)] px-4 py-3">
+            <p className="text-sm text-[var(--platform-text)]">
+              <span className="font-medium">{selectedIds.size}</span> selected
+            </p>
+            <select
+              value={bulkStatus}
+              onChange={(e) => {
+                const status = e.target.value;
+                setBulkStatus(status);
+                if (status) void applyBulkStatus(status);
+              }}
+              className="platform-select min-h-9 min-w-[10rem] text-sm"
+              aria-label="Bulk status change"
+            >
+              <option value="">Change status…</option>
+              {(["available", "pre_order", "reserved", "sold"] as const).map((value) => (
+                <option key={value} value={value}>
+                  Mark as {VEHICLE_STATUS_LABELS[value]}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedIds(new Set());
+                setBulkStatus("");
+              }}
+              className="text-xs text-[var(--platform-text-secondary)] hover:text-[var(--platform-text)]"
+            >
+              Clear selection
+            </button>
+          </div>
+        )}
+        <VirtualTableScroll className="platform-table-scroll max-h-[min(70vh,48rem)] max-w-full overflow-x-auto overflow-y-auto">
+          {(scrollRef) => (
           <table className="platform-table w-full min-w-[64rem] text-left text-sm">
             <colgroup>
+              {canEdit && <col className="w-10" />}
               <col className="w-16" />
               <col className="w-[min(14rem,20%)]" />
               <col className="w-[min(10rem,14%)]" />
@@ -483,6 +684,20 @@ export default function InventoryPage() {
             </colgroup>
             <thead>
               <tr className="text-xs text-[var(--platform-text-secondary)]">
+                {canEdit && (
+                  <th className="px-3 py-3 font-medium">
+                    <input
+                      type="checkbox"
+                      checked={
+                        filtered.length > 0 &&
+                        filtered.every((v) => selectedIds.has(v.id))
+                      }
+                      onChange={toggleSelectAllVisible}
+                      className="size-4 rounded border-[var(--platform-border)]"
+                      aria-label="Select all visible vehicles"
+                    />
+                  </th>
+                )}
                 <th className="px-4 py-3 font-medium">Photo</th>
                 <th className="px-4 py-3 font-medium">Vehicle</th>
                 <th className="px-4 py-3 font-medium">Category</th>
@@ -494,18 +709,23 @@ export default function InventoryPage() {
                 <th className="px-4 py-3 font-medium">{canEdit || canApprove ? "Actions" : "Links"}</th>
               </tr>
             </thead>
-            <tbody>
-              {filtered.length === 0 ? (
+            <VirtualTableBody
+              scrollRef={scrollRef}
+              items={filtered}
+              colSpan={canEdit ? 10 : 9}
+              rowHeight={88}
+              getKey={(v) => v.id}
+              emptyRow={
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={canEdit ? 10 : 9}
                     className="px-4 py-12 text-center text-[var(--platform-text-secondary)]"
                   >
                     No vehicles match your filters.
                   </td>
                 </tr>
-              ) : (
-                filtered.map((v) => {
+              }
+              renderRow={(v) => {
                   const approvalStatus = v.approval_status ?? "approved";
                   const isPending = approvalStatus === "pending_approval";
                   const isRejected = approvalStatus === "rejected";
@@ -526,7 +746,24 @@ export default function InventoryPage() {
                     images: display.images,
                   });
                   return (
-                    <tr key={v.id} className="border-t border-[var(--platform-border)]">
+                    <tr
+                      className={cn(
+                        "border-t border-[var(--platform-border)]",
+                        actingOnId === v.id && "opacity-60"
+                      )}
+                    >
+                      {canEdit && (
+                        <td className="px-3 py-3 align-middle">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(v.id)}
+                            onChange={() => toggleSelected(v.id)}
+                            disabled={actingOnId === v.id}
+                            className="size-4 rounded border-[var(--platform-border)]"
+                            aria-label={`Select ${display.year} ${display.make} ${display.model}`}
+                          />
+                        </td>
+                      )}
                       <td className="px-4 py-3">
                         <div className="relative size-12 overflow-hidden rounded-md border border-[var(--platform-border)] bg-[var(--platform-bg)]">
                           <SafeVehicleImage
@@ -556,6 +793,16 @@ export default function InventoryPage() {
                         <p className="mt-0.5 truncate text-xs text-[var(--platform-text-secondary)]">
                           {v.location}
                         </p>
+                        {(() => {
+                          const exteriorColor = resolveExteriorColor(display);
+                          if (!exteriorColor) return null;
+                          return (
+                            <p className="mt-0.5 flex items-center gap-1.5 text-xs text-[var(--platform-text-secondary)]">
+                              <VehicleColorSwatch color={exteriorColor} />
+                              <span className="truncate">{exteriorColor}</span>
+                            </p>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-3 align-middle">
                         <CategoryBadges vehicle={v} variant="platform" compact />
@@ -572,7 +819,19 @@ export default function InventoryPage() {
                         {display.mileage.toLocaleString()} km
                       </td>
                       <td className="px-4 py-3 align-middle">
-                        <StatusBadge status={v.status} />
+                        <VehicleStatusControl
+                          status={v.status}
+                          editable={canEdit}
+                          loading={actingOnId === v.id}
+                          onStatusChange={(status) =>
+                            requestStatusChange(
+                              v.id,
+                              `${display.year} ${display.make} ${display.model}`,
+                              status,
+                              v.status
+                            )
+                          }
+                        />
                       </td>
                       <td className="px-4 py-3 align-middle">
                         <div className="space-y-1">
@@ -641,16 +900,51 @@ export default function InventoryPage() {
                               )}
                             </>
                           )}
+                          {canEdit && v.status !== "available" && (
+                            <button
+                              type="button"
+                              disabled={actingOnId === v.id}
+                              onClick={() =>
+                                requestStatusChange(
+                                  v.id,
+                                  `${display.year} ${display.make} ${display.model}`,
+                                  "available",
+                                  v.status
+                                )
+                              }
+                              className="text-[var(--platform-success)] hover:underline disabled:opacity-50"
+                            >
+                              Mark available
+                            </button>
+                          )}
+                          {canEdit && v.status !== "pre_order" && (
+                            <button
+                              type="button"
+                              disabled={actingOnId === v.id}
+                              onClick={() =>
+                                requestStatusChange(
+                                  v.id,
+                                  `${display.year} ${display.make} ${display.model}`,
+                                  "pre_order",
+                                  v.status
+                                )
+                              }
+                              className="text-[var(--platform-accent)] hover:underline disabled:opacity-50"
+                            >
+                              Mark pre-order
+                            </button>
+                          )}
                           {canEdit && v.status === "sold" && (
                             <button
                               type="button"
                               disabled={actingOnId === v.id}
                               title="Use when more stock of this model exists"
                               onClick={() =>
-                                updateVehicleStatus(
+                                requestStatusChange(
                                   v.id,
+                                  `${display.year} ${display.make} ${display.model}`,
                                   "available",
-                                  `${display.year} ${display.make} ${display.model} is available again.`
+                                  v.status
                                 )
                               }
                               className="text-[var(--platform-success)] hover:underline disabled:opacity-50"
@@ -694,15 +988,61 @@ export default function InventoryPage() {
                       </td>
                     </tr>
                   );
-                })
-              )}
-            </tbody>
+              }}
+            />
           </table>
-        </div>
+          )}
+        </VirtualTableScroll>
         <div className="border-t border-[var(--platform-border)] px-4 py-3 text-xs text-[var(--platform-text-secondary)]">
           Showing {filtered.length} of {vehicles.length} vehicles
         </div>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(statusConfirmTarget)}
+        onOpenChange={(open) => {
+          if (!open) setStatusConfirmTarget(null);
+        }}
+        title="Mark as sold?"
+        description={
+          statusConfirmTarget
+            ? statusConfirmTarget.bulk
+              ? `Mark ${statusConfirmTarget.name} as sold? Sold listings are hidden from public buy-now inventory. If any vehicle is the last available unit of its model, it will move to pre-order instead.`
+              : `Mark ${statusConfirmTarget.name} as sold? It will be removed from public buy-now inventory. If this is the last available unit of this model, the listing will move to pre-order instead.`
+            : ""
+        }
+        confirmLabel="Mark sold"
+        destructive
+        onConfirm={async () => {
+          if (!statusConfirmTarget) return;
+          if (statusConfirmTarget.bulk) {
+            const ids = [...selectedIds];
+            let failed = 0;
+            for (const id of ids) {
+              const ok = await updateVehicleStatus(id, "sold");
+              if (!ok) failed++;
+            }
+            await load();
+            if (failed === 0) {
+              setSelectedIds(new Set());
+              setBulkStatus("");
+              setToast(
+                `Marked ${ids.length} vehicle${ids.length === 1 ? "" : "s"} as sold.`
+              );
+            } else {
+              setToast(`Updated ${ids.length - failed} of ${ids.length} vehicles. Some updates failed.`);
+            }
+          } else {
+            const ok = await updateVehicleStatus(
+              statusConfirmTarget.id,
+              "sold",
+              `${statusConfirmTarget.name} marked as sold.`
+            );
+            if (ok) await load();
+          }
+          setStatusConfirmTarget(null);
+        }}
+      />
 
       <ConfirmDialog
         open={Boolean(rejectTarget)}

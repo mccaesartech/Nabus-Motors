@@ -3,6 +3,7 @@ import { createAdminSupabase } from "@/lib/supabase/admin";
 import { jsonError, jsonOk } from "@/lib/inquiries/server";
 import { emailsMatch, phonesMatch } from "@/lib/platform/shipment";
 import { isFreightReferenceCode } from "@/lib/platform/freight-reference";
+import { consumeRateLimit, requestIp } from "@/lib/security/rate-limit";
 
 type ShipmentRow = {
   id: string;
@@ -178,6 +179,16 @@ async function resolveShipmentForQuote(
 }
 
 export async function GET(req: NextRequest) {
+  const rateLimit = consumeRateLimit("public-tracking", requestIp(req.headers), {
+    limit: 30,
+    windowMs: 15 * 60_000,
+  });
+  if (!rateLimit.allowed) {
+    return jsonError("Too many tracking attempts. Try again later.", 429, {
+      "Retry-After": String(rateLimit.retryAfterSeconds),
+    });
+  }
+
   const number = req.nextUrl.searchParams.get("number")?.trim() || null;
   const reference = req.nextUrl.searchParams.get("reference")?.trim() || null;
   const email = req.nextUrl.searchParams.get("email")?.trim() ?? null;
@@ -243,7 +254,7 @@ export async function GET(req: NextRequest) {
       .select(
         "id, tracking_number, status, origin_country, destination, estimated_arrival, actual_arrival, vessel_name, container_number, customer_email, reference_type, reference_id, notes, updated_at"
       )
-      .or(`customer_email.ilike.${normalizedEmail}`)
+      .ilike("customer_email", normalizedEmail)
       .order("updated_at", { ascending: false })
       .limit(20);
 

@@ -18,7 +18,7 @@ function isInvitePath(pathname: string) {
   return /^\/platform\/invite\/[^/]+$/.test(pathname);
 }
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const autoRedirect = resolveAutoDivisionRedirect(req);
   if (autoRedirect) return autoRedirect;
 

@@ -80,7 +80,7 @@ function HeroPosterFallback({
         alt=""
         aria-hidden
         fill
-        priority
+        preload
         sizes="100vw"
         decoding="async"
         className="object-cover object-center"

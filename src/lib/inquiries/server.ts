@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createServerSupabase } from "@/lib/supabase/server";
+import { summarizeRecordForLog } from "@/lib/security/safe-logging";
 
 const OPTIONAL_COLUMN_GROUPS: string[][] = [
   ["vehicle_slug", "vehicle_title", "vehicle_price_usd", "payment_status"],
@@ -86,7 +87,10 @@ export async function insertRow(
   const supabase = createAdminSupabase() ?? createServerSupabase();
 
   if (!supabase) {
-    console.info(`[inquiry:${table}]`, row);
+    console.info(`[inquiry:${table}] database unavailable; payload omitted`, {
+      table,
+      ...summarizeRecordForLog(row),
+    });
     return { ok: true };
   }
 
@@ -142,6 +146,6 @@ export function jsonOk(
   return NextResponse.json({ ok: true, message, ...extra });
 }
 
-export function jsonError(message: string, status = 500) {
-  return NextResponse.json({ ok: false, message }, { status });
+export function jsonError(message: string, status = 500, headers?: HeadersInit) {
+  return NextResponse.json({ ok: false, message }, { status, headers });
 }

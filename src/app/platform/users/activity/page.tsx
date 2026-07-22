@@ -17,6 +17,7 @@ const ACTION_LABELS: Record<string, string> = {
   invite_sent: "Invitation sent",
   invite_accepted: "Invitation accepted",
   user_updated: "User updated",
+  user_password_set: "User password set",
   user_removed: "User removed",
   vehicle_created: "Vehicle created",
   vehicle_submitted: "Vehicle submitted for approval",

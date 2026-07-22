@@ -33,6 +33,11 @@ const TAB_GROUPS: { label: string; tabs: TabDef[] }[] = [
     label: "Corporate",
     tabs: [
       { id: "corporateHomepage", label: "Corp. Homepage", preview: "/" },
+      {
+        id: "startYourJourney",
+        label: "How Can We Help",
+        preview: "/",
+      },
       { id: "corporateServices", label: "Corp. Services", preview: "/" },
       { id: "corporateStats", label: "Corp. Stats", preview: "/" },
       { id: "corporateFaq", label: "Corp. FAQ", preview: "/" },
@@ -892,7 +897,11 @@ export default function SiteContentPage() {
                       label="Profile photo"
                       hint="Leave empty to use the default placeholder for this slot"
                       value={testimonial.image}
-                      defaultPreview={resolveTestimonialImage("", i)}
+                      defaultPreview={resolveTestimonialImage(
+                        "",
+                        i,
+                        testimonial.name
+                      )}
                       onChange={(v) => updateTestimonial(i, "image", v)}
                     />
                   </div>
@@ -991,7 +1000,11 @@ export default function SiteContentPage() {
                       label="Profile photo"
                       hint="Leave empty to use the default placeholder for this slot"
                       value={testimonial.image}
-                      defaultPreview={resolveTestimonialImage("", i)}
+                      defaultPreview={resolveTestimonialImage(
+                        "",
+                        i,
+                        testimonial.name
+                      )}
                       onChange={(v) => updateCorporateTestimonial(i, "image", v)}
                     />
                   </div>

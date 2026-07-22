@@ -83,7 +83,7 @@ export function ServiceImageCard({
         sizes="(max-width: 640px) 100vw, 454px"
         quality={75}
         loading={priority ? undefined : "lazy"}
-        priority={priority}
+        preload={priority}
       />
       <div
         className="pointer-events-none absolute inset-0 bg-gradient-to-t from-brand-black/85 via-brand-black/35 to-transparent"

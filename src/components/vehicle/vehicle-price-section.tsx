@@ -17,7 +17,7 @@ export function VehiclePriceSection({ usdAmount }: VehiclePriceSectionProps) {
 
   return (
     <div>
-      <p className="text-3xl font-semibold text-foreground">
+      <p className="text-3xl font-semibold tabular-nums text-foreground">
         {formatPrice(usdAmount)}
       </p>
       {otherCurrencies.length > 0 && (

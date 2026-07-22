@@ -1,11 +1,15 @@
 import type { VehicleInput } from "./vehicle-fields";
-import { DEFAULT_TRUST_BADGES } from "@/lib/vehicles/trust-badges";
 import {
   galleryFromInput,
   imagesFromGallery,
+  localShipmentConflict,
+  normalizeWalkaroundVideoUrl,
   primaryAndAdditionalFromVehicle,
   syncVehicleImagesFromPrimaryAndAdditional,
 } from "./vehicle-fields";
+import { omitEmptyOptionalVehicleFields } from "@/lib/admin/vehicle-columns";
+import { buildVehicleSpecs } from "@/lib/admin/vehicle-specs";
+import { DEFAULT_TRUST_BADGES } from "@/lib/vehicles/trust-badges";
 
 export function rowFromInput(
   input: VehicleInput,
@@ -26,7 +30,7 @@ export function rowFromInput(
   const gallery = synced.gallery ?? galleryFromInput(input.gallery, input.images);
   const images = synced.images ?? imagesFromGallery(gallery);
 
-  return {
+  return omitEmptyOptionalVehicleFields({
     slug,
     make: input.make.trim(),
     model: input.model.trim(),
@@ -50,7 +54,13 @@ export function rowFromInput(
     additional_images: synced.additional_images ?? [],
     images,
     gallery,
-    specs: [],
+    specs: buildVehicleSpecs({
+      seating_capacity: input.seating_capacity,
+      drivetrain: input.drivetrain,
+      horsepower: input.horsepower,
+      range: input.range,
+      specs: input.specs,
+    }),
     history: [
       {
         date: new Date().toLocaleDateString("en-US", {
@@ -65,13 +75,15 @@ export function rowFromInput(
     trust_badges: input.trust_badges ?? DEFAULT_TRUST_BADGES,
     inspection_summary: input.inspection_summary?.trim() || null,
     country_of_origin: input.country_of_origin?.trim() || null,
-    financing_available: input.financing_available !== false,
-    shipment_available: input.shipment_available !== false,
-    customs_clearing_available: input.customs_clearing_available !== false,
+    financing_available: Boolean(input.financing_available),
+    shipment_available: Boolean(input.available_locally)
+      ? false
+      : Boolean(input.shipment_available),
+    customs_clearing_available: Boolean(input.customs_clearing_available),
     warranty_notes: input.warranty_notes?.trim() || null,
-    walkaround_video_url: input.walkaround_video_url?.trim() || null,
+    walkaround_video_url: normalizeWalkaroundVideoUrl(input.walkaround_video_url),
     available_locally: Boolean(input.available_locally),
-  };
+  });
 }
 
 export function validateVehicleInput(
@@ -89,6 +101,13 @@ export function validateVehicleInput(
     return { ok: false, message: "Mileage is required." };
   }
   if (!input.location?.trim()) return { ok: false, message: "Location is required." };
+  if (localShipmentConflict(input.available_locally, input.shipment_available)) {
+    return {
+      ok: false,
+      message:
+        "Locally available stock cannot also be marked for shipment. Turn off one of them.",
+    };
+  }
 
   return { ok: true, data: input as VehicleInput };
 }

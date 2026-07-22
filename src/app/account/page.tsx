@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { MessageSquare, MessageSquarePlus, Package, Send, Ship, ShoppingCart, CalendarCheck, Car, Truck, Search } from "lucide-react";
+import { MessageSquare, MessageSquarePlus, Package, Send, Ship, ShoppingCart, CalendarCheck, Car, Truck, Search, Settings } from "lucide-react";
 import { Container } from "@/components/shared/container";
 import { ShipmentTimeline } from "@/components/shared/shipment-timeline";
 import { ImportMilestoneTimeline } from "@/components/shared/import-milestone-timeline";
@@ -1111,6 +1111,21 @@ function AccountContent() {
                 </>
               )}
             </div>
+          </div>
+        </section>
+
+        <section className="rounded-lg border p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Settings</h2>
+              <p className="text-sm text-muted-foreground">
+                Privacy, security, and account deletion are managed in account settings.
+              </p>
+            </div>
+            <Button variant="outline" className="min-h-11 gap-2" render={<Link href="/account/settings/privacy" />}>
+              <Settings className="size-4" />
+              Privacy &amp; Security
+            </Button>
           </div>
         </section>
       </div>

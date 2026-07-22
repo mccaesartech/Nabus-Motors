@@ -23,6 +23,10 @@ const STATUS_MAP: Record<string, string> = {
   delivered: "platform-badge-available",
   closed: "platform-badge-closed",
   active: "platform-badge-available",
+  pending_deletion: "platform-badge-pending",
+  archived: "platform-badge-closed",
+  deleted: "platform-badge-closed",
+  suspended: "platform-badge-pending",
   pending_approval: "platform-badge-pending",
   rejected: "platform-badge-closed",
   approved: "platform-badge-available",
@@ -34,7 +38,11 @@ export function StatusBadge({ status, className }: { status: string; className?:
   const key = status.toLowerCase();
   const variant = STATUS_MAP[key] ?? "platform-badge-closed";
   const label =
-    key === "pre_order" ? availabilityLabel("pre_order") : status;
+    key === "pre_order"
+      ? availabilityLabel("pre_order")
+      : key === "pending_deletion"
+        ? "Pending deletion"
+        : key.replace(/_/g, " ");
   const showDot = VEHICLE_STATUSES.has(key);
 
   return (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { PageHeader } from "@/components/platform/page-header";
@@ -17,39 +17,66 @@ export default function PlatformSearchPage() {
   const [query, setQuery] = useState(initialQ);
   const [groups, setGroups] = useState<AdminSearchGroup[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const searchAbortRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef(0);
 
   const runSearch = useCallback(
     async (value: string) => {
+      searchAbortRef.current?.abort();
+      const controller = new AbortController();
+      searchAbortRef.current = controller;
+      const requestId = ++requestIdRef.current;
       const trimmed = value.trim();
       if (trimmed.length < 2) {
         setGroups([]);
+        setError(null);
+        setLoading(false);
         return;
       }
 
       setLoading(true);
+      setError(null);
       try {
         const res = await fetch(
-          `/api/admin/search?q=${encodeURIComponent(trimmed)}&full=1`
+          `/api/admin/search?q=${encodeURIComponent(trimmed)}&full=1`,
+          { signal: controller.signal }
         );
+        if (requestId !== requestIdRef.current) return;
         if (isAdminAuthError(res)) {
           router.push(adminLoginPath());
           return;
         }
-        if (!res.ok) {
+        const json = (await res.json()) as {
+          ok?: boolean;
+          configured?: boolean;
+          message?: string;
+          groups?: AdminSearchGroup[];
+        };
+        if (requestId !== requestIdRef.current) return;
+        if (!res.ok || json.ok === false || json.configured === false) {
           setGroups([]);
+          setError(json.message ?? "Search failed. Try again.");
           return;
         }
-        const json = await res.json();
         setGroups(json.groups ?? []);
         saveRecentSearch(trimmed);
       } catch {
+        if (controller.signal.aborted) return;
         setGroups([]);
+        setError("Search failed. Check your connection and try again.");
       } finally {
-        setLoading(false);
+        if (requestId === requestIdRef.current) {
+          setLoading(false);
+        }
       }
     },
     [router]
   );
+
+  useEffect(() => {
+    return () => searchAbortRef.current?.abort();
+  }, []);
 
   useEffect(() => {
     const q = searchParams.get("q");
@@ -59,6 +86,16 @@ export default function PlatformSearchPage() {
     }
   }, [searchParams, runSearch]);
 
+  // Debounced live search while typing (keeps URL in sync on Enter/Search).
+  useEffect(() => {
+    const urlQ = searchParams.get("q") ?? "";
+    if (query.trim() === urlQ.trim()) return;
+    const handle = window.setTimeout(() => {
+      void runSearch(query);
+    }, 250);
+    return () => window.clearTimeout(handle);
+  }, [query, searchParams, runSearch]);
+
   const trimmed = query.trim();
   const total = groups.reduce((sum, g) => sum + g.results.length, 0);
 
@@ -66,7 +103,7 @@ export default function PlatformSearchPage() {
     <div className="space-y-6">
       <PageHeader
         title="Search"
-        description="Find vehicles, customers, leads, sales, and messages in one place."
+        description="Find vehicles, customers, leads, sales, parts, and messages in one place."
         breadcrumb="Platform"
         showBack={false}
       />
@@ -88,7 +125,7 @@ export default function PlatformSearchPage() {
                   }
                 }
               }}
-              placeholder="Search vehicles, customers, leads, sales..."
+              placeholder="Search VIN, customers, leads, parts, sales..."
               className="platform-input platform-input--icon h-11 w-full text-base"
               autoComplete="off"
             />
@@ -112,18 +149,31 @@ export default function PlatformSearchPage() {
         <p className="text-sm text-[var(--platform-text-secondary)]">Searching…</p>
       )}
 
-      {!loading && trimmed.length >= 2 && total === 0 && (
+      {!loading && error && (
+        <div className="platform-card rounded-xl px-6 py-8 text-center">
+          <p className="text-base font-medium text-[var(--platform-text)]">{error}</p>
+          <button
+            type="button"
+            onClick={() => void runSearch(query)}
+            className="mt-3 text-sm font-medium text-[var(--platform-accent)] hover:underline"
+          >
+            Retry search
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && trimmed.length >= 2 && total === 0 && (
         <div className="platform-card rounded-xl px-6 py-12 text-center">
           <p className="text-base font-medium text-[var(--platform-text)]">
             No results for &ldquo;{trimmed}&rdquo;
           </p>
           <p className="mt-2 text-sm text-[var(--platform-text-secondary)]">
-            Try a different spelling, customer email, VIN, or vehicle make and model.
+            Try a different spelling, customer email, VIN, stock slug, SKU, or reference code.
           </p>
         </div>
       )}
 
-      {!loading && total > 0 && (
+      {!loading && !error && total > 0 && (
         <>
           <p className="text-sm text-[var(--platform-text-secondary)]">
             {total} result{total !== 1 ? "s" : ""} for &ldquo;{trimmed}&rdquo;
@@ -132,7 +182,7 @@ export default function PlatformSearchPage() {
         </>
       )}
 
-      {!loading && trimmed.length < 2 && (
+      {!loading && !error && trimmed.length < 2 && (
         <div className="platform-card rounded-xl px-6 py-12 text-center">
           <p className="text-sm text-[var(--platform-text-secondary)]">
             Enter at least 2 characters to search across your entire dealership data.

@@ -2,25 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { canViewInviteLinks, requirePermission } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { INVITABLE_ROLES, ROLE_LABELS, normalizeRole } from "@/lib/platform/permissions";
-import { generateToken, hashToken } from "@/lib/platform/password";
-import { getPublicSiteUrl } from "@/lib/site-url";
+import { generateToken, hashPassword, hashToken } from "@/lib/platform/password";
+import { buildPlatformInviteUrl } from "@/lib/platform/invite-url";
 import { logPlatformActivity } from "@/lib/platform/activity";
 import { sendPlatformInviteEmail, getPlatformEmailConfig } from "@/lib/email/platform-invite";
 import type { PlatformUserInviteInfo } from "@/lib/platform/modules";
+import {
+  computePlatformInviteExpiresAt,
+  isPlatformInviteExpired,
+} from "@/lib/platform/invite-ttl";
 
 export const dynamic = "force-dynamic";
-
-const INVITE_TTL_DAYS = 7;
 
 function withSchemaMigrationHint(message: string): string {
   if (/sender_anonymized|token_plain|schema cache/i.test(message)) {
     return "Database update required: run 026_platform_production_schema_fixes.sql in the Supabase SQL editor, then retry.";
   }
   return message;
-}
-
-function inviteUrl(token: string) {
-  return `${getPublicSiteUrl()}/platform/invite/${token}`;
 }
 
 async function refreshInviteForUser(
@@ -31,7 +29,7 @@ async function refreshInviteForUser(
 
   const plainToken = generateToken();
   const tokenHash = await hashToken(plainToken);
-  const expiresAt = new Date(Date.now() + INVITE_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const expiresAt = computePlatformInviteExpiresAt();
 
   const { error } = await supabase.from("platform_user_invites").insert({
     user_id: userId,
@@ -44,7 +42,7 @@ async function refreshInviteForUser(
     throw new Error(error.message);
   }
 
-  return { link: inviteUrl(plainToken), expiresAt };
+  return { link: buildPlatformInviteUrl(plainToken), expiresAt };
 }
 
 type InviteRecord = {
@@ -65,7 +63,7 @@ function buildInviteInfo(invite: InviteRecord | undefined): PlatformUserInviteIn
     };
   }
 
-  const expired = new Date(invite.expires_at).getTime() < Date.now();
+  const expired = isPlatformInviteExpired(invite.expires_at);
   if (expired) {
     return { status: "expired", expiresAt: invite.expires_at };
   }
@@ -73,7 +71,7 @@ function buildInviteInfo(invite: InviteRecord | undefined): PlatformUserInviteIn
   if (invite.token_plain) {
     return {
       status: "active",
-      inviteUrl: inviteUrl(invite.token_plain),
+      inviteUrl: buildPlatformInviteUrl(invite.token_plain),
       expiresAt: invite.expires_at,
     };
   }
@@ -103,7 +101,7 @@ async function getOrRefreshInviteForUser(
 
     if (existing?.token_plain) {
       return {
-        link: inviteUrl(existing.token_plain),
+        link: buildPlatformInviteUrl(existing.token_plain),
         expiresAt: existing.expires_at,
       };
     }
@@ -228,7 +226,7 @@ export async function GET(req: NextRequest) {
     pendingInvites: isOwner
       ? (invites ?? []).filter(
           (invite) =>
-            !invite.accepted_at && new Date(invite.expires_at).getTime() > Date.now()
+            !invite.accepted_at && !isPlatformInviteExpired(invite.expires_at)
         )
       : [],
     roles: INVITABLE_ROLES,
@@ -251,6 +249,8 @@ export async function POST(req: NextRequest) {
   const name = String(body.name ?? "").trim();
   const email = String(body.email ?? "").trim().toLowerCase();
   const role = normalizeRole(String(body.role ?? "staff"));
+  const password = typeof body.password === "string" ? body.password : "";
+  const confirmPassword = typeof body.confirmPassword === "string" ? body.confirmPassword : "";
 
   if (!name || !email) {
     return NextResponse.json({ ok: false, message: "Name and email required" }, { status: 400 });
@@ -260,12 +260,65 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "Invalid role for invitation" }, { status: 400 });
   }
 
+  if (password) {
+    if (password.length < 8) {
+      return NextResponse.json(
+        { ok: false, message: "Password must be at least 8 characters." },
+        { status: 400 }
+      );
+    }
+    if (password !== confirmPassword) {
+      return NextResponse.json({ ok: false, message: "Passwords do not match." }, { status: 400 });
+    }
+  }
+
   const supabase = createAdminSupabase();
   if (!supabase) {
     return NextResponse.json({ ok: false, message: "Supabase not configured" }, { status: 503 });
   }
 
   const now = new Date().toISOString();
+
+  // With a password the account is active immediately — no invite link needed.
+  if (password) {
+    const passwordHash = await hashPassword(password);
+    const { data: user, error: userError } = await supabase
+      .from("platform_users")
+      .insert({
+        name,
+        email,
+        role,
+        status: "active",
+        invited_at: now,
+        activated_at: now,
+        password_hash: passwordHash,
+      })
+      .select()
+      .single();
+
+    if (userError) {
+      const duplicate = userError.message.toLowerCase().includes("duplicate");
+      return NextResponse.json(
+        { ok: false, message: duplicate ? "A user with this email already exists." : userError.message },
+        { status: duplicate ? 409 : 500 }
+      );
+    }
+
+    await logPlatformActivity(auth.auth, "user_password_set", email, {
+      user_id: user.id,
+      role,
+      created_with_password: true,
+    });
+
+    return NextResponse.json({
+      ok: true,
+      passwordSet: true,
+      user: { ...user, password_hash: undefined, role, status: "active" },
+      emailSent: false,
+      emailConfigured: getPlatformEmailConfig().configured,
+    });
+  }
+
   const { data: user, error: userError } = await supabase
     .from("platform_users")
     .insert({
@@ -288,7 +341,7 @@ export async function POST(req: NextRequest) {
 
   const plainToken = generateToken();
   const tokenHash = await hashToken(plainToken);
-  const expiresAt = new Date(Date.now() + INVITE_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const expiresAt = computePlatformInviteExpiresAt();
 
   const { error: inviteError } = await supabase.from("platform_user_invites").insert({
     user_id: user.id,
@@ -305,13 +358,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const link = inviteUrl(plainToken);
+  const link = buildPlatformInviteUrl(plainToken);
   const emailResult = await sendPlatformInviteEmail({
     to: email,
     name,
     role,
     inviteUrl: link,
-    expiresInDays: INVITE_TTL_DAYS,
   });
   await logPlatformActivity(auth.auth, "invite_sent", email, {
     role,
@@ -344,6 +396,9 @@ export async function PATCH(req: NextRequest) {
   const id = String(body.id ?? "");
   const role = body.role ? normalizeRole(String(body.role)) : undefined;
   const name = body.name ? String(body.name).trim() : undefined;
+  const status = body.status ? String(body.status).trim() : undefined;
+  const password = typeof body.password === "string" ? body.password : "";
+  const confirmPassword = typeof body.confirmPassword === "string" ? body.confirmPassword : "";
   const resendInvite = Boolean(body.resendInvite);
   const getInviteLink = Boolean(body.getInviteLink);
 
@@ -351,8 +406,24 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "Missing id" }, { status: 400 });
   }
 
+  if (password) {
+    if (password.length < 8) {
+      return NextResponse.json(
+        { ok: false, message: "Password must be at least 8 characters." },
+        { status: 400 }
+      );
+    }
+    if (password !== confirmPassword) {
+      return NextResponse.json({ ok: false, message: "Passwords do not match." }, { status: 400 });
+    }
+  }
+
   if (role && !INVITABLE_ROLES.includes(role) && role !== "owner" && role !== "super_admin") {
     return NextResponse.json({ ok: false, message: "Invalid role" }, { status: 400 });
+  }
+
+  if (status && !["active", "disabled", "pending"].includes(status)) {
+    return NextResponse.json({ ok: false, message: "Invalid status" }, { status: 400 });
   }
 
   const supabase = createAdminSupabase();
@@ -360,9 +431,48 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "Supabase not configured" }, { status: 503 });
   }
 
+  if (password) {
+    const { data: target } = await supabase
+      .from("platform_users")
+      .select("id, email, role, status")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (!target) {
+      return NextResponse.json({ ok: false, message: "User not found." }, { status: 404 });
+    }
+
+    if (normalizeRole(target.role) === "owner" && !canViewInviteLinks(auth.auth)) {
+      return NextResponse.json(
+        { ok: false, message: "Only the owner can set an owner account's password." },
+        { status: 403 }
+      );
+    }
+
+    const passwordHash = await hashPassword(password);
+    const passwordUpdates: Record<string, string> = { password_hash: passwordHash };
+    // A user with a password no longer needs the invite flow to activate.
+    if (target.status === "pending") {
+      passwordUpdates.status = "active";
+      passwordUpdates.activated_at = new Date().toISOString();
+    }
+
+    const { error: passwordError } = await supabase
+      .from("platform_users")
+      .update(passwordUpdates)
+      .eq("id", id);
+
+    if (passwordError) {
+      return NextResponse.json({ ok: false, message: passwordError.message }, { status: 500 });
+    }
+
+    await logPlatformActivity(auth.auth, "user_password_set", target.email, { user_id: id });
+  }
+
   const updates: Record<string, string> = {};
   if (role) updates.role = role;
   if (name) updates.name = name;
+  if (status) updates.status = status;
 
   if (Object.keys(updates).length > 0) {
     const { error } = await supabase.from("platform_users").update(updates).eq("id", id);
@@ -409,7 +519,6 @@ export async function PATCH(req: NextRequest) {
       name: user.name,
       role: normalizeRole(user.role),
       inviteUrl: link,
-      expiresInDays: INVITE_TTL_DAYS,
     });
     await logPlatformActivity(auth.auth, "invite_sent", user.email, {
       resent: resendInvite,

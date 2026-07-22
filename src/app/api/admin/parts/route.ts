@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
+import {
+  recordPartStockChange,
+} from "@/lib/platform/inventory-movements/record";
 
 function slugify(value: string): string {
   return value
@@ -82,6 +85,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
   }
 
+  const stockQty = Number(body.stock_quantity) || 0;
+  if (stockQty > 0) {
+    await recordPartStockChange(
+      supabase,
+      {
+        id: data.id,
+        name: data.name,
+        sku: data.sku,
+        price_usd: data.price_usd,
+      },
+      stockQty,
+      auth.auth
+    );
+  }
+
   return NextResponse.json({ ok: true, part: data });
 }
 
@@ -100,6 +118,18 @@ export async function PATCH(req: NextRequest) {
   const id = String(body.id ?? "").trim();
   if (!id) {
     return NextResponse.json({ ok: false, message: "Part id is required." }, { status: 400 });
+  }
+
+  let priorStock: number | null = null;
+  if (body.stock_quantity !== undefined) {
+    const { data: existing } = await supabase
+      .from("parts")
+      .select("stock_quantity, name, sku, price_usd")
+      .eq("id", id)
+      .maybeSingle();
+    if (existing) {
+      priorStock = Number(existing.stock_quantity) || 0;
+    }
   }
 
   const updates: Record<string, unknown> = {};
@@ -132,6 +162,24 @@ export async function PATCH(req: NextRequest) {
 
   if (error) {
     return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+  }
+
+  if (priorStock != null && body.stock_quantity !== undefined && data) {
+    const nextStock = Number(data.stock_quantity) || 0;
+    const delta = nextStock - priorStock;
+    if (delta !== 0) {
+      await recordPartStockChange(
+        supabase,
+        {
+          id: data.id,
+          name: data.name,
+          sku: data.sku,
+          price_usd: data.price_usd,
+        },
+        delta,
+        auth.auth
+      );
+    }
   }
 
   return NextResponse.json({ ok: true, part: data });

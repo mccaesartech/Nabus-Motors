@@ -10,6 +10,10 @@ export function resolvedAdminPath() {
   return process.env.ADMIN_PATH ?? ADMIN_PATH;
 }
 
+export function isAdminSessionSecretConfigured(): boolean {
+  return Boolean(process.env.ADMIN_SECRET?.trim());
+}
+
 async function sha256Hex(input: string): Promise<string> {
   const data = new TextEncoder().encode(input);
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
@@ -18,9 +22,14 @@ async function sha256Hex(input: string): Promise<string> {
     .join("");
 }
 
-export async function expectedAdminToken(): Promise<string | null> {
-  const password = process.env.ADMIN_PASSWORD;
-  const secret = process.env.ADMIN_SECRET ?? "true-goshen-admin-secret";
-  if (!password) return null;
+export async function adminTokenForPassword(password: string): Promise<string | null> {
+  const secret = process.env.ADMIN_SECRET?.trim();
+  if (!password || !secret) return null;
   return sha256Hex(`${password}:${secret}`);
+}
+
+export async function expectedAdminToken(): Promise<string | null> {
+  const password = process.env.ADMIN_PASSWORD?.trim();
+  if (!password) return null;
+  return adminTokenForPassword(password);
 }

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin/auth";
+import { requirePermission } from "@/lib/admin/auth";
 import { notifyCustomer } from "@/lib/notifications/customer-notify";
 import { notifyCustomerOrderConfirmed } from "@/lib/customer/notifications-server";
 import { formatCustomerNotificationFeedback } from "@/lib/notifications/notification-status";
 import { logPlatformActivity } from "@/lib/platform/activity";
+import { recordOrderConfirmed } from "@/lib/platform/inventory-movements/record";
 import { fetchAdminOrderDetail } from "@/lib/platform/orders-admin";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 
@@ -12,7 +13,7 @@ type RouteContext = { params: Promise<{ id: string }> };
 const ORDER_STATUSES = ["pending", "confirmed", "shipped", "fulfilled", "cancelled"] as const;
 
 export async function GET(_req: NextRequest, context: RouteContext) {
-  const auth = await requireAdmin();
+  const auth = await requirePermission("parts");
   if (!auth.ok) {
     return NextResponse.json({ ok: false }, { status: auth.status });
   }
@@ -32,7 +33,7 @@ export async function GET(_req: NextRequest, context: RouteContext) {
 }
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
-  const auth = await requireAdmin();
+  const auth = await requirePermission("parts");
   if (!auth.ok) {
     return NextResponse.json({ ok: false }, { status: auth.status });
   }
@@ -97,6 +98,19 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       action: "order_confirmed",
       customer_email: existing.email,
     });
+
+    await recordOrderConfirmed(
+      supabase,
+      {
+        id: existing.id,
+        name: existing.name,
+        totalUsd: existing.totalUsd,
+        confirmedAt: now,
+        partCount: existing.partCount,
+        vehicleCount: existing.vehicleCount,
+      },
+      auth.auth
+    );
 
     const order = await fetchAdminOrderDetail(supabase, id);
     const feedback = formatCustomerNotificationFeedback(notificationResult, {
@@ -172,6 +186,19 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       orderId: id,
       orderRef,
     });
+
+    await recordOrderConfirmed(
+      supabase,
+      {
+        id: existing.id,
+        name: existing.name,
+        totalUsd: existing.totalUsd,
+        confirmedAt: updates.confirmed_at,
+        partCount: existing.partCount,
+        vehicleCount: existing.vehicleCount,
+      },
+      auth.auth
+    );
 
     const order = await fetchAdminOrderDetail(supabase, id);
     const feedback = formatCustomerNotificationFeedback(notificationResult, {

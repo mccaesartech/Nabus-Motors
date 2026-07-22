@@ -10,14 +10,28 @@ export type PlatformSessionPayload = {
   pwd: string;
 };
 
-function sessionSecret(): string {
-  return process.env.ADMIN_SECRET ?? "true-goshen-admin-secret";
+function sessionSecret(): string | null {
+  return process.env.ADMIN_SECRET?.trim() || null;
 }
 
 async function sha256Hex(input: string): Promise<string> {
   const data = new TextEncoder().encode(input);
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
   return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function hmacSha256Hex(input: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(signature))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
@@ -50,11 +64,15 @@ export async function buildPlatformSessionCookieValue(
   role: string,
   passwordHash: string
 ): Promise<string> {
+  const secret = sessionSecret();
+  if (!secret) {
+    throw new Error("ADMIN_SECRET is required to create platform sessions.");
+  }
   const exp = Math.floor(Date.now() / 1000) + PLATFORM_SESSION_TTL_SEC;
   const pwd = await passwordHashFingerprint(passwordHash);
   const payload: PlatformSessionPayload = { uid: userId, role, exp, pwd };
   const payloadB64 = base64UrlEncode(JSON.stringify(payload));
-  const sig = await sha256Hex(`${payloadB64}:${sessionSecret()}`);
+  const sig = await hmacSha256Hex(payloadB64, secret);
   return `${payloadB64}.${sig}`;
 }
 
@@ -63,6 +81,8 @@ export async function parsePlatformSessionCookieValue(
   value: string | undefined
 ): Promise<PlatformSessionPayload | null> {
   if (!value) return null;
+  const secret = sessionSecret();
+  if (!secret) return null;
 
   const dot = value.indexOf(".");
   if (dot <= 0) return null;
@@ -71,7 +91,7 @@ export async function parsePlatformSessionCookieValue(
   const sig = value.slice(dot + 1);
   if (!payloadB64 || !sig) return null;
 
-  const expectedSig = await sha256Hex(`${payloadB64}:${sessionSecret()}`);
+  const expectedSig = await hmacSha256Hex(payloadB64, secret);
   if (sig.length !== expectedSig.length) return null;
 
   // Constant-time-ish compare
@@ -117,5 +137,9 @@ export async function createPlatformSessionToken(
   userId: string,
   passwordHash: string
 ): Promise<string> {
-  return sha256Hex(`${userId}:${passwordHash}:${sessionSecret()}`);
+  const secret = sessionSecret();
+  if (!secret) {
+    throw new Error("ADMIN_SECRET is required to create platform sessions.");
+  }
+  return hmacSha256Hex(`${userId}:${passwordHash}`, secret);
 }

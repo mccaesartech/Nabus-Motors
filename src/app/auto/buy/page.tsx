@@ -26,10 +26,10 @@ export default async function BuyPage() {
 
   return (
     <>
-      <section className="bg-brand-black py-16 sm:py-20">
+      <section className="bg-brand-primary py-16 sm:py-20">
         <Container>
           <h1 className="text-3xl font-semibold text-white sm:text-4xl">{hero.title}</h1>
-          <p className="mt-4 max-w-xl text-base text-text-secondary">{hero.subtitle}</p>
+          <p className="mt-4 max-w-xl text-base text-on-dark-secondary">{hero.subtitle}</p>
         </Container>
       </section>
 

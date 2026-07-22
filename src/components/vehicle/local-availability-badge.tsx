@@ -4,17 +4,20 @@ import { cn } from "@/lib/utils";
 type LocalAvailabilityBadgeProps = {
   available?: boolean | null;
   className?: string;
+  /** Shorter label for inventory cards. */
+  compact?: boolean;
 };
 
 export function LocalAvailabilityBadge({
   available,
   className,
+  compact = false,
 }: LocalAvailabilityBadgeProps) {
   if (!available) return null;
 
   return (
     <Badge variant="verified" className={cn(className)}>
-      Now Available in Ghana
+      {compact ? "In Ghana" : "Now Available in Ghana"}
     </Badge>
   );
 }

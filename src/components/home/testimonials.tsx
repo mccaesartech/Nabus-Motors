@@ -29,7 +29,11 @@ export function Testimonials({ content }: TestimonialsProps) {
               <div className="flex items-start gap-4">
                 <div className="relative size-12 shrink-0 overflow-hidden rounded-full">
                   <SafeVehicleImage
-                    src={resolveTestimonialImage(testimonial.image, index)}
+                    src={resolveTestimonialImage(
+                      testimonial.image,
+                      index,
+                      testimonial.name
+                    )}
                     alt={testimonial.name}
                   />
                 </div>

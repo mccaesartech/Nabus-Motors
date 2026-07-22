@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CartQuantityStepper } from "@/components/parts/cart-quantity-stepper";
 import { usePartsCart } from "@/context/parts-cart-context";
@@ -34,8 +34,13 @@ export function AddToCartButton({
   variant = "outline",
   showIcon = true,
 }: AddToCartButtonProps) {
-  const { addPart, isPartInCart, getPartQuantity, setPartQuantity } =
-    usePartsCart();
+  const {
+    addPart,
+    isPartInCart,
+    getPartQuantity,
+    setPartQuantity,
+    removePart,
+  } = usePartsCart();
   const [feedback, setFeedback] = useState(false);
 
   if (priceUsd == null) return null;
@@ -66,11 +71,20 @@ export function AddToCartButton({
       <div className={cn("flex items-center gap-2", className)}>
         <CartQuantityStepper
           quantity={quantity}
+          min={0}
           onDecrease={() => setPartQuantity(partId, quantity - 1)}
           onIncrease={() => addPart(partId, 1, snapshot)}
           max={stockQuantity && stockQuantity > 0 ? stockQuantity : undefined}
           size={size === "default" ? "default" : "sm"}
         />
+        <button
+          type="button"
+          aria-label="Remove from cart"
+          className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:border-destructive/50 hover:bg-destructive/5 hover:text-destructive"
+          onClick={() => removePart(partId)}
+        >
+          <Trash2 className="size-3.5" />
+        </button>
         {feedback && (
           <span className="text-xs font-medium text-emerald-700">Added!</span>
         )}

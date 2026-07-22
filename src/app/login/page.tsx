@@ -53,11 +53,10 @@ function LoginForm() {
 
   useEffect(() => {
     if (!sessionPreferenceModalOpen && pendingRedirect && user) {
-      router.push(pendingRedirect);
-      router.refresh();
+      window.location.assign(pendingRedirect);
       setPendingRedirect(null);
     }
-  }, [sessionPreferenceModalOpen, pendingRedirect, user, router]);
+  }, [sessionPreferenceModalOpen, pendingRedirect, user]);
 
   useEffect(() => {
     if (registered && !hasChosenSessionPreference()) {
@@ -106,9 +105,8 @@ function LoginForm() {
       await applySessionPreference(chosenPreference);
     }
 
-    router.push(redirectTo);
-    router.refresh();
-    setLoading(false);
+    window.location.assign(redirectTo);
+    return;
   }
 
   return (

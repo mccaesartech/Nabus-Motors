@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Container } from "@/components/shared/container";
 import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,6 @@ import {
 import { supabase } from "@/lib/supabase/client";
 
 function AuthCallbackContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState("");
 
@@ -64,8 +63,7 @@ function AuthCallbackContent() {
         markSessionPreferencePromptPending();
       }
 
-      router.replace(redirect);
-      router.refresh();
+      window.location.replace(redirect);
     }
 
     void completeSignIn();
@@ -73,7 +71,7 @@ function AuthCallbackContent() {
     return () => {
       active = false;
     };
-  }, [router, searchParams]);
+  }, [searchParams]);
 
   return (
     <Container className="py-16 sm:py-20">

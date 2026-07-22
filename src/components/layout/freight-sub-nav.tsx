@@ -44,9 +44,9 @@ export function FreightSubNav() {
                 <FullPageLink
                   href={link.href}
                   className={cn(
-                    "rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors",
+                    "rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors",
                     active
-                      ? "bg-brand-purple/10 text-brand-purple"
+                      ? "bg-brand-freight-accent/10 text-brand-freight-accent"
                       : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                   )}
                   aria-current={active ? "page" : undefined}
@@ -59,7 +59,7 @@ export function FreightSubNav() {
         </div>
         <FullPageLink
           href={CORPORATE_HOME}
-          className="shrink-0 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+          className="shrink-0 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           ← Company Home
         </FullPageLink>

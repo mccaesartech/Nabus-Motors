@@ -36,7 +36,7 @@ function OrderItemRow({ item }: OrderItemRowProps) {
         {item.image_url ? (
           <Image
             src={item.image_url}
-            alt=""
+            alt={item.name}
             fill
             className="object-cover"
             sizes="48px"

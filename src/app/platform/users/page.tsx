@@ -8,15 +8,19 @@ import {
   ChevronDown,
   Copy,
   ExternalLink,
+  KeyRound,
   Mail,
   RefreshCw,
   Trash2,
   UserPlus,
+  UserX,
   X,
 } from "lucide-react";
+import { PasswordInput } from "@/components/ui/password-input";
 import { PageHeader } from "@/components/platform/page-header";
 import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
+import { PLATFORM_INVITE_EXPIRY_LABEL } from "@/lib/platform/invite-ttl";
 import { ROLE_LABELS } from "@/lib/platform/permissions";
 import type { PlatformUserInviteInfo, PlatformUserRow } from "@/lib/platform/modules";
 import { formatPlatformDate } from "@/lib/platform/datetime";
@@ -257,6 +261,17 @@ export default function UsersPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("manager");
+  const [newPassword, setNewPassword] = useState("");
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
+  const [newPasswordError, setNewPasswordError] = useState("");
+  const [passwordPanel, setPasswordPanel] = useState<{
+    userId: string;
+    email: string;
+    name: string;
+  } | null>(null);
+  const [panelPassword, setPanelPassword] = useState("");
+  const [panelConfirm, setPanelConfirm] = useState("");
+  const [panelError, setPanelError] = useState("");
   const [toast, setToast] = useState("");
   const [toastVariant, setToastVariant] = useState<"success" | "warning">("success");
   const [invitePanel, setInvitePanel] = useState<InvitePanel | null>(null);
@@ -332,6 +347,12 @@ export default function UsersPage() {
     }
   }, [users, invitePanel]);
 
+  useEffect(() => {
+    if (passwordPanel && !users.some((user) => user.id === passwordPanel.userId)) {
+      setPasswordPanel(null);
+    }
+  }, [users, passwordPanel]);
+
   function showInvitePanel(
     userId: string,
     invitedEmail: string,
@@ -370,18 +391,48 @@ export default function UsersPage() {
 
   async function inviteUser(e: React.FormEvent) {
     e.preventDefault();
+    setNewPasswordError("");
+
+    if (newPassword || newPasswordConfirm) {
+      if (newPassword.length < 8) {
+        setNewPasswordError("Password must be at least 8 characters.");
+        return;
+      }
+      if (newPassword !== newPasswordConfirm) {
+        setNewPasswordError("Passwords do not match.");
+        return;
+      }
+    }
+
     const invitedEmail = email.trim().toLowerCase();
     const invitedName = name.trim();
     const res = await fetch("/api/admin/platform-users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: invitedName, email: invitedEmail, role }),
+      body: JSON.stringify({
+        name: invitedName,
+        email: invitedEmail,
+        role,
+        ...(newPassword
+          ? { password: newPassword, confirmPassword: newPasswordConfirm }
+          : {}),
+      }),
     });
     const json = await res.json();
     const link = json.inviteLink ?? json.inviteUrl ?? "";
     if (res.ok) {
       setName("");
       setEmail("");
+      setNewPassword("");
+      setNewPasswordConfirm("");
+      if (json.passwordSet) {
+        setToastVariant("success");
+        setToast(
+          `${invitedEmail} created with a password. They can sign in immediately.`
+        );
+        load();
+        return;
+      }
       if (link) {
         setCanViewInviteLinks(true);
         const userId = json.user?.id ?? "";
@@ -493,6 +544,54 @@ export default function UsersPage() {
     }
   }
 
+  function openPasswordPanel(user: PlatformUserRow) {
+    setPasswordPanel({ userId: user.id, email: user.email, name: user.name });
+    setPanelPassword("");
+    setPanelConfirm("");
+    setPanelError("");
+  }
+
+  async function submitSetPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!passwordPanel) return;
+
+    setPanelError("");
+    if (panelPassword.length < 8) {
+      setPanelError("Password must be at least 8 characters.");
+      return;
+    }
+    if (panelPassword !== panelConfirm) {
+      setPanelError("Passwords do not match.");
+      return;
+    }
+
+    setRowActionId(passwordPanel.userId);
+    try {
+      const res = await fetch("/api/admin/platform-users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: passwordPanel.userId,
+          password: panelPassword,
+          confirmPassword: panelConfirm,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setPanelError(json.message ?? "Could not set password.");
+        return;
+      }
+      setToastVariant("success");
+      setToast(`Password set for ${passwordPanel.email}. They can sign in with it now.`);
+      setPasswordPanel(null);
+      setPanelPassword("");
+      setPanelConfirm("");
+      load();
+    } finally {
+      setRowActionId(null);
+    }
+  }
+
   async function updateRole(id: string, newRole: string) {
     await fetch("/api/admin/platform-users", {
       method: "PATCH",
@@ -500,6 +599,31 @@ export default function UsersPage() {
       body: JSON.stringify({ id, role: newRole }),
     });
     load();
+  }
+
+  async function toggleUserStatus(user: PlatformUserRow) {
+    if (user.role === "owner") return;
+    const nextStatus = user.status === "disabled" ? "active" : "disabled";
+    const label = nextStatus === "disabled" ? "disable" : "re-enable";
+    if (!confirm(`${label.charAt(0).toUpperCase() + label.slice(1)} ${user.email}?`)) return;
+
+    setRowActionId(user.id);
+    try {
+      const res = await fetch("/api/admin/platform-users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: user.id, status: nextStatus }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setToastVariant("warning");
+        setToast(json.message ?? `Could not ${label} user.`);
+      } else {
+        load();
+      }
+    } finally {
+      setRowActionId(null);
+    }
   }
 
   async function removeUser(id: string) {
@@ -609,7 +733,7 @@ export default function UsersPage() {
                   : `Invite link for ${invitePanel.email}`}
               </p>
               <p className="mt-0.5 text-xs text-[var(--platform-text-secondary)]">
-                {invitePanel.name} · pending · link valid 7 days
+                {invitePanel.name} · pending · link valid {PLATFORM_INVITE_EXPIRY_LABEL}
               </p>
               {!invitePanel.emailSent && (
                 <p className="mt-2 text-xs text-amber-800">
@@ -686,6 +810,80 @@ export default function UsersPage() {
         </div>
       )}
 
+      {passwordPanel && (
+        <form
+          onSubmit={submitSetPassword}
+          className="platform-card space-y-4 rounded-xl border border-[var(--platform-accent)]/20 p-5"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-[var(--platform-text)]">
+                Set password for {passwordPanel.email}
+              </p>
+              <p className="mt-0.5 text-xs text-[var(--platform-text-secondary)]">
+                {passwordPanel.name} · they will sign in with this password. Enter it twice to
+                confirm.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPasswordPanel(null)}
+              className="shrink-0 text-[var(--platform-text-secondary)] hover:text-[var(--platform-text)]"
+              aria-label="Dismiss"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block space-y-1.5">
+              <span className="text-xs text-[var(--platform-text-secondary)]">New password</span>
+              <PasswordInput
+                required
+                minLength={8}
+                autoComplete="new-password"
+                className="platform-input w-full"
+                value={panelPassword}
+                onChange={(e) => setPanelPassword(e.target.value)}
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="text-xs text-[var(--platform-text-secondary)]">
+                Confirm password
+              </span>
+              <PasswordInput
+                required
+                minLength={8}
+                autoComplete="new-password"
+                className="platform-input w-full"
+                value={panelConfirm}
+                onChange={(e) => setPanelConfirm(e.target.value)}
+              />
+            </label>
+          </div>
+
+          {panelError && <p className="text-sm text-red-600">{panelError}</p>}
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="submit"
+              disabled={rowActionId === passwordPanel.userId}
+              className="platform-btn-primary min-h-11"
+            >
+              <KeyRound className="size-4" />
+              {rowActionId === passwordPanel.userId ? "Saving…" : "Set password"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPasswordPanel(null)}
+              className="platform-btn-secondary min-h-11"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
       <form onSubmit={inviteUser} className="platform-card grid gap-4 rounded-xl p-5 sm:grid-cols-4">
         <label className="block space-y-1.5 sm:col-span-1">
           <span className="text-xs text-[var(--platform-text-secondary)]">Name</span>
@@ -723,9 +921,41 @@ export default function UsersPage() {
         <div className="flex items-end sm:col-span-1">
           <button type="submit" className="platform-btn-primary w-full">
             <UserPlus className="size-4" />
-            Send invite
+            {newPassword ? "Create user" : "Send invite"}
           </button>
         </div>
+        <label className="block space-y-1.5 sm:col-span-2">
+          <span className="text-xs text-[var(--platform-text-secondary)]">
+            Password (optional)
+          </span>
+          <PasswordInput
+            autoComplete="new-password"
+            minLength={8}
+            className="platform-input w-full"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+          />
+        </label>
+        <label className="block space-y-1.5 sm:col-span-2">
+          <span className="text-xs text-[var(--platform-text-secondary)]">
+            Confirm password
+          </span>
+          <PasswordInput
+            autoComplete="new-password"
+            minLength={8}
+            required={Boolean(newPassword)}
+            className="platform-input w-full"
+            value={newPasswordConfirm}
+            onChange={(e) => setNewPasswordConfirm(e.target.value)}
+          />
+        </label>
+        <p className="text-xs text-[var(--platform-text-secondary)] sm:col-span-4">
+          Set a password to activate the account immediately — no invite email needed. Leave
+          blank to send an invite link instead.
+        </p>
+        {newPasswordError && (
+          <p className="text-sm text-red-600 sm:col-span-4">{newPasswordError}</p>
+        )}
       </form>
 
       <div className="platform-card overflow-x-auto rounded-xl">
@@ -821,6 +1051,28 @@ export default function UsersPage() {
                               className={`size-4 ${rowActionId === user.id ? "animate-spin" : ""}`}
                             />
                           )}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => openPasswordPanel(user)}
+                        disabled={rowActionId === user.id}
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center text-[var(--platform-text-secondary)] hover:text-[var(--platform-accent)]"
+                        aria-label="Set password"
+                        title="Set password"
+                      >
+                        <KeyRound className="size-4" />
+                      </button>
+                      {user.role !== "owner" && user.status !== "pending" && (
+                        <button
+                          type="button"
+                          onClick={() => void toggleUserStatus(user)}
+                          disabled={rowActionId === user.id}
+                          className="inline-flex min-h-11 min-w-11 items-center justify-center text-[var(--platform-text-secondary)] hover:text-amber-700"
+                          aria-label={user.status === "disabled" ? "Re-enable user" : "Disable user"}
+                          title={user.status === "disabled" ? "Re-enable user" : "Disable user"}
+                        >
+                          <UserX className="size-4" />
                         </button>
                       )}
                       {user.role !== "owner" && (

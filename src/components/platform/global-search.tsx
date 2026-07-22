@@ -6,10 +6,12 @@ import {
   Car,
   DollarSign,
   MessageSquare,
+  Package,
   Search,
-  User,
   Users,
 } from "lucide-react";
+import { adminLoginPath } from "@/lib/admin/paths";
+import { isAdminAuthError } from "@/lib/admin/client";
 import { platformPath } from "@/lib/platform/paths";
 import {
   readRecentSearches,
@@ -22,6 +24,7 @@ import { cn } from "@/lib/utils";
 
 const TYPE_ICONS: Record<AdminSearchResultType, typeof Car> = {
   vehicle: Car,
+  part: Package,
   lead: MessageSquare,
   customer: Users,
   sale: DollarSign,
@@ -29,10 +32,10 @@ const TYPE_ICONS: Record<AdminSearchResultType, typeof Car> = {
 };
 
 const SEARCH_SUGGESTIONS = [
-  "Try a vehicle make or model (e.g. BMW)",
-  "Search by customer name or email",
-  "Look up a VIN or stock slug",
-  "Find leads by phone number",
+  "Try a VIN, stock slug, make, model, year, or color",
+  "Search by customer name, email, or phone",
+  "Look up lead reference codes or order IDs",
+  "Find parts by SKU or brand",
 ];
 
 type GlobalSearchProps = {
@@ -49,38 +52,69 @@ export function GlobalSearch({
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const searchAbortRef = useRef<AbortController | null>(null);
+  const searchRequestIdRef = useRef(0);
   const [query, setQuery] = useState("");
   const [groups, setGroups] = useState<AdminSearchGroup[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [recent, setRecent] = useState<string[]>([]);
+  const [recent] = useState<string[]>(() => readRecentSearches());
 
-  const runSearch = useCallback(async (value: string) => {
-    const trimmed = value.trim();
-    if (trimmed.length < 2) {
-      setGroups([]);
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/admin/search?q=${encodeURIComponent(trimmed)}`);
-      if (!res.ok) {
+  const runSearch = useCallback(
+    async (value: string) => {
+      searchAbortRef.current?.abort();
+      const controller = new AbortController();
+      searchAbortRef.current = controller;
+      const requestId = ++searchRequestIdRef.current;
+      const trimmed = value.trim();
+      if (trimmed.length < 2) {
         setGroups([]);
+        setError(null);
+        setLoading(false);
         return;
       }
-      const json = await res.json();
-      setGroups(json.groups ?? []);
-    } catch {
-      setGroups([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/admin/search?q=${encodeURIComponent(trimmed)}`, {
+          signal: controller.signal,
+        });
+        if (requestId !== searchRequestIdRef.current) return;
+        if (isAdminAuthError(res)) {
+          router.push(adminLoginPath());
+          return;
+        }
+        const json = (await res.json()) as {
+          ok?: boolean;
+          configured?: boolean;
+          message?: string;
+          groups?: AdminSearchGroup[];
+        };
+        if (requestId !== searchRequestIdRef.current) return;
+        if (!res.ok || json.ok === false || json.configured === false) {
+          setGroups([]);
+          setError(json.message ?? "Search failed. Try again.");
+          return;
+        }
+        setGroups(json.groups ?? []);
+        setError(null);
+      } catch {
+        if (controller.signal.aborted) return;
+        setGroups([]);
+        setError("Search failed. Check your connection and try again.");
+      } finally {
+        if (requestId === searchRequestIdRef.current) {
+          setLoading(false);
+        }
+      }
+    },
+    [router]
+  );
 
   useEffect(() => {
-    setRecent(readRecentSearches());
+    return () => searchAbortRef.current?.abort();
   }, []);
 
   useEffect(() => {
@@ -95,6 +129,7 @@ export function GlobalSearch({
     function onPointerDown(event: MouseEvent) {
       if (!containerRef.current?.contains(event.target as Node)) {
         setOpen(false);
+        inputRef.current?.blur();
       }
     }
     document.addEventListener("mousedown", onPointerDown);
@@ -158,7 +193,7 @@ export function GlobalSearch({
             inputRef.current?.blur();
           }
         }}
-        placeholder="Search vehicles, customers, leads, sales..."
+        placeholder="Search VIN, customers, leads, parts..."
         className={cn(
           "relative z-[1] h-10 w-full min-w-0 platform-input platform-input--icon pr-14 text-sm",
           inputClassName
@@ -207,7 +242,20 @@ export function GlobalSearch({
             <p className="px-4 py-4 text-sm text-[var(--platform-text-secondary)]">Searching…</p>
           )}
 
-          {trimmed.length >= 2 && !loading && totalResults === 0 && (
+          {trimmed.length >= 2 && !loading && error && (
+            <div className="px-4 py-4">
+              <p className="text-sm font-medium text-[var(--platform-text)]">{error}</p>
+              <button
+                type="button"
+                onClick={() => void runSearch(query)}
+                className="mt-2 text-xs font-medium text-[var(--platform-accent)] hover:underline"
+              >
+                Retry search
+              </button>
+            </div>
+          )}
+
+          {trimmed.length >= 2 && !loading && !error && totalResults === 0 && (
             <div className="px-4 py-4">
               <p className="text-sm font-medium text-[var(--platform-text)]">
                 No results for &ldquo;{trimmed}&rdquo;
@@ -220,7 +268,7 @@ export function GlobalSearch({
             </div>
           )}
 
-          {trimmed.length >= 2 && !loading && totalResults > 0 && (
+          {trimmed.length >= 2 && !loading && !error && totalResults > 0 && (
             <div className="max-h-[28rem] overflow-y-auto py-1">
               {groups.map((group) => (
                 <div key={group.type}>
@@ -265,7 +313,7 @@ export function GlobalSearch({
 
           {trimmed.length < 2 && !showRecent && (
             <p className="px-4 py-4 text-sm text-[var(--platform-text-secondary)]">
-              Type at least 2 characters to search everything — vehicles, leads, customers, sales, and messages.
+              Type at least 2 characters to search vehicles, parts, leads, customers, sales, and messages.
             </p>
           )}
 

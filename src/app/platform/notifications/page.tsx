@@ -16,9 +16,14 @@ import { PageHeader } from "@/components/platform/page-header";
 import { ConfirmDialog } from "@/components/platform/confirm-dialog";
 import { PaymentStatusBadge } from "@/components/platform/status-badge";
 import { PreorderNotificationPreview } from "@/components/platform/preorder-notification-preview";
+import {
+  AdminNotificationBody,
+  adminNotificationHref,
+  adminNotificationLinkLabel,
+} from "@/components/platform/admin-notification-body";
 import { useAdminNotifications } from "@/context/admin-notifications-context";
+import { formatAdminNotificationForDisplay } from "@/lib/platform/notification-display";
 import { parsePreorderMetadata } from "@/lib/platform/preorder";
-import { platformPath } from "@/lib/platform/paths";
 import type { AdminNotification } from "@/lib/platform/types";
 import { cn } from "@/lib/utils";
 import { PlatformDateTime } from "@/components/platform/platform-datetime";
@@ -32,7 +37,8 @@ const TYPE_ICONS: Record<string, typeof Bell> = {
   appraisal: Package,
   low_stock: AlertTriangle,
   team_message: MessageSquare,
-  freight_quote: Ship,
+  delivery_deferred: AlertTriangle,
+  delivery_failed: AlertTriangle,
 };
 
 export default function NotificationsPage() {
@@ -88,9 +94,13 @@ export default function NotificationsPage() {
           <ul>
             {notifications.map((n) => {
               const Icon = TYPE_ICONS[n.type] ?? Bell;
-              const href = n.link ?? platformPath("leads");
+              const display = formatAdminNotificationForDisplay(n);
+              const href = adminNotificationHref(n);
+              const viewLabel = adminNotificationLinkLabel(n);
               const preorderMeta = n.type === "preorder" ? parsePreorderMetadata(n.metadata) : null;
               const isPreorder = n.type === "preorder" && preorderMeta;
+              const isDelivery =
+                n.type === "delivery_failed" || n.type === "delivery_deferred";
 
               return (
                 <li
@@ -118,7 +128,7 @@ export default function NotificationsPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <p className="text-sm font-medium leading-snug text-[var(--platform-text)] sm:text-base">
-                          {n.title}
+                          {display.title}
                         </p>
                         {!n.readAt && (
                           <span className="rounded-full bg-[var(--platform-accent)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
@@ -129,10 +139,13 @@ export default function NotificationsPage() {
                           <PaymentStatusBadge status={preorderMeta.paymentStatus} />
                         )}
                       </div>
-                      {!isPreorder && (
+                      {!isPreorder && !isDelivery && (
                         <p className="mt-1 text-sm leading-relaxed text-[var(--platform-text-secondary)]">
-                          {n.message}
+                          {display.message}
                         </p>
+                      )}
+                      {!isPreorder && isDelivery && (
+                        <AdminNotificationBody notification={n} variant="full" className="mt-2" />
                       )}
                       {isPreorder && (
                         <PreorderNotificationPreview notification={n} variant="full" />
@@ -149,7 +162,7 @@ export default function NotificationsPage() {
                       onClick={() => handleOpenNotification(n)}
                       className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg bg-[rgba(139,92,246,0.1)] px-3 text-sm font-medium text-[var(--platform-accent)] transition-colors hover:bg-[rgba(139,92,246,0.15)] sm:flex-none sm:px-4"
                     >
-                      View
+                      {viewLabel}
                     </Link>
                     {!n.readAt && n.id !== "low-stock" && (
                       <button

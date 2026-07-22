@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCustomerFromAuthHeader } from "@/lib/customer/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import type { PartsOrderItemSummary, PartsOrderSummary } from "@/lib/parts/cart-types";
+import { userOrEmailFilter } from "@/lib/security/postgrest-filter";
 
 function firstImage(images: unknown): string | null {
   if (!Array.isArray(images) || images.length === 0) return null;
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest) {
     .select(
       "id, status, total_usd, created_at, parts_order_items(id, item_type, part_id, vehicle_id, part_name, part_slug, sku, quantity, unit_price_usd, item_intent)"
     )
-    .or(`user_id.eq.${user.id},email.ilike.${email}`)
+    .or(userOrEmailFilter(user.id, email))
     .order("created_at", { ascending: false })
     .limit(20);
 

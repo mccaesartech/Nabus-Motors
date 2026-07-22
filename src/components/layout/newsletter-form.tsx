@@ -32,7 +32,7 @@ export function NewsletterForm() {
       <Button
         type="submit"
         disabled={loading}
-        className="h-10 shrink-0 rounded-md bg-brand-cta-gold px-5 text-sm font-semibold text-brand-charcoal hover:bg-brand-cta-gold-hover"
+        className="h-10 shrink-0 rounded-md bg-brand-cta-gold px-5 text-sm font-semibold text-brand-charcoal-dark hover:bg-brand-cta-gold-hover"
       >
         {loading ? "…" : "Subscribe"}
       </Button>

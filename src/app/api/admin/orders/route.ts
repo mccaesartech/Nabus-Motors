@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin/auth";
+import { requirePermission } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { fetchAdminOrders } from "@/lib/platform/orders-admin";
 
 export async function GET() {
-  const auth = await requireAdmin();
+  const auth = await requirePermission("parts");
   if (!auth.ok) {
     return NextResponse.json({ ok: false }, { status: auth.status });
   }

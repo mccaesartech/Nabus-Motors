@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { ADMIN_COOKIE, expectedAdminToken, PLATFORM_USER_COOKIE } from "@/lib/admin/config";
 import { createAdminSupabase } from "@/lib/supabase/admin";
-import { verifyPassword } from "@/lib/platform/password";
+import { hashPassword, verifyPassword } from "@/lib/platform/password";
 import {
   createPlatformSessionToken,
   parseLegacyPlatformSessionCookie,
@@ -94,12 +94,22 @@ export async function verifyPlatformSessionCookie(
   };
 }
 
+export type PlatformLoginResult =
+  | { status: "success"; auth: PlatformAuthContext }
+  | { status: "invalid" }
+  /** Account exists but has no password yet — the user must create one (entered twice). */
+  | { status: "needs_password_setup" }
+  | { status: "password_setup_failed"; message: string };
+
+const MIN_PLATFORM_PASSWORD_LENGTH = 8;
+
 export async function authenticatePlatformUser(
   email: string,
-  password: string
-): Promise<PlatformAuthContext | null> {
+  password: string,
+  confirmPassword?: string
+): Promise<PlatformLoginResult> {
   const supabase = createAdminSupabase();
-  if (!supabase) return null;
+  if (!supabase) return { status: "invalid" };
 
   const normalizedEmail = email.trim().toLowerCase();
   const { data, error } = await supabase
@@ -108,11 +118,59 @@ export async function authenticatePlatformUser(
     .eq("email", normalizedEmail)
     .maybeSingle();
 
-  if (error || !data) return null;
-  if (data.status !== "active" || !data.password_hash) return null;
+  if (error || !data) return { status: "invalid" };
+  if (data.status === "disabled") return { status: "invalid" };
+
+  // No password on file (invited but never activated): the first password the
+  // user chooses at sign-in becomes their password. It must be entered twice.
+  if (!data.password_hash) {
+    if (typeof confirmPassword !== "string") {
+      return { status: "needs_password_setup" };
+    }
+    if (password.length < MIN_PLATFORM_PASSWORD_LENGTH) {
+      return {
+        status: "password_setup_failed",
+        message: `Password must be at least ${MIN_PLATFORM_PASSWORD_LENGTH} characters.`,
+      };
+    }
+    if (password !== confirmPassword) {
+      return { status: "password_setup_failed", message: "Passwords do not match." };
+    }
+
+    const passwordHash = await hashPassword(password);
+    const now = new Date().toISOString();
+    const { error: updateError } = await supabase
+      .from("platform_users")
+      .update({
+        password_hash: passwordHash,
+        status: "active",
+        activated_at: data.status === "active" ? undefined : now,
+        last_login_at: now,
+      })
+      .eq("id", data.id)
+      .is("password_hash", null);
+
+    if (updateError) {
+      return { status: "password_setup_failed", message: "Could not save password. Try again." };
+    }
+
+    return {
+      status: "success",
+      auth: {
+        type: "user",
+        userId: data.id,
+        name: data.name,
+        email: data.email,
+        role: normalizeRole(data.role),
+        passwordHash,
+      },
+    };
+  }
+
+  if (data.status !== "active") return { status: "invalid" };
 
   const valid = await verifyPassword(password, data.password_hash);
-  if (!valid) return null;
+  if (!valid) return { status: "invalid" };
 
   await supabase
     .from("platform_users")
@@ -120,12 +178,15 @@ export async function authenticatePlatformUser(
     .eq("id", data.id);
 
   return {
-    type: "user",
-    userId: data.id,
-    name: data.name,
-    email: data.email,
-    role: normalizeRole(data.role),
-    passwordHash: data.password_hash,
+    status: "success",
+    auth: {
+      type: "user",
+      userId: data.id,
+      name: data.name,
+      email: data.email,
+      role: normalizeRole(data.role),
+      passwordHash: data.password_hash,
+    },
   };
 }
 

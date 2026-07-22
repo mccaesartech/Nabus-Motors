@@ -8,29 +8,11 @@ import type {
   VehicleSpec,
 } from "@/lib/types";
 import { photosFor } from "./vehicle-images";
+import { colorLabelForImageUrl, VEHICLE_COLOR_OPTIONS } from "@/lib/vehicles/vehicle-colors";
 
-export const CHINESE_MAKES = [
-  "BYD",
-  "Geely",
-  "Chery",
-  "MG",
-  "Haval",
-  "Changan",
-  "GWM",
-  "Jetour",
-  "DFSK",
-  "BAIC",
-  "Lynk & Co",
-  "XPeng",
-  "NIO",
-  "Hongqi",
-  "Zeekr",
-  "Li Auto",
-  "Aion",
-  "Wuling",
-  "Voyah",
-  "Denza",
-] as const;
+import { CHINESE_MAKES } from "@/lib/vehicles/chinese-makes";
+
+export { CHINESE_MAKES };
 
 const LOCATIONS = [
   "Accra, Ghana",
@@ -40,16 +22,7 @@ const LOCATIONS = [
   "Cape Coast, Ghana",
 ];
 
-const COLORS = [
-  "Pearl White",
-  "Midnight Black",
-  "Graphite Grey",
-  "Silver Frost",
-  "Deep Blue",
-  "Champagne Gold",
-  "Atomic Grey",
-  "Obsidian Black",
-];
+const COLORS = VEHICLE_COLOR_OPTIONS.map((opt) => opt.label);
 
 const CONDITIONS: Condition[] = ["New", "Used", "Certified Pre-Owned"];
 const TRANSMISSIONS: Transmission[] = ["Automatic", "DCT", "CVT", "Manual"];
@@ -144,7 +117,8 @@ function generateVehicle(
   const slug = `${year}-${slugify(brand.make)}-${slugify(modelTpl.model)}-${slugify(trim)}-${index}`;
   const featured = rand() < (brand.featuredRatio ?? 0.12);
   const location = pick(rand, LOCATIONS);
-  const color = pick(rand, COLORS);
+  const images = photosFor(slug, globalId, modelTpl.bodyType);
+  const color = colorLabelForImageUrl(images[0]) ?? pick(rand, COLORS);
   const transmission =
     fuelType === "Electric"
       ? "Automatic"
@@ -159,6 +133,10 @@ function generateVehicle(
       : statusRoll < 0.95
         ? "pre_order"
         : "reserved";
+
+  const isGhanaStock = location.toLowerCase().includes("ghana");
+  const isChinese = CHINESE_MAKES.includes(brand.make as (typeof CHINESE_MAKES)[number]);
+  const availableLocally = isGhanaStock && status === "available" && rand() < 0.35;
 
   return {
     id: String(globalId),
@@ -179,10 +157,15 @@ function generateVehicle(
     vin: `${slugify(brand.make).slice(0, 3).toUpperCase()}${year}${String(globalId).padStart(5, "0")}`,
     description: `${year} ${brand.make} ${modelTpl.model} ${trim} — verified, inspected, and ready for delivery across Ghana. Transparent pricing with full documentation from True Goshen Auto.`,
     featured,
-    images: photosFor(slug, globalId, modelTpl.bodyType),
+    images,
     specs: buildSpecs(modelTpl.bodyType, fuelType, rand),
     history: buildHistory(rand),
     status,
+    countryOfOrigin: isGhanaStock ? "ghana" : isChinese ? "china" : "other",
+    financingAvailable: rand() < 0.7,
+    shipmentAvailable: !availableLocally && status !== "pre_order" && rand() < 0.85,
+    customsClearingAvailable: !isGhanaStock && rand() < 0.8,
+    availableLocally,
     createdAt,
   };
 }

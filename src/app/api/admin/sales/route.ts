@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin/auth";
+import { requirePermission } from "@/lib/admin/auth";
 import type { PlatformAuthContext } from "@/lib/admin/auth";
 import { revalidatePublicSite } from "@/lib/admin/revalidate";
 import { fetchPreorderInquiryById } from "@/lib/platform/data";
 import { SALE_STATUSES, type SaleStatus } from "@/lib/platform/sales";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { applySoldStatusTransition } from "@/lib/vehicles/stock-automation";
+import { recordVehicleSold } from "@/lib/platform/inventory-movements/record";
 import { notDeletedFilter, softDeleteEntity } from "@/lib/platform/trash";
 
 const SALE_SELECT = `
@@ -93,6 +94,34 @@ async function completeSale(
       .eq("id", preorderInquiryId);
   }
 
+  if (vehicleId) {
+    const { data: saleRow } = await supabase
+      .from("sales")
+      .select("sale_price")
+      .eq("id", saleId)
+      .maybeSingle();
+
+    const { data: vehicleRow } = await supabase
+      .from("vehicles")
+      .select("id, year, make, model, price")
+      .eq("id", vehicleId)
+      .maybeSingle();
+
+    if (vehicleRow) {
+      await recordVehicleSold(
+        supabase,
+        vehicleRow,
+        {
+          salePrice: saleRow?.sale_price ?? vehicleRow.price,
+          saleId,
+          occurredAt: now,
+          auth,
+          movementType: "sale_completed",
+        }
+      );
+    }
+  }
+
   revalidatePublicSite();
 }
 
@@ -173,7 +202,7 @@ async function revertSaleConversion(
 }
 
 export async function GET() {
-  const auth = await requireAdmin();
+  const auth = await requirePermission("sales");
   if (!auth.ok) {
     return NextResponse.json({ ok: false }, { status: auth.status });
   }
@@ -232,7 +261,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requireAdmin();
+  const auth = await requirePermission("sales");
   if (!auth.ok) {
     return NextResponse.json({ ok: false }, { status: auth.status });
   }
@@ -351,7 +380,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const auth = await requireAdmin();
+  const auth = await requirePermission("sales");
   if (!auth.ok) {
     return NextResponse.json({ ok: false }, { status: auth.status });
   }
@@ -428,7 +457,7 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const auth = await requireAdmin();
+  const auth = await requirePermission("sales");
   if (!auth.ok) {
     return NextResponse.json({ ok: false }, { status: auth.status });
   }

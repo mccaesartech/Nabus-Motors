@@ -1,6 +1,6 @@
 /** Lightweight vehicle preference tracking for explainable recommendations. */
 
-import { CHINESE_MAKES } from "@/lib/data/generate-inventory";
+import { CHINESE_MAKES } from "@/lib/vehicles/chinese-makes";
 import type { Vehicle, VehicleFilters } from "@/lib/types";
 
 export const VEHICLE_PREFERENCES_KEY = "true-goshen-vehicle-preferences";

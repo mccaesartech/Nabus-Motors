@@ -2,7 +2,9 @@ import {
   Award,
   BadgeCheck,
   Calculator,
+  CalendarCheck,
   Car,
+  Clock,
   Compass,
   FileText,
   Globe,
@@ -37,6 +39,8 @@ export const SITE_CONTENT_ICONS = {
   Globe,
   Compass,
   MessageCircle,
+  Clock,
+  CalendarCheck,
 } as const;
 
 export type SiteContentIconName = keyof typeof SITE_CONTENT_ICONS;

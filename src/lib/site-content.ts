@@ -62,6 +62,8 @@ export type {
   DivisionLandingCard,
   DivisionLandingSiteContent,
   PageHeroSiteContentSimple,
+  StartYourJourneyAdvisorContent,
+  StartYourJourneySiteContent,
 } from "@/lib/site-content/corporate-defaults";
 
 export {

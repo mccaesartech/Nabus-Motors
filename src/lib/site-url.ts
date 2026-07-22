@@ -1,6 +1,7 @@
-const FALLBACK_SITE_URL = "https://truegoshen.com";
+export const PRODUCTION_PUBLIC_SITE_URL = "https://truegoshen.vercel.app";
 const PRODUCTION_AUTO_SITE_URL = "https://truegoshen.vercel.app";
 const DEV_LOCALHOST_URL = "http://localhost:3000";
+const LEGACY_AUTO_DEPLOYMENT_HOSTS = new Set(["truegoshenauto.vercel.app"]);
 
 function isLocalhostHostname(hostname: string): boolean {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
@@ -18,11 +19,15 @@ function isDevelopment(): boolean {
   return process.env.NODE_ENV === "development" && !process.env.VERCEL;
 }
 
-function normalizeOrigin(raw: string | undefined, fallback: string): string {
+function normalizeOrigin(
+  raw: string | undefined,
+  fallback: string,
+  allowLocalhost = isDevelopment()
+): string {
   const trimmed = raw?.trim();
   if (!trimmed) return fallback;
 
-  if (isDevelopment() && isLocalhostUrl(trimmed)) {
+  if (allowLocalhost && isLocalhostUrl(trimmed)) {
     try {
       return new URL(trimmed).origin;
     } catch {
@@ -34,7 +39,7 @@ function normalizeOrigin(raw: string | undefined, fallback: string): string {
 
   try {
     const origin = new URL(trimmed).origin;
-    if (!isDevelopment() && isLocalhostUrl(origin)) return fallback;
+    if (!allowLocalhost && isLocalhostUrl(origin)) return fallback;
     return origin;
   } catch {
     return fallback;
@@ -42,8 +47,22 @@ function normalizeOrigin(raw: string | undefined, fallback: string): string {
 }
 
 /** Canonical public site URL (corporate HQ) for metadata, invites, and emails. */
+export function resolvePublicSiteUrl(
+  configuredUrl: string | undefined,
+  development = false
+): string {
+  const fallback = development ? DEV_LOCALHOST_URL : PRODUCTION_PUBLIC_SITE_URL;
+  const origin = normalizeOrigin(configuredUrl, fallback, development);
+
+  if (!development && LEGACY_AUTO_DEPLOYMENT_HOSTS.has(new URL(origin).hostname)) {
+    return PRODUCTION_PUBLIC_SITE_URL;
+  }
+
+  return origin;
+}
+
 export function getPublicSiteUrl(): string {
-  return normalizeOrigin(process.env.NEXT_PUBLIC_SITE_URL, FALLBACK_SITE_URL);
+  return resolvePublicSiteUrl(process.env.NEXT_PUBLIC_SITE_URL, isDevelopment());
 }
 
 /**

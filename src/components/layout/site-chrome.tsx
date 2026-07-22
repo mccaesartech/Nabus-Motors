@@ -10,7 +10,9 @@ import { CustomerBackBar } from "@/components/layout/customer-back-bar";
 import { FreightSubNav } from "@/components/layout/freight-sub-nav";
 import { Footer } from "@/components/layout/footer";
 import { MaintenanceBanner } from "@/components/layout/maintenance-banner";
-import { ADMIN_PATH } from "@/lib/admin/paths";
+import { InstallCustomerAppBanner } from "@/components/pwa/install-customer-app-banner";
+import { PwaInstallToastHost } from "@/components/pwa/pwa-install-toast-host";
+import { isAdminAppPath } from "@/lib/pwa/routes";
 import type { OperationalSettings, SiteSettings } from "@/lib/platform/site-settings";
 import { toOperationalSettings } from "@/lib/platform/site-settings";
 import { DEFAULT_SITE_SETTINGS } from "@/lib/platform/modules";
@@ -46,8 +48,7 @@ export function SiteChrome({
   operational = toOperationalSettings(DEFAULT_SITE_SETTINGS as SiteSettings),
 }: SiteChromeProps) {
   const pathname = usePathname() ?? "";
-  const isAdmin =
-    pathname.startsWith(`/${ADMIN_PATH}`) || pathname.startsWith("/platform");
+  const isAdmin = isAdminAppPath(pathname);
 
   const displayContent = useMemo(() => {
     if (operational.featureShowSparePartsNav) return content;
@@ -84,8 +85,13 @@ export function SiteChrome({
           showFreightNav={operational.featureShowFreightNav}
         />
       )}
-      <main className="min-w-0 flex-1 overflow-x-hidden pt-[var(--header-height)]">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="min-w-0 flex-1 overflow-x-hidden pt-[var(--header-height)] outline-none"
+      >
         {useFreightSubNav ? <FreightSubNav /> : <DivisionContextBar />}
+        <InstallCustomerAppBanner />
         <CustomerBackBar />
         {children}
       </main>
@@ -95,6 +101,7 @@ export function SiteChrome({
         brand={useAutoHeader ? "auto" : "corporate"}
       />
       <WhatsAppFloat whatsappNumber={operational.whatsapp_number || content.global.whatsappNumber} />
+      <PwaInstallToastHost />
       {useAutoHeader ? <CompareFloatingBar /> : null}
     </>
   );

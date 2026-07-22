@@ -7,6 +7,16 @@ import {
   vehicleTitleFromRow,
 } from "@/lib/platform/preorder";
 import { formatPlatformPrice } from "@/lib/currency";
+import {
+  enhanceAdminNotification,
+  mapNotificationLogToAdminNotification,
+} from "@/lib/platform/notification-display";
+import {
+  adminNotificationRecipientScope,
+  applyDismissalsToNotifications,
+  listDismissedAdminNotificationKeys,
+  LOW_STOCK_NOTIFICATION_ID,
+} from "@/lib/platform/notification-read-state";
 
 export type AdminNotification = {
   id: string;
@@ -58,7 +68,7 @@ function recipientFilterOr(auth: PlatformAuthContext): string {
 }
 
 function mapRow(row: NotificationRow): AdminNotification {
-  return {
+  return enhanceAdminNotification({
     id: row.id,
     type: row.type,
     title: row.title,
@@ -69,7 +79,7 @@ function mapRow(row: NotificationRow): AdminNotification {
     readAt: row.read_at,
     createdAt: row.created_at,
     metadata: row.metadata ?? undefined,
-  };
+  });
 }
 
 const OPEN_STATUSES = ["new", "pending"];
@@ -276,28 +286,20 @@ export async function fetchAdminNotifications(
     .limit(5);
 
   for (const row of failedDeliveries ?? []) {
-    const exists = notifications.some((n) => n.id === `notification-log-${row.id}`);
+    const mapped = mapNotificationLogToAdminNotification(row);
+    const exists = notifications.some((n) => n.id === mapped.id);
     if (exists) continue;
-    notifications.unshift({
-      id: `notification-log-${row.id}`,
-      type: "delivery_failed",
-      title: `Delivery ${row.status}: ${row.template}`,
-      message: row.detail
-        ? `${row.channel} → ${row.recipient}: ${row.detail}`
-        : `${row.channel} → ${row.recipient}`,
-      link:
-        row.source_table === "profiles" && row.source_id
-          ? `/platform/customers/${row.source_id}`
-          : null,
-      sourceTable: row.source_table,
-      sourceId: row.source_id,
-      readAt: null,
-      createdAt: row.created_at,
-      metadata: { channel: row.channel, status: row.status },
-    });
+    notifications.unshift(mapped);
   }
 
-  return { notifications: notifications.slice(0, limit), fromTable: true };
+  let finalNotifications = notifications.slice(0, limit);
+  if (auth) {
+    const scope = adminNotificationRecipientScope(auth);
+    const dismissedKeys = await listDismissedAdminNotificationKeys(supabase, scope);
+    finalNotifications = applyDismissalsToNotifications(finalNotifications, dismissedKeys);
+  }
+
+  return { notifications: finalNotifications, fromTable: true };
 }
 
 export async function countUnreadNotifications(
@@ -323,7 +325,15 @@ export async function countUnreadNotifications(
   }
 
   let unread = count ?? 0;
-  if (notifyLowStockEnabled && availableVehicles < lowStockThreshold) unread += 1;
+  if (notifyLowStockEnabled && availableVehicles < lowStockThreshold) {
+    if (auth) {
+      const scope = adminNotificationRecipientScope(auth);
+      const dismissedKeys = await listDismissedAdminNotificationKeys(supabase, scope);
+      if (!dismissedKeys.has(LOW_STOCK_NOTIFICATION_ID)) unread += 1;
+    } else {
+      unread += 1;
+    }
+  }
   return unread;
 }
 

@@ -24,10 +24,12 @@ import {
   DEFAULT_INVENTORY_PAGE,
   DEFAULT_SHIPPING_CONSULTATION,
   DEFAULT_SPARE_PARTS_LANDING,
+  DEFAULT_START_YOUR_JOURNEY,
   mergeCorporateFaqItems,
   mergeCorporateServiceCards,
   mergeCorporateStatItems,
   mergeDivisionLandingCards,
+  mergeStartYourJourneyAdvisor,
   type CorporateFaqSiteContent,
   type CorporateHomepageSiteContent,
   type CorporateServicesSiteContent,
@@ -38,6 +40,7 @@ import {
   type InventoryPageSiteContent,
   type PageHeroSiteContentSimple,
   type SparePartsLandingSiteContent,
+  type StartYourJourneySiteContent,
 } from "@/lib/site-content/corporate-defaults";
 
 export type {
@@ -55,6 +58,8 @@ export type {
   PageHeroSiteContentSimple,
   SparePartsLandingSiteContent,
   CorporateDivisionsSiteContent,
+  StartYourJourneyAdvisorContent,
+  StartYourJourneySiteContent,
 } from "@/lib/site-content/corporate-defaults";
 
 export type SiteContentCard = {
@@ -214,6 +219,7 @@ export type SiteContent = {
   testimonials: TestimonialsSiteContent;
   corporateTestimonials: TestimonialsSiteContent;
   corporateHomepage: CorporateHomepageSiteContent;
+  startYourJourney: StartYourJourneySiteContent;
   corporateServices: CorporateServicesSiteContent;
   corporateStats: CorporateStatsSiteContent;
   corporateFaq: CorporateFaqSiteContent;
@@ -241,6 +247,7 @@ export const SITE_CONTENT_SECTIONS = [
   "testimonials",
   "corporateTestimonials",
   "corporateHomepage",
+  "startYourJourney",
   "corporateServices",
   "corporateStats",
   "corporateFaq",
@@ -270,6 +277,7 @@ export const SECTION_DB_KEYS: Record<SiteContentSection, string> = {
   testimonials: "testimonials",
   corporateTestimonials: "corporate_testimonials",
   corporateHomepage: "corporate_homepage",
+  startYourJourney: "start_your_journey",
   corporateServices: "corporate_services",
   corporateStats: "corporate_stats",
   corporateFaq: "corporate_faq",
@@ -462,6 +470,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     ],
   },
   corporateHomepage: DEFAULT_CORPORATE_HOMEPAGE,
+  startYourJourney: DEFAULT_START_YOUR_JOURNEY,
   corporateServices: DEFAULT_CORPORATE_SERVICES,
   corporateStats: DEFAULT_CORPORATE_STATS,
   corporateFaq: DEFAULT_CORPORATE_FAQ,
@@ -785,10 +794,17 @@ function deepMergeSection<T extends Record<string, unknown>>(defaults: T, patch:
         result[key as keyof T] = value as T[keyof T];
       }
     } else if (isPlainObject(current) && isPlainObject(value)) {
-      result[key as keyof T] = deepMergeSection(
-        current as Record<string, unknown>,
-        value
-      ) as T[keyof T];
+      if (key === "advisor") {
+        result[key as keyof T] = mergeStartYourJourneyAdvisor(
+          current as import("@/lib/site-content/corporate-defaults").StartYourJourneyAdvisorContent,
+          value
+        ) as T[keyof T];
+      } else {
+        result[key as keyof T] = deepMergeSection(
+          current as Record<string, unknown>,
+          value
+        ) as T[keyof T];
+      }
     } else {
       result[key as keyof T] = value as T[keyof T];
     }

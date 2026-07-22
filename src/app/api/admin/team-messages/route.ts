@@ -17,6 +17,7 @@ import {
   buildConversationAuditContext,
   buildConversationSummaries,
   buildRecipients,
+  countUnreadTeamMessages,
   createDirectConversation,
   ensureActorInAllStaff,
   findExistingConversation,
@@ -81,6 +82,13 @@ export async function GET(req: NextRequest) {
   }
 
   const conversationId = req.nextUrl.searchParams.get("conversationId");
+
+  // Lightweight badge poll — skips channel provisioning, member sync writes,
+  // full message history, and recipient loads that the full inbox needs.
+  if (req.nextUrl.searchParams.get("summary") === "1") {
+    const unreadTotal = await countUnreadTeamMessages(supabase, auth);
+    return NextResponse.json({ ok: true, configured: true, unreadTotal });
+  }
 
   const channelsReady = await checkTeamChannelsReady(supabase);
 

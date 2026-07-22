@@ -2,6 +2,7 @@ import type { VehicleInput } from "@/lib/admin/vehicle-fields";
 import type { BodyType, VehicleGalleryData } from "@/lib/types";
 import pool from "@/lib/data/car-photo-pool.json";
 import { hashSlug } from "@/lib/data/vehicle-images";
+import { photoIdsMatchingColor } from "@/lib/vehicles/vehicle-colors";
 
 type PhotoPoolKey = keyof typeof pool;
 
@@ -46,6 +47,7 @@ function pexelsUrl(id: number, seed: string, offset: number): string {
 }
 
 function pickUrls(ids: number[], slug: string, count: number, startOffset = 0): string[] {
+  if (ids.length === 0) return [];
   const h = hashSlug(slug);
   const urls: string[] = [];
   for (let i = 0; i < count; i++) {
@@ -59,13 +61,15 @@ function pickUrls(ids: number[], slug: string, count: number, startOffset = 0): 
 export function suggestStockPhotos(vehicle: Partial<VehicleInput>): VehicleGalleryData {
   const slug = vehicleSlug(vehicle);
   const exteriorIds = exteriorPool(vehicle.body_type);
+  const colorMatched = photoIdsMatchingColor(exteriorIds, vehicle.color);
+  const preferredExterior = colorMatched.length > 0 ? colorMatched : exteriorIds;
   const interiorIds = poolIds("interior");
   const engineIds = poolIds("engine");
 
   return {
-    exterior: pickUrls(exteriorIds, slug, 3, 0),
+    exterior: pickUrls(preferredExterior, slug, 3, 0),
     interior: pickUrls(interiorIds, `${slug}-interior`, 3, 0),
     engine: pickUrls(engineIds, `${slug}-engine`, 2, 0),
-    other: pickUrls(exteriorIds, `${slug}-other`, 1, 4),
+    other: pickUrls(preferredExterior, `${slug}-other`, 1, 4),
   };
 }

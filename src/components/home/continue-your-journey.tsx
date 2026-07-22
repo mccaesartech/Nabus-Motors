@@ -185,8 +185,8 @@ export function ContinueYourJourney() {
     if (cartCount > 0) {
       next.push({
         id: "spare-parts-order",
-        label: "Continue Spare Parts Order",
-        href: ROUTES.auto.cart,
+        label: "Shop spare parts",
+        href: ROUTES.auto.spareParts,
         icon: Package,
       });
     }

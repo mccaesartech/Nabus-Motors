@@ -27,17 +27,52 @@ export function normalizeMediaUrl(url: string): string {
   return trimmed;
 }
 
-const DEFAULT_TESTIMONIAL_AVATARS = [
-  "https://ui-avatars.com/api/?name=Kwame+Asante&background=111827&color=f9fafb&size=128",
-  "https://ui-avatars.com/api/?name=Ama+Osei&background=111827&color=f9fafb&size=128",
-  "https://ui-avatars.com/api/?name=David+Martinez&background=111827&color=f9fafb&size=128",
-  "https://ui-avatars.com/api/?name=Jennifer+Mensah&background=111827&color=f9fafb&size=128",
-];
+/**
+ * Derive avatar initials from a display name.
+ * - Multi-part: first letter of first + last word ("Ama Mensah" → "AM")
+ * - Single word: up to two letters ("Grace" → "GR")
+ * - Empty / whitespace: "?"
+ */
+export function getNameInitials(name: string): string {
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.replace(/[^\p{L}\p{N}]/gu, ""))
+    .filter(Boolean);
 
-export function resolveTestimonialImage(image: string, index: number): string {
+  if (parts.length === 0) return "?";
+
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+
+  const first = parts[0][0] ?? "";
+  const last = parts[parts.length - 1][0] ?? "";
+  return `${first}${last}`.toUpperCase();
+}
+
+/** Build a ui-avatars placeholder whose letters match the displayed name. */
+export function buildTestimonialAvatarUrl(name: string, index = 0): string {
+  const trimmed = name.trim();
+  const label = trimmed || `Client ${index + 1}`;
+  const params = new URLSearchParams({
+    name: label,
+    background: "111827",
+    color: "f9fafb",
+    size: "128",
+  });
+  return `https://ui-avatars.com/api/?${params.toString()}`;
+}
+
+export function resolveTestimonialImage(
+  image: string,
+  index: number,
+  name = ""
+): string {
   const normalized = normalizeMediaUrl(image);
   if (isValidImageUrl(normalized)) return normalized;
-  return DEFAULT_TESTIMONIAL_AVATARS[index % DEFAULT_TESTIMONIAL_AVATARS.length];
+  return buildTestimonialAvatarUrl(name, index);
 }
 
 /** Custom uploaded category image always wins over stock pool photos. */

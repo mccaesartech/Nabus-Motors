@@ -18,6 +18,7 @@ export function CustomerBackBar() {
     >
       <Container className="py-2.5">
         <BackNav
+          href={config.fallbackHref}
           label={config.label}
           fallbackHref={config.fallbackHref}
           variant="public"

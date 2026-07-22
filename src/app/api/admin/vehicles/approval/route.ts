@@ -11,6 +11,8 @@ import {
 } from "@/lib/admin/vehicle-pending-changes";
 import { logPlatformActivity } from "@/lib/platform/activity";
 import { clearVehiclePendingNotifications } from "@/lib/platform/vehicle-approval-notifications";
+import type { DbVehicle } from "@/lib/platform/types";
+import { vehicleWriteWithOptionalFallback } from "@/lib/admin/vehicle-columns";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { resolveRequestedSoldStatus } from "@/lib/vehicles/stock-automation";
 
@@ -148,14 +150,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "Invalid approval status." }, { status: 400 });
   }
 
+  if (updatePayload.available_locally === true) {
+    updatePayload.shipment_available = false;
+  } else if (updatePayload.shipment_available === true) {
+    updatePayload.available_locally = false;
+  }
+
   const previousSlug = existing.slug;
 
-  const { data, error } = await supabase
-    .from("vehicles")
-    .update(updatePayload)
-    .eq("id", id)
-    .select()
-    .maybeSingle();
+  const { result, warning } = await vehicleWriteWithOptionalFallback(
+    async (selectColumns, payload) =>
+      supabase.from("vehicles").update(payload).eq("id", id).select(selectColumns).maybeSingle(),
+    updatePayload
+  );
+  const { data, error } = result;
 
   if (error) {
     return NextResponse.json(
@@ -168,11 +176,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "Vehicle could not be updated." }, { status: 500 });
   }
 
+  const vehicle = data as DbVehicle;
+
   await clearVehiclePendingNotifications(supabase, id);
 
   if (action === "approve" || (action === "dismiss" && isEditPending)) {
-    revalidatePublicSite(data.slug);
-    if (data.slug !== previousSlug) {
+    revalidatePublicSite(vehicle.slug);
+    if (vehicle.slug !== previousSlug) {
       revalidatePublicSite(previousSlug);
     }
   }
@@ -188,13 +198,13 @@ export async function POST(req: NextRequest) {
       : action === "dismiss"
         ? "vehicle_approved"
         : "vehicle_rejected";
-  await logPlatformActivity(auth.auth, activityType, data.slug, {
-    id: data.id,
+  await logPlatformActivity(auth.auth, activityType, vehicle.slug, {
+    id: vehicle.id,
     note,
     vehicle_title: title,
     edit_rejection: action === "reject" && isEditPending,
     edit_dismissed: action === "dismiss",
   });
 
-  return NextResponse.json({ ok: true, vehicle: data });
+  return NextResponse.json({ ok: true, vehicle, warning });
 }

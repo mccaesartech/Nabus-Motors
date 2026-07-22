@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  PUBLIC_UNEXPECTED_ERROR_MESSAGE,
+  publicErrorReference,
+} from "@/lib/errors/public-error";
+
 export default function GlobalError({
   error,
   reset,
@@ -7,6 +12,8 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const errorReference = publicErrorReference(error);
+
   return (
     <html lang="en">
       <body
@@ -27,9 +34,9 @@ export default function GlobalError({
             Something went wrong
           </h1>
           <p style={{ color: "#C4B5FD", fontSize: "0.875rem", margin: "0 0 1rem" }}>
-            The page failed to load. Try reloading to fetch the latest version.
+            {PUBLIC_UNEXPECTED_ERROR_MESSAGE}
           </p>
-          {error?.message ? (
+          {errorReference ? (
             <p
               style={{
                 color: "#7C6B9E",
@@ -38,7 +45,7 @@ export default function GlobalError({
                 wordBreak: "break-word",
               }}
             >
-              {error.message}
+              {errorReference}
             </p>
           ) : null}
           <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center" }}>

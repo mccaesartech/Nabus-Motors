@@ -78,7 +78,7 @@ export function FreightFormAccountFields({
             <p className="text-xs text-muted-foreground sm:col-span-2">
               Already have an account? Enter your existing password above to sign in when you
               submit.{" "}
-              <Link href="/login" className="font-medium text-brand-purple hover:underline">
+              <Link href="/login" className="font-medium text-brand-freight-accent hover:underline">
                 Sign in separately
               </Link>
             </p>
@@ -137,7 +137,7 @@ export function FreightSubmitSuccess({
       <div className="flex flex-wrap gap-3 text-sm">
         <Link
           href="/freight-forwarding/tracking"
-          className="inline-flex items-center rounded-md bg-brand-purple px-4 py-2 font-medium text-white hover:bg-brand-purple-dark"
+          className="inline-flex items-center rounded-md bg-brand-freight-accent px-4 py-2 font-medium text-white hover:bg-brand-freight-accent-dark"
         >
           Track your quote
         </Link>
@@ -177,11 +177,11 @@ export function LoggedInContactBanner({
   return (
     <div
       className={cn(
-        "rounded-lg border border-brand-purple/20 bg-brand-purple/5 px-4 py-3 text-sm sm:col-span-2",
+        "rounded-lg border border-brand-freight-accent/20 bg-brand-freight-accent/5 px-4 py-3 text-sm sm:col-span-2",
         className
       )}
     >
-      <p className="text-xs font-medium uppercase tracking-wide text-brand-purple">
+      <p className="text-xs font-medium uppercase tracking-wide text-brand-freight-accent">
         Contacting as
       </p>
       <p className="mt-1 font-medium text-foreground">

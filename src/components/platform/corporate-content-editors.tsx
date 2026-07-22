@@ -268,6 +268,262 @@ export function CorporateContentEditors({
     );
   }
 
+  if (activeTab === "startYourJourney") {
+    const journey = content.startYourJourney;
+    const savedJourney = savedContent.startYourJourney;
+    return (
+      <div className="space-y-8">
+        <div className="rounded-lg border border-[var(--platform-border)] bg-[var(--platform-surface-muted,transparent)] p-4">
+          <h3 className="text-sm font-semibold text-[var(--platform-text)]">
+            How can we help you today?
+          </h3>
+          <p className="mt-1 text-xs text-[var(--platform-text-secondary)]">
+            Homepage service tiles shown under the hero on{" "}
+            <span className="font-medium text-[var(--platform-text)]">/</span>. Edit section copy,
+            card images, links, and the advisor tile.
+          </p>
+        </div>
+
+        <div>
+          <h3 className="mb-4 text-sm font-semibold text-[var(--platform-text)]">
+            Section heading
+          </h3>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Title" className="sm:col-span-2">
+              <TextInput
+                value={journey.title}
+                onChange={(v) =>
+                  updateSection("startYourJourney", (p) => ({ ...p, title: v }))
+                }
+              />
+            </Field>
+            <Field label="Description" className="sm:col-span-2">
+              <TextArea
+                value={journey.description}
+                onChange={(v) =>
+                  updateSection("startYourJourney", (p) => ({ ...p, description: v }))
+                }
+              />
+            </Field>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <h3 className="text-sm font-semibold text-[var(--platform-text)]">Service tiles</h3>
+          {journey.cards.map((card, i) => (
+            <div
+              key={card.id}
+              className="space-y-3 rounded-lg border border-[var(--platform-border)] p-4"
+            >
+              <p className="text-sm font-medium text-[var(--platform-text)]">
+                Tile {i + 1}
+                <span className="ml-2 font-normal text-[var(--platform-text-secondary)]">
+                  ({card.id})
+                </span>
+              </p>
+              <Field label="Icon">
+                <select
+                  className="platform-input w-full"
+                  value={card.icon}
+                  onChange={(e) =>
+                    updateSection("startYourJourney", (p) => {
+                      const cards = [...p.cards];
+                      cards[i] = {
+                        ...cards[i],
+                        icon: e.target.value as (typeof cards)[number]["icon"],
+                      };
+                      return { ...p, cards };
+                    })
+                  }
+                >
+                  {SITE_CONTENT_ICON_NAMES.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Title">
+                <TextInput
+                  value={card.title}
+                  onChange={(v) =>
+                    updateSection("startYourJourney", (p) => {
+                      const cards = [...p.cards];
+                      cards[i] = { ...cards[i], title: v };
+                      return { ...p, cards };
+                    })
+                  }
+                />
+              </Field>
+              <Field label="Description">
+                <TextArea
+                  value={card.description}
+                  onChange={(v) =>
+                    updateSection("startYourJourney", (p) => {
+                      const cards = [...p.cards];
+                      cards[i] = { ...cards[i], description: v };
+                      return { ...p, cards };
+                    })
+                  }
+                />
+              </Field>
+              <Field label="Button label (CTA)">
+                <TextInput
+                  value={card.cta}
+                  onChange={(v) =>
+                    updateSection("startYourJourney", (p) => {
+                      const cards = [...p.cards];
+                      cards[i] = { ...cards[i], cta: v };
+                      return { ...p, cards };
+                    })
+                  }
+                />
+              </Field>
+              <Field label="Button link">
+                <TextInput
+                  value={card.href}
+                  onChange={(v) =>
+                    updateSection("startYourJourney", (p) => {
+                      const cards = [...p.cards];
+                      cards[i] = { ...cards[i], href: v };
+                      return { ...p, cards };
+                    })
+                  }
+                />
+              </Field>
+              <Field label="Image alt text">
+                <TextInput
+                  value={card.imageAlt}
+                  onChange={(v) =>
+                    updateSection("startYourJourney", (p) => {
+                      const cards = [...p.cards];
+                      cards[i] = { ...cards[i], imageAlt: v };
+                      return { ...p, cards };
+                    })
+                  }
+                />
+              </Field>
+              <SiteImageUpload
+                label="Tile image"
+                hint="Upload or paste a URL — shown on the homepage tile"
+                value={card.image}
+                savedValue={savedJourney.cards[i]?.image}
+                previewSize="category"
+                previewLabel={card.title || `Tile ${i + 1}`}
+                onChange={(v) =>
+                  updateSection("startYourJourney", (p) => {
+                    const cards = [...p.cards];
+                    cards[i] = { ...cards[i], image: v };
+                    return { ...p, cards };
+                  })
+                }
+              />
+            </div>
+          ))}
+        </div>
+
+        <div>
+          <h3 className="mb-4 text-sm font-semibold text-[var(--platform-text)]">
+            Advisor tile
+          </h3>
+          <div className="space-y-3 rounded-lg border border-[var(--platform-border)] p-4">
+            <Field label="Title">
+              <TextInput
+                value={journey.advisor.title}
+                onChange={(v) =>
+                  updateSection("startYourJourney", (p) => ({
+                    ...p,
+                    advisor: { ...p.advisor, title: v },
+                  }))
+                }
+              />
+            </Field>
+            <Field label="Description">
+              <TextArea
+                value={journey.advisor.description}
+                onChange={(v) =>
+                  updateSection("startYourJourney", (p) => ({
+                    ...p,
+                    advisor: { ...p.advisor, description: v },
+                  }))
+                }
+              />
+            </Field>
+            <Field label="Primary button label (WhatsApp)">
+              <TextInput
+                value={journey.advisor.primaryLabel}
+                onChange={(v) =>
+                  updateSection("startYourJourney", (p) => ({
+                    ...p,
+                    advisor: { ...p.advisor, primaryLabel: v },
+                  }))
+                }
+              />
+            </Field>
+            <Field label="WhatsApp prefilled message">
+              <TextArea
+                value={journey.advisor.whatsappMessage}
+                onChange={(v) =>
+                  updateSection("startYourJourney", (p) => ({
+                    ...p,
+                    advisor: { ...p.advisor, whatsappMessage: v },
+                  }))
+                }
+              />
+            </Field>
+            <Field label="Secondary button label">
+              <TextInput
+                value={journey.advisor.secondaryLabel}
+                onChange={(v) =>
+                  updateSection("startYourJourney", (p) => ({
+                    ...p,
+                    advisor: { ...p.advisor, secondaryLabel: v },
+                  }))
+                }
+              />
+            </Field>
+            <Field label="Secondary button link">
+              <TextInput
+                value={journey.advisor.secondaryHref}
+                onChange={(v) =>
+                  updateSection("startYourJourney", (p) => ({
+                    ...p,
+                    advisor: { ...p.advisor, secondaryHref: v },
+                  }))
+                }
+              />
+            </Field>
+            <Field label="Image alt text">
+              <TextInput
+                value={journey.advisor.imageAlt}
+                onChange={(v) =>
+                  updateSection("startYourJourney", (p) => ({
+                    ...p,
+                    advisor: { ...p.advisor, imageAlt: v },
+                  }))
+                }
+              />
+            </Field>
+            <SiteImageUpload
+              label="Advisor tile image"
+              hint="Upload or paste a URL"
+              value={journey.advisor.image}
+              savedValue={savedJourney.advisor.image}
+              previewSize="category"
+              previewLabel={journey.advisor.title || "Advisor"}
+              onChange={(v) =>
+                updateSection("startYourJourney", (p) => ({
+                  ...p,
+                  advisor: { ...p.advisor, image: v },
+                }))
+              }
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (activeTab === "corporateServices") {
     return (
       <div className="space-y-6">

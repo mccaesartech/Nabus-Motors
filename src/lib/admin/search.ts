@@ -1,9 +1,14 @@
+import { quotePostgrestFilterValue } from "@/lib/security/postgrest-filter";
+import { matchesSmartQuery } from "@/lib/admin/search-ranking";
+import type { PlatformPermission } from "@/lib/platform/permissions";
+
 export type AdminSearchResultType =
   | "vehicle"
   | "lead"
   | "customer"
   | "sale"
-  | "message";
+  | "message"
+  | "part";
 
 export type AdminSearchResult = {
   id: string;
@@ -26,6 +31,7 @@ export const SEARCH_LIMITS = {
   customer: 3,
   sale: 3,
   message: 3,
+  part: 3,
 } as const;
 
 export const SEARCH_FULL_LIMITS = {
@@ -34,15 +40,25 @@ export const SEARCH_FULL_LIMITS = {
   customer: 15,
   sale: 15,
   message: 15,
+  part: 10,
 } as const;
 
 export const RECENT_SEARCHES_KEY = "tga-admin-recent-searches";
 export const MAX_RECENT_SEARCHES = 8;
+export const MAX_ADMIN_SEARCH_LENGTH = 100;
+
+/** Permission required to see each result type in global search. */
+export const SEARCH_TYPE_PERMISSION: Record<AdminSearchResultType, PlatformPermission> = {
+  vehicle: "inventory",
+  lead: "leads",
+  customer: "customers",
+  sale: "sales",
+  message: "messages",
+  part: "parts",
+};
 
 export function matchesSearchQuery(haystack: string, query: string): boolean {
-  const q = query.trim().toLowerCase();
-  if (!q) return false;
-  return haystack.toLowerCase().includes(q);
+  return matchesSmartQuery(haystack, query);
 }
 
 /** Escape special characters for PostgREST ilike patterns. */
@@ -55,12 +71,14 @@ export function ilikePattern(query: string): string {
 }
 
 export function buildOrIlike(columns: string[], pattern: string): string {
-  return columns.map((col) => `${col}.ilike.${pattern}`).join(",");
+  const quotedPattern = quotePostgrestFilterValue(pattern);
+  return columns.map((col) => `${col}.ilike.${quotedPattern}`).join(",");
 }
 
 export function groupSearchResults(results: AdminSearchResult[]): AdminSearchGroup[] {
   const order: AdminSearchResultType[] = [
     "vehicle",
+    "part",
     "lead",
     "customer",
     "sale",
@@ -68,6 +86,7 @@ export function groupSearchResults(results: AdminSearchResult[]): AdminSearchGro
   ];
   const labels: Record<AdminSearchResultType, string> = {
     vehicle: "Vehicles",
+    part: "Parts",
     lead: "Leads",
     customer: "Customers",
     sale: "Sales",

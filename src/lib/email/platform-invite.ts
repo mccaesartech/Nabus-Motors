@@ -1,5 +1,6 @@
 import "server-only";
 import { ROLE_LABELS, type PlatformRole } from "@/lib/platform/permissions";
+import { PLATFORM_INVITE_EXPIRY_LABEL } from "@/lib/platform/invite-ttl";
 
 const INVITE_SUBJECT = "You're invited to True Goshen Admin";
 
@@ -8,7 +9,6 @@ type InviteEmailParams = {
   name: string;
   role: PlatformRole | string;
   inviteUrl: string;
-  expiresInDays: number;
 };
 
 type SendResult =
@@ -66,7 +66,7 @@ function roleLabel(role: PlatformRole | string): string {
   return ROLE_LABELS[role as PlatformRole] ?? role;
 }
 
-function buildInviteHtml({ name, role, inviteUrl, expiresInDays }: InviteEmailParams): string {
+function buildInviteHtml({ name, role, inviteUrl }: InviteEmailParams): string {
   const label = roleLabel(role);
   return `<!DOCTYPE html>
 <html lang="en">
@@ -101,7 +101,7 @@ function buildInviteHtml({ name, role, inviteUrl, expiresInDays }: InviteEmailPa
                 <a href="${escapeHtml(inviteUrl)}" style="color:#2563eb;">${escapeHtml(inviteUrl)}</a>
               </p>
               <p style="margin:0;font-size:14px;line-height:1.6;color:#71717a;">
-                This invitation expires in ${expiresInDays} days. If you weren't expecting this email, you can safely ignore it.
+                This invitation expires in ${PLATFORM_INVITE_EXPIRY_LABEL}. If you weren't expecting this email, you can safely ignore it.
               </p>
             </td>
           </tr>
@@ -113,7 +113,7 @@ function buildInviteHtml({ name, role, inviteUrl, expiresInDays }: InviteEmailPa
 </html>`;
 }
 
-function buildInviteText({ name, role, inviteUrl, expiresInDays }: InviteEmailParams): string {
+function buildInviteText({ name, role, inviteUrl }: InviteEmailParams): string {
   const label = roleLabel(role);
   return [
     `Hi ${name},`,
@@ -123,7 +123,7 @@ function buildInviteText({ name, role, inviteUrl, expiresInDays }: InviteEmailPa
     "Set your password and activate your account using this link:",
     inviteUrl,
     "",
-    `This invitation expires in ${expiresInDays} days.`,
+    `This invitation expires in ${PLATFORM_INVITE_EXPIRY_LABEL}.`,
     "",
     "If you weren't expecting this email, you can safely ignore it.",
   ].join("\n");

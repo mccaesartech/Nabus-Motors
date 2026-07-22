@@ -19,6 +19,7 @@ export function BackButton({
   return (
     <BackNav
       variant="platform"
+      href={fallbackHref}
       label={label}
       fallbackHref={fallbackHref}
       compact={compact}

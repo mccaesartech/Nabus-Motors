@@ -1,5 +1,7 @@
 import { PLATFORM_NAV } from "@/lib/platform/nav";
-import { platformPath } from "@/lib/platform/paths";
+import { platformPath, platformPathPrefix } from "@/lib/platform/paths";
+
+const PLATFORM_PREFIX = platformPathPrefix();
 
 /** Resolve the mobile/desktop topbar title for a platform route. */
 export function platformPageTitle(pathname: string): string {
@@ -10,7 +12,7 @@ export function platformPageTitle(pathname: string): string {
   if (pathname.includes("/inventory/") && pathname.endsWith("/edit")) return "Edit vehicle";
   if (pathname.endsWith("/users/activity")) return "Activity";
   if (pathname.includes("/leads/preorder/")) return "Pre-order detail";
-  if (/^\/platform\/customers\/[^/]+$/.test(pathname)) return "Customer detail";
+  if (new RegExp(`^${PLATFORM_PREFIX}/customers/[^/]+$`).test(pathname)) return "Customer detail";
   if (pathname.startsWith(platformPath("invite"))) return "Team invite";
   if (pathname.startsWith(platformPath("appointments"))) return "Appointments";
   if (pathname.startsWith(platformPath("tracking"))) return "Import Tracking";
@@ -26,7 +28,7 @@ export function platformPageTitle(pathname: string): string {
     if (item.href.endsWith("/dashboard")) {
       return (
         pathname === item.href ||
-        pathname === "/platform" ||
+        pathname === PLATFORM_PREFIX ||
         pathname === platformPath("")
       );
     }

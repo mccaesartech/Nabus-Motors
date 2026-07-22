@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   ADMIN_COOKIE,
   PLATFORM_USER_COOKIE,
+  adminTokenForPassword,
   adminDashboardPath,
   expectedAdminToken,
+  isAdminSessionSecretConfigured,
 } from "@/lib/admin/config";
 import { authenticatePlatformUser } from "@/lib/admin/auth";
 import {
@@ -11,22 +13,63 @@ import {
   PLATFORM_SESSION_TTL_SEC,
 } from "@/lib/platform/session";
 import { logPlatformActivity } from "@/lib/platform/activity";
+import { consumeRateLimit, requestIp } from "@/lib/security/rate-limit";
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  const body = await req.json().catch(() => ({}));
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
   const password = typeof body.password === "string" ? body.password : "";
+  const confirmPassword =
+    typeof body.confirmPassword === "string" ? body.confirmPassword : undefined;
 
   if (!password) {
     return NextResponse.json({ ok: false, message: "Password is required." }, { status: 400 });
   }
+  if (!isAdminSessionSecretConfigured()) {
+    return NextResponse.json(
+      { ok: false, message: "Login is not configured on the server." },
+      { status: 503 }
+    );
+  }
+
+  const rateLimit = consumeRateLimit(
+    "admin-password-login",
+    `${requestIp(req.headers)}:${email || "owner"}`,
+    { limit: 5, windowMs: 15 * 60_000 }
+  );
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { ok: false, message: "Too many sign-in attempts. Try again later." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rateLimit.retryAfterSeconds) },
+      }
+    );
+  }
 
   if (email) {
-    const auth = await authenticatePlatformUser(email, password);
-    if (!auth) {
+    const result = await authenticatePlatformUser(email, password, confirmPassword);
+    if (result.status === "needs_password_setup") {
+      return NextResponse.json(
+        {
+          ok: false,
+          needsPasswordSetup: true,
+          message: "No password is set for this account yet. Create one now by entering it twice.",
+        },
+        { status: 409 }
+      );
+    }
+    if (result.status === "password_setup_failed") {
+      return NextResponse.json(
+        { ok: false, needsPasswordSetup: true, message: result.message },
+        { status: 400 }
+      );
+    }
+    if (result.status !== "success") {
       return NextResponse.json({ ok: false, message: "Invalid email or password." }, { status: 401 });
     }
 
+    const auth = result.auth;
     if (!auth.userId || !auth.passwordHash) {
       return NextResponse.json(
         { ok: false, message: "Account is not fully activated. Contact your administrator." },
@@ -61,7 +104,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (password !== process.env.ADMIN_PASSWORD) {
+  const submitted = await adminTokenForPassword(password);
+  if (!submitted || submitted !== expected) {
     return NextResponse.json({ ok: false, message: "Invalid email or password." }, { status: 401 });
   }
 

@@ -25,12 +25,14 @@ import {
 import type { VehicleGalleryData } from "@/lib/types";
 import { EMPTY_VEHICLE_GALLERY } from "@/lib/types";
 import { primaryAndAdditionalToGallery } from "@/lib/data/vehicle-images";
+import { omitEmptyOptionalVehicleFields } from "@/lib/admin/vehicle-columns";
 import { makes } from "@/lib/data/catalog-meta";
 import { formatAdminCurrencyPreviews } from "@/lib/currency";
 import { usePlatformCurrency } from "@/context/platform-currency-context";
 import { CategoryBadges } from "@/components/admin/category-badges";
 import { VehicleAiChat } from "@/components/platform/vehicle-ai-chat";
 import { VehicleImageUpload } from "@/components/platform/vehicle-image-upload";
+import { VehicleColorField } from "@/components/shared/vehicle-color-field";
 
 export type PlatformVehicle = VehicleInput & {
   id?: string;
@@ -97,6 +99,11 @@ export function PlatformVehicleForm({
           engine_size: initial.engine_size ?? "",
           color: initial.color ?? "",
           vin: initial.vin ?? "",
+          seating_capacity: initial.seating_capacity ?? undefined,
+          drivetrain: initial.drivetrain ?? "",
+          horsepower: initial.horsepower ?? "",
+          range: initial.range ?? "",
+          specs: initial.specs ?? [],
           description: initial.description ?? "",
           featured: initial.featured ?? false,
           status: initial.status ?? "available",
@@ -105,11 +112,11 @@ export function PlatformVehicleForm({
           trust_badges: initial.trust_badges ?? { ...DEFAULT_TRUST_BADGES },
           inspection_summary: initial.inspection_summary ?? "",
           warranty_notes: initial.warranty_notes ?? "",
-          walkaround_video_url: initial.walkaround_video_url ?? "",
+          walkaround_video_url: initial.walkaround_video_url ?? undefined,
           country_of_origin: initial.country_of_origin ?? "",
-          financing_available: initial.financing_available ?? true,
-          shipment_available: initial.shipment_available ?? true,
-          customs_clearing_available: initial.customs_clearing_available ?? true,
+          financing_available: initial.financing_available ?? false,
+          shipment_available: initial.shipment_available ?? false,
+          customs_clearing_available: initial.customs_clearing_available ?? false,
           available_locally: initial.available_locally ?? false,
         }
       : emptyVehicleForm()
@@ -155,7 +162,16 @@ export function PlatformVehicleForm({
   }
 
   function update<K extends keyof VehicleInput>(key: K, value: VehicleInput[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm((prev) => {
+      const next = { ...prev, [key]: value };
+      if (key === "available_locally" && value === true) {
+        next.shipment_available = false;
+      }
+      if (key === "shipment_available" && value === true) {
+        next.available_locally = false;
+      }
+      return next;
+    });
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -167,13 +183,15 @@ export function PlatformVehicleForm({
         primaryImageUrl,
         additionalImages
       );
-      await onSave({
-        ...form,
-        primary_image_url: synced.primary_image_url,
-        additional_images: synced.additional_images,
-        gallery: synced.gallery,
-        images: synced.images,
-      });
+      await onSave(
+        omitEmptyOptionalVehicleFields({
+          ...form,
+          primary_image_url: synced.primary_image_url,
+          additional_images: synced.additional_images,
+          gallery: synced.gallery,
+          images: synced.images,
+        })
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save vehicle.");
     }
@@ -363,12 +381,16 @@ export function PlatformVehicleForm({
             />
           </Field>
           <Field label="Color">
-            <input
-              value={form.color}
-              onChange={(e) => update("color", e.target.value)}
-              className="platform-input"
-              placeholder="e.g. Pearl White"
+            <VehicleColorField
+              value={form.color ?? ""}
+              onChange={(color) => update("color", color)}
+              primaryImageUrl={form.primary_image_url || form.images?.[0]}
+              selectClassName="platform-select w-full"
+              inputClassName="platform-input"
             />
+            <p className="mt-1 text-xs text-[var(--platform-text-secondary)]">
+              Choose the color that matches the car in the primary photo.
+            </p>
           </Field>
           <Field label="VIN / Stock #">
             <input
@@ -376,6 +398,65 @@ export function PlatformVehicleForm({
               onChange={(e) => update("vin", e.target.value)}
               className="platform-input"
               placeholder="Vehicle identification number"
+            />
+          </Field>
+          <Field
+            label="Seating capacity"
+            hint="Shown as “Seating” on the public vehicle page"
+          >
+            <input
+              type="number"
+              min={1}
+              max={99}
+              value={form.seating_capacity ?? ""}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw === "") {
+                  update("seating_capacity", null);
+                  return;
+                }
+                const n = Number(raw);
+                update(
+                  "seating_capacity",
+                  Number.isFinite(n) && n > 0 ? Math.round(n) : null
+                );
+              }}
+              className="platform-input"
+              placeholder="e.g. 5"
+            />
+          </Field>
+          <Field label="Drivetrain">
+            <input
+              value={form.drivetrain ?? ""}
+              onChange={(e) => update("drivetrain", e.target.value)}
+              className="platform-input"
+              placeholder="e.g. AWD, FWD, RWD, 4WD"
+              list="platform-drivetrains"
+            />
+            <datalist id="platform-drivetrains">
+              <option value="FWD" />
+              <option value="RWD" />
+              <option value="AWD" />
+              <option value="4WD" />
+            </datalist>
+          </Field>
+          <Field label="Horsepower">
+            <input
+              value={form.horsepower ?? ""}
+              onChange={(e) => update("horsepower", e.target.value)}
+              className="platform-input"
+              placeholder="e.g. 211 hp"
+            />
+          </Field>
+          <Field
+            label="Range"
+            hint="For EVs / plug-in hybrids — leave blank if not applicable"
+          >
+            <input
+              value={form.range ?? ""}
+              onChange={(e) => update("range", e.target.value)}
+              className="platform-input"
+              placeholder="e.g. 450 km CLTC"
             />
           </Field>
         </div>
@@ -443,7 +524,7 @@ export function PlatformVehicleForm({
           </Field>
           <Field
             label="Local availability"
-            hint="When enabled, interested customers are emailed that this vehicle is in Ghana and can be bought without shipping. Turning off does not send notifications."
+            hint="When enabled, interested customers are emailed that this vehicle is in Ghana and can be bought without shipping. Turning this on clears “Shipment available”. Change Status to sold or pre-order to remove from public inventory."
           >
             <label className="flex items-center gap-2.5 rounded-lg border border-[var(--platform-border)] px-3 py-2.5 text-sm text-[var(--platform-text)]">
               <input
@@ -516,7 +597,9 @@ export function PlatformVehicleForm({
           hint="YouTube, Vimeo, or direct MP4 link — shown on the vehicle detail page when set"
         >
           <input
-            type="url"
+            type="text"
+            inputMode="url"
+            autoComplete="off"
             value={form.walkaround_video_url ?? ""}
             onChange={(e) => update("walkaround_video_url", e.target.value)}
             className="platform-input w-full"
@@ -544,7 +627,7 @@ export function PlatformVehicleForm({
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
-                  checked={form.financing_available !== false}
+                  checked={Boolean(form.financing_available)}
                   onChange={(e) => update("financing_available", e.target.checked)}
                   className="size-4 rounded border-[var(--platform-border)] accent-[var(--platform-accent)]"
                 />
@@ -553,16 +636,19 @@ export function PlatformVehicleForm({
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
-                  checked={form.shipment_available !== false}
+                  checked={Boolean(form.shipment_available)}
                   onChange={(e) => update("shipment_available", e.target.checked)}
                   className="size-4 rounded border-[var(--platform-border)] accent-[var(--platform-accent)]"
                 />
                 Shipment available
               </label>
+              <p className="text-xs text-[var(--platform-text-secondary)]">
+                Cannot combine with “Available locally”.
+              </p>
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
-                  checked={form.customs_clearing_available !== false}
+                  checked={Boolean(form.customs_clearing_available)}
                   onChange={(e) => update("customs_clearing_available", e.target.checked)}
                   className="size-4 rounded border-[var(--platform-border)] accent-[var(--platform-accent)]"
                 />

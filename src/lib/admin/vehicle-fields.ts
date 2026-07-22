@@ -5,6 +5,7 @@ import type {
   FuelType,
   Transmission,
   VehicleGalleryData,
+  VehicleSpec,
 } from "@/lib/types";
 import { EMPTY_VEHICLE_GALLERY } from "@/lib/types";
 import {
@@ -36,6 +37,16 @@ export type VehicleInput = {
   engine_size?: string;
   color?: string;
   vin?: string;
+  /** Passenger seating capacity shown on the public specs grid (stored in `specs`). */
+  seating_capacity?: number | null;
+  /** e.g. FWD / AWD / RWD / 4WD — stored in `specs`. */
+  drivetrain?: string;
+  /** e.g. 211 hp — stored in `specs`. */
+  horsepower?: string;
+  /** e.g. 649 km CLTC — stored in `specs` (EVs / PHEVs). */
+  range?: string;
+  /** Full specs array; usually derived from seating/drivetrain/horsepower/range. */
+  specs?: VehicleSpec[];
   description?: string;
   featured?: boolean;
   status?: string;
@@ -140,6 +151,11 @@ export function emptyVehicleForm(): VehicleInput {
     engine_size: "",
     color: "",
     vin: "",
+    seating_capacity: undefined,
+    drivetrain: "",
+    horsepower: "",
+    range: "",
+    specs: [],
     description: "",
     featured: false,
     status: "available",
@@ -150,10 +166,25 @@ export function emptyVehicleForm(): VehicleInput {
     trust_badges: { ...DEFAULT_TRUST_BADGES },
     inspection_summary: "",
     country_of_origin: "",
-    financing_available: true,
-    shipment_available: true,
-    customs_clearing_available: true,
+    financing_available: false,
+    shipment_available: false,
+    customs_clearing_available: false,
   };
+}
+
+/** Local stock and shipment inventory are mutually exclusive (DB check 069). */
+export function localShipmentConflict(
+  availableLocally: boolean | null | undefined,
+  shipmentAvailable: boolean | null | undefined
+): boolean {
+  return Boolean(availableLocally) && Boolean(shipmentAvailable);
+}
+
+export function normalizeWalkaroundVideoUrl(value: string | null | undefined): string | null {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed) return null;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
 }
 
 export function primaryAndAdditionalFromVehicle(vehicle: {

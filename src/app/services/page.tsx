@@ -19,7 +19,7 @@ export default async function ServicesPage() {
 
   return (
     <>
-      <section className="bg-brand-black py-16 sm:py-20">
+      <section className="bg-brand-primary py-16 sm:py-20">
         <Container>
           {page.heroEyebrow.trim() && (
             <p className="text-xs font-medium uppercase tracking-[0.2em] text-white/70">
@@ -29,7 +29,7 @@ export default async function ServicesPage() {
           <h1 className="mt-4 max-w-2xl text-3xl font-semibold text-white sm:text-4xl">
             {page.heroTitle}
           </h1>
-          <p className="mt-4 max-w-2xl text-base leading-relaxed text-text-secondary">
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-on-dark-secondary">
             {page.heroSubtitle}
           </p>
         </Container>

@@ -95,8 +95,11 @@ export interface Vehicle {
   warrantyNotes?: string | null;
   walkaroundVideoUrl?: string | null;
   availableLocally?: boolean;
+  localAvailabilityAt?: string | null;
   createdAt: string;
 }
+
+export type FulfillmentMode = "all" | "in_ghana" | "import_ship" | "pre_order_only";
 
 export interface VehicleFilters {
   make?: string;
@@ -116,7 +119,10 @@ export interface VehicleFilters {
   financingAvailable?: boolean;
   shipmentAvailable?: boolean;
   customsClearingAvailable?: boolean;
+  availableLocally?: boolean;
   status?: VehicleAvailabilityStatus;
+  fulfillmentMode?: FulfillmentMode;
+  trustBadges?: TrustBadgeKey[];
 }
 
 export type SortOption =

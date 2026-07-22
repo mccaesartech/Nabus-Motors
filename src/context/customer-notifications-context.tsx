@@ -11,6 +11,11 @@ import {
 } from "react";
 import type { CustomerNotification } from "@/lib/customer/notification-types";
 import { useCustomerAuth } from "@/context/customer-auth-context";
+import { useAfterIdle } from "@/hooks/use-after-idle";
+import {
+  countUnreadAdminNotifications,
+  mergeLoadedNotificationReadState,
+} from "@/lib/platform/notification-read-state";
 
 type MarkReadMatchingOptions = {
   link?: string;
@@ -44,6 +49,7 @@ function matchesCriteria(
 
 export function CustomerNotificationsProvider({ children }: { children: ReactNode }) {
   const { user, getAccessToken, loading: authLoading } = useCustomerAuth();
+  const idleReady = useAfterIdle(2000);
   const [notifications, setNotifications] = useState<CustomerNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -65,15 +71,19 @@ export function CustomerNotificationsProvider({ children }: { children: ReactNod
       });
       if (!res.ok) return;
       const json = await res.json();
-      setNotifications(json.notifications ?? []);
-      setUnreadCount(json.unreadCount ?? 0);
+      const incoming = (json.notifications ?? []) as CustomerNotification[];
+      setNotifications((previous) => {
+        const merged = mergeLoadedNotificationReadState(previous, incoming);
+        setUnreadCount(countUnreadAdminNotifications(merged));
+        return merged;
+      });
     } finally {
       setLoading(false);
     }
   }, [user, getAccessToken]);
 
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || !idleReady) return;
     if (!user) {
       setNotifications([]);
       setUnreadCount(0);
@@ -83,7 +93,9 @@ export function CustomerNotificationsProvider({ children }: { children: ReactNod
     void load();
     const interval = window.setInterval(() => void load(), POLL_MS);
 
-    const onFocus = () => void load();
+    const onFocus = () => {
+      if (document.visibilityState === "visible") void load();
+    };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onFocus);
 
@@ -92,7 +104,7 @@ export function CustomerNotificationsProvider({ children }: { children: ReactNod
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onFocus);
     };
-  }, [authLoading, user, load]);
+  }, [authLoading, idleReady, user, load]);
 
   const patchNotifications = useCallback(
     async (body: Record<string, unknown>) => {

@@ -1,13 +1,15 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { PlatformSidebar } from "./sidebar";
 import { PlatformTopbar } from "./topbar";
 import { PlatformDbBanner } from "./platform-db-banner";
 import { AdminNotificationsProvider } from "@/context/admin-notifications-context";
 import { PlatformCurrencyProvider } from "@/context/platform-currency-context";
+import { PwaInstallToastHost } from "@/components/pwa/pwa-install-toast-host";
 import { useLockBodyScroll } from "@/hooks/use-lock-body-scroll";
+import { initDeferredInstallPromptCapture } from "@/lib/pwa/install-utils";
 import { cn } from "@/lib/utils";
 import type { PlatformPermission, PlatformRole } from "@/lib/platform/permissions";
 
@@ -31,6 +33,9 @@ type PlatformShellProps = {
   userName: string;
   userRole: PlatformRole;
   userEmail: string;
+  permissions: SessionPermissions;
+  authType: "owner" | "user";
+  authUserId?: string;
 };
 
 export function PlatformShell({
@@ -38,13 +43,19 @@ export function PlatformShell({
   userName,
   userRole,
   userEmail,
+  permissions,
+  authType,
+  authUserId,
 }: PlatformShellProps) {
   const pathname = usePathname() ?? "";
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [session, setSession] = useState<PlatformSession | null>(null);
 
   useLockBodyScroll(mobileOpen);
+
+  useEffect(() => {
+    initDeferredInstallPromptCapture();
+  }, []);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -56,27 +67,14 @@ export function PlatformShell({
     const syncDesktop = () => {
       if (media.matches) {
         setMobileOpen(false);
+      } else {
+        // Phones use a full overlay drawer; a persistent 72px rail leaves charts too narrow.
+        setCollapsed(false);
       }
     };
     syncDesktop();
     media.addEventListener("change", syncDesktop);
     return () => media.removeEventListener("change", syncDesktop);
-  }, []);
-
-  useEffect(() => {
-    fetch("/api/admin/session")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json) => {
-        if (json?.ok) {
-          setSession({
-            name: json.user.name,
-            email: json.user.email,
-            role: json.user.role,
-            permissions: json.permissions,
-          });
-        }
-      })
-      .catch(() => undefined);
   }, []);
 
   function handleMenuClick() {
@@ -92,11 +90,8 @@ export function PlatformShell({
   }
 
   function handleMobileClose() {
-    const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
     setMobileOpen(false);
-    if (!isDesktop) {
-      setCollapsed(true);
-    }
+    setCollapsed(false);
   }
 
   function handleExpand() {
@@ -111,43 +106,34 @@ export function PlatformShell({
     setCollapsed(false);
   }
 
-  const resolved: PlatformSession = session ?? {
-    name: userName,
-    email: userEmail,
-    role: userRole,
-    permissions: {
-      dashboard: true,
-      inventory: true,
-      inventory_edit: userRole !== "staff",
-      inventory_approve: userRole === "owner" || userRole === "super_admin",
-      customers: true,
-      sales: true,
-      finance: userRole === "owner" || userRole === "super_admin",
-      leads: true,
-      freight: true,
-      parts: userRole !== "staff",
-      messages: true,
-      emails: true,
-      team_messages: true,
-      documents: true,
-      reports: userRole === "owner" || userRole === "super_admin",
-      users: userRole === "owner" || userRole === "super_admin",
-      settings: userRole === "owner" || userRole === "super_admin",
-      site_content: userRole === "owner" || userRole === "super_admin" || userRole === "manager",
-      activity: userRole === "owner" || userRole === "super_admin",
-      trash: userRole === "owner" || userRole === "super_admin" || userRole === "manager",
-    },
-  };
+  const resolved: PlatformSession = useMemo(
+    () => ({
+      name: userName,
+      email: userEmail,
+      role: userRole,
+      permissions,
+    }),
+    [userName, userEmail, userRole, permissions]
+  );
+
+  // Stable identity — a fresh object here re-triggers the notifications
+  // provider's session effect on every shell re-render (nav, sidebar toggles).
+  const realtimeSession = useMemo(
+    () => ({ type: authType, userId: authUserId }),
+    [authType, authUserId]
+  );
 
   const showMobileIconRail = collapsed && !mobileOpen;
 
   return (
     <PlatformCurrencyProvider>
-    <AdminNotificationsProvider>
+    <AdminNotificationsProvider realtimeSession={realtimeSession}>
     <PlatformSessionContext.Provider value={resolved}>
       <div
         className={cn(
-          "platform-theme grid h-dvh overflow-hidden max-lg:grid-cols-1",
+          // overflow-x-clip (not overflow-hidden) so portrait content can't trap zoom/scroll;
+          // avoid 100dvw which often causes 1px sideways overflow on mobile browsers.
+          "platform-theme grid h-dvh w-full max-w-full overflow-x-clip overflow-y-hidden max-lg:grid-cols-1",
           collapsed
             ? "lg:grid-cols-[4.5rem_minmax(0,1fr)]"
             : "lg:grid-cols-[16rem_minmax(0,1fr)]"
@@ -164,7 +150,7 @@ export function PlatformShell({
         />
         <div
           className={cn(
-            "relative z-0 flex min-h-0 min-w-0 flex-col",
+            "relative z-0 flex min-h-0 min-w-0 max-w-full flex-col overflow-x-clip",
             showMobileIconRail && "max-lg:pl-[4.5rem]"
           )}
         >
@@ -175,12 +161,33 @@ export function PlatformShell({
             userName={resolved.name}
             userRole={resolved.role}
           />
-          <main className="platform-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-auto p-4 lg:p-6">
+          <main
+            id="main-content"
+            className="platform-main platform-scrollbar min-h-0 min-w-0 max-w-full flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain p-3 sm:p-5 lg:p-8"
+            onMouseDown={(event) => {
+              const target = event.target as HTMLElement;
+              if (
+                target.closest(
+                  "input, textarea, select, [contenteditable='true'], button, a, label"
+                )
+              ) {
+                return;
+              }
+              const active = document.activeElement;
+              if (
+                active instanceof HTMLInputElement ||
+                active instanceof HTMLTextAreaElement
+              ) {
+                active.blur();
+              }
+            }}
+          >
             <PlatformDbBanner />
             {children}
           </main>
         </div>
       </div>
+      <PwaInstallToastHost />
     </PlatformSessionContext.Provider>
     </AdminNotificationsProvider>
     </PlatformCurrencyProvider>

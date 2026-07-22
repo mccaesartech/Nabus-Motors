@@ -433,6 +433,99 @@ export const DEFAULT_SPARE_PARTS_LANDING: SparePartsLandingSiteContent = {
   ],
 };
 
+/** Homepage “How can we help you today?” journey tiles + advisor card. */
+export type StartYourJourneyAdvisorContent = {
+  title: string;
+  description: string;
+  image: string;
+  imageAlt: string;
+  primaryLabel: string;
+  secondaryLabel: string;
+  secondaryHref: string;
+  whatsappMessage: string;
+};
+
+export type StartYourJourneySiteContent = {
+  title: string;
+  description: string;
+  cards: DivisionLandingCard[];
+  advisor: StartYourJourneyAdvisorContent;
+};
+
+export const DEFAULT_START_YOUR_JOURNEY: StartYourJourneySiteContent = {
+  title: "How can we help you today?",
+  description: "Choose the service you need — our divisions work together under one trusted brand.",
+  cards: [
+    {
+      id: "buy-vehicle",
+      icon: "Car",
+      title: "Buy a Vehicle in Ghana",
+      description:
+        "Browse verified stock with transparent pricing, inspection reports, and professional support.",
+      cta: "Browse Available Vehicles",
+      href: ROUTES.auto.home,
+      image: "/images/services/buy-vehicle.jpg",
+      imageAlt: "Premium vehicles available for purchase in Ghana",
+    },
+    {
+      id: "pre-order",
+      icon: "Clock",
+      title: "Pre-Order from China/Japan",
+      description:
+        "Reserve imports from China, Japan, and other markets with a structured pre-order process.",
+      cta: "Pre-Order a Vehicle",
+      href: ROUTES.auto.preorder,
+      image: "/images/services/china-japan-imports.jpg",
+      imageAlt: "International vehicle imports from China and Japan",
+    },
+    {
+      id: "freight",
+      icon: "Ship",
+      title: "Freight & Customs",
+      description:
+        "End-to-end shipping, documentation, and Ghana customs clearing for vehicles and cargo.",
+      cta: "Freight Services",
+      href: ROUTES.corporate.freight,
+      image: "/images/services/freight-containers.jpg",
+      imageAlt: "Freight containers and international shipping logistics",
+    },
+    {
+      id: "spare-parts",
+      icon: "Package",
+      title: "Genuine Spare Parts",
+      description:
+        "OEM and aftermarket parts for popular makes — browse the catalogue or request specific items.",
+      cta: "Browse Spare Parts",
+      href: ROUTES.auto.spareParts,
+      image: "/images/services/spare-parts.jpg",
+      imageAlt: "Genuine automotive spare parts",
+    },
+    {
+      id: "appointment",
+      icon: "CalendarCheck",
+      title: "Book Inspection/Test Drive",
+      description:
+        "Schedule a showroom visit to inspect vehicles in person or arrange a test drive with our team.",
+      cta: "Book Appointment",
+      href: ROUTES.corporate.appointments,
+      image: "/images/services/buy-vehicle.jpg",
+      imageAlt: "Customer inspecting a vehicle at the showroom",
+    },
+  ],
+  advisor: {
+    title: "Speak With Advisor",
+    description:
+      "Get personalised guidance on vehicles, shipping, parts, or your next step — by WhatsApp or our contact team.",
+    image: "/images/services/personalised-advice.jpg",
+    imageAlt: "True Goshen advisor ready to assist",
+    primaryLabel: "Talk to an Expert",
+    secondaryLabel: "Contact Us",
+    secondaryHref: ROUTES.corporate.contact,
+    whatsappMessage:
+      "Hello True Goshen, I would like to speak with an advisor about your services.",
+  },
+};
+
 export type CorporateDivisionsSiteContent = {
   title: string;
   description: string;
@@ -633,11 +726,31 @@ export function mergeDivisionLandingCards(
     title: asTrimmedString(saved.title) || def.title,
     description: asTrimmedString(saved.description) || def.description,
     cta: asTrimmedString(saved.cta) ?? def.cta,
-    href: asTrimmedString(saved.href) ?? def.href,
+    href: asTrimmedString(saved.href) || def.href,
     image:
       asTrimmedString(saved.image) ||
       asTrimmedString(saved.imageUrl) ||
       def.image,
     imageAlt: asTrimmedString(saved.imageAlt) || def.imageAlt,
   }));
+}
+
+export function mergeStartYourJourneyAdvisor(
+  defaults: StartYourJourneyAdvisorContent,
+  patch: unknown
+): StartYourJourneyAdvisorContent {
+  if (!isPlainObject(patch)) return defaults;
+  return {
+    title: asTrimmedString(patch.title) || defaults.title,
+    description: asTrimmedString(patch.description) || defaults.description,
+    image:
+      asTrimmedString(patch.image) ||
+      asTrimmedString(patch.imageUrl) ||
+      defaults.image,
+    imageAlt: asTrimmedString(patch.imageAlt) || defaults.imageAlt,
+    primaryLabel: asTrimmedString(patch.primaryLabel) || defaults.primaryLabel,
+    secondaryLabel: asTrimmedString(patch.secondaryLabel) || defaults.secondaryLabel,
+    secondaryHref: asTrimmedString(patch.secondaryHref) || defaults.secondaryHref,
+    whatsappMessage: asTrimmedString(patch.whatsappMessage) || defaults.whatsappMessage,
+  };
 }

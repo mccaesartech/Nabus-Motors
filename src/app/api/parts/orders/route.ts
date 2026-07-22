@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
     const partIds = partItems.map((item) => item.partId).filter(Boolean);
     const vehicleIds = vehicleItems.map((item) => item.vehicleId).filter(Boolean);
 
-    let partsMap = new Map<
+    const partsMap = new Map<
       string,
       {
         id: string;
@@ -211,7 +211,10 @@ export async function POST(req: NextRequest) {
     }
 
     if (!supabase) {
-      console.info("[parts/orders] checkout (no DB)", { name, email, orderItems, totalUsd });
+      console.info("[parts/orders] database unavailable; customer payload omitted", {
+        itemCount: orderItems.length,
+        totalUsd,
+      });
       return jsonOk("Order submitted. Our team will contact you shortly.", {
         orderId: null,
       });

@@ -4,6 +4,7 @@ import type {
   VehicleImageCategory,
 } from "@/lib/types";
 import { EMPTY_VEHICLE_GALLERY, VEHICLE_GALLERY_ORDER } from "@/lib/types";
+import { photoIdsMatchingColor } from "@/lib/vehicles/vehicle-colors";
 import pool from "./car-photo-pool.json";
 
 export const PLACEHOLDER_IMAGE = "/vehicles/placeholder.svg";
@@ -91,20 +92,24 @@ export function categoryPhotoUrlFor(categoryId: string, slug: string): string {
 export function photoIdFor(
   slug: string,
   index: number,
-  bodyType?: BodyType
+  bodyType?: BodyType,
+  preferredColor?: string | null
 ): number {
   const ids = poolForBodyType(bodyType);
   const h = hashSlug(slug);
-  return ids[(index + h) % ids.length];
+  const matching = photoIdsMatchingColor(ids, preferredColor);
+  const poolIdsToUse = matching.length > 0 ? matching : ids;
+  return poolIdsToUse[(index + h) % poolIdsToUse.length];
 }
 
 /** Center-cropped exterior shot — avoids focal crops that can show people */
 export function photoUrlFor(
   slug: string,
   index = 0,
-  bodyType?: BodyType
+  bodyType?: BodyType,
+  preferredColor?: string | null
 ): string {
-  const id = photoIdFor(slug, index, bodyType);
+  const id = photoIdFor(slug, index, bodyType, preferredColor);
   return pexelsPhotoUrl(id, slug);
 }
 
@@ -130,10 +135,11 @@ function sanitizeUrls(urls?: string[]): string[] {
 function poolPhotoFor(
   slug: string,
   id: string,
-  bodyType?: BodyType
+  bodyType?: BodyType,
+  preferredColor?: string | null
 ): string {
   const index = Number.parseInt(id, 10) || hashSlug(slug);
-  return photoUrlFor(slug, index, bodyType);
+  return photoUrlFor(slug, index, bodyType, preferredColor);
 }
 
 export function sanitizeGallery(
@@ -212,11 +218,12 @@ export function photosFor(
   slug: string,
   index = 0,
   bodyType?: BodyType,
-  images?: string[]
+  images?: string[],
+  preferredColor?: string | null
 ): string[] {
   const fromDb = sanitizeUrls(images);
   if (fromDb.length > 0) return fromDb;
-  return [photoUrlFor(slug, index, bodyType)];
+  return [photoUrlFor(slug, index, bodyType, preferredColor)];
 }
 
 export function vehicleImagesFor(vehicle: {

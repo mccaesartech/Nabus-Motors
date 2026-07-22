@@ -18,6 +18,7 @@ import {
 } from "@/lib/platform/customer-chat-notifications";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createCustomerSupabase } from "@/lib/supabase/customer";
+import { userOrEmailFilter } from "@/lib/security/postgrest-filter";
 
 const VALID_CATEGORIES = new Set<string>(
   CUSTOMER_MESSAGE_CATEGORIES.map((c) => c.value)
@@ -183,7 +184,7 @@ export async function POST(req: NextRequest) {
         .from("preorder_inquiries")
         .select("id")
         .eq("id", preorderId)
-        .or(`user_id.eq.${user.id},email.ilike.${user.email}`)
+        .or(userOrEmailFilter(user.id, user.email))
         .maybeSingle();
       if (preorder) insertPayload.preorder_id = preorder.id;
     }

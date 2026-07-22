@@ -77,7 +77,7 @@ export function FinancingPageClient({ hero }: FinancingPageClientProps) {
 
   return (
     <>
-      <section className="relative bg-brand-black py-20 sm:py-24">
+      <section className="relative bg-brand-primary py-20 sm:py-24">
         <Container className="relative">
           {hero.eyebrow && (
             <p className="text-xs font-medium uppercase tracking-[0.2em] text-white/70">
@@ -87,7 +87,7 @@ export function FinancingPageClient({ hero }: FinancingPageClientProps) {
           <h1 className="mt-4 max-w-lg text-3xl font-semibold text-white sm:text-4xl">
             {hero.title}
           </h1>
-          <p className="mt-4 max-w-xl text-base leading-relaxed text-text-secondary">
+          <p className="mt-4 max-w-xl text-base leading-relaxed text-on-dark-secondary">
             {hero.subtitle}
           </p>
         </Container>

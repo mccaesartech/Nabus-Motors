@@ -3,6 +3,7 @@ import { getCustomerFromAuthHeader } from "@/lib/customer/auth";
 import { syncCustomerAccount } from "@/lib/customer/preorder-account";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import type { ShipmentWithEvents } from "@/lib/platform/shipment";
+import { userOrEmailFilter } from "@/lib/security/postgrest-filter";
 
 async function loadShipmentEvents(
   supabase: NonNullable<ReturnType<typeof createAdminSupabase>>,
@@ -38,13 +39,13 @@ export async function GET(req: NextRequest) {
       .select(
         "id, tracking_number, reference_type, reference_id, status, origin_country, destination, estimated_arrival, actual_arrival, vessel_name, container_number, notes, created_at, updated_at"
       )
-      .or(`user_id.eq.${user.id},customer_email.ilike.${email}`)
+      .or(userOrEmailFilter(user.id, email, "customer_email"))
       .order("updated_at", { ascending: false })
       .limit(50),
     supabase
       .from("freight_quote_requests")
       .select("id, service_type, origin_country, destination, status, created_at, cargo_description, cargo_size, reference_code, converted_shipment_id")
-      .or(`user_id.eq.${user.id},email.ilike.${email}`)
+      .or(userOrEmailFilter(user.id, email))
       .order("created_at", { ascending: false })
       .limit(20),
     supabase
@@ -52,7 +53,7 @@ export async function GET(req: NextRequest) {
       .select(
         "id, status, payment_status, created_at, vehicle_title, vehicle_slug, shipping_handling, vehicle:vehicles(year, make, model, trim, slug)"
       )
-      .or(`user_id.eq.${user.id},email.ilike.${email}`)
+      .or(userOrEmailFilter(user.id, email))
       .order("created_at", { ascending: false })
       .limit(50),
   ]);

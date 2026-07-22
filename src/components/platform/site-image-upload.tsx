@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImagePlus, Loader2, RotateCcw, Upload, X } from "lucide-react";
-import { isValidImageUrl } from "@/lib/data/vehicle-images";
+import { isValidImageUrl, PLACEHOLDER_IMAGE } from "@/lib/data/vehicle-images";
 import { normalizeMediaUrl } from "@/lib/site-content/media-url";
-import { SafeVehicleImage } from "@/components/shared/safe-vehicle-image";
 
 type PreviewSize = "compact" | "large" | "category";
 
@@ -207,24 +206,25 @@ export function SiteImageUpload({
               .filter(Boolean)
               .join(" ")}
           >
-            {previewSize === "compact" ? (
-              <SafeVehicleImage
-                key={previewUrl}
-                src={previewUrl}
-                alt={previewLabel || "Preview"}
-                fill={false}
-                width={320}
-                height={200}
-                className="h-32 w-full max-w-[20rem] object-cover sm:h-36"
-              />
-            ) : (
-              <SafeVehicleImage
-                key={previewUrl}
-                src={previewUrl}
-                alt={previewLabel || "Preview"}
-                className="transition-transform duration-300 group-hover:scale-[1.02]"
-              />
-            )}
+            {/* Native <img> — admin must always see the asset being edited.
+                Avoids next/image opacity-gate / cache races that left previews blank. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              key={previewUrl}
+              src={previewUrl}
+              alt={previewLabel || "Preview"}
+              className={
+                previewSize === "compact"
+                  ? "h-32 w-full max-w-[20rem] object-cover sm:h-36"
+                  : "absolute inset-0 size-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+              }
+              onError={(e) => {
+                const el = e.currentTarget;
+                if (el.dataset.fallback === "1") return;
+                el.dataset.fallback = "1";
+                el.src = PLACEHOLDER_IMAGE;
+              }}
+            />
             {isStorefrontPreview && (
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
             )}

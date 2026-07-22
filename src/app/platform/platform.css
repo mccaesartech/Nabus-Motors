@@ -148,6 +148,8 @@
   padding: 0 0.75rem;
   font-size: 0.875rem;
   color: var(--platform-text);
+  cursor: pointer;
+  caret-color: transparent;
 }
 
 @layer components {
@@ -401,12 +403,203 @@
   background-color: var(--platform-card);
   border: 1px solid var(--platform-border);
   border-radius: 0.5rem;
-  padding: 1.25rem;
-  transition: border-color 0.15s ease;
+  padding: 1rem 1.125rem;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
 }
 
 .platform-stat-card:hover {
   border-color: #c4b5fd;
+}
+
+/* Dashboard cards — subtle lift on hover */
+.platform-dashboard-card {
+  background-color: var(--platform-card);
+  border: 1px solid var(--platform-border);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.platform-dashboard-card:hover {
+  border-color: #c4b5fd;
+  box-shadow: 0 4px 16px rgba(76, 29, 149, 0.08);
+  transform: translateY(-1px);
+}
+
+button.platform-dashboard-card:disabled {
+  transform: none;
+  cursor: default;
+}
+
+button.platform-dashboard-card:disabled:hover {
+  box-shadow: none;
+  transform: none;
+}
+
+/* Chart load & micro-animations */
+@keyframes platform-chart-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.platform-chart-fade-in {
+  animation: platform-chart-fade-in 0.5s ease-out;
+}
+
+@keyframes platform-chart-bar-grow {
+  from {
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+  to {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+}
+
+.platform-chart-bar-grow {
+  animation: platform-chart-bar-grow 0.6s ease-out;
+}
+
+.platform-progress-ring {
+  transition: stroke-dashoffset 0.6s ease-out;
+}
+
+.platform-main > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Dashboard chart surfaces — prefer explicit min-height; avoid SVG max-width collapse */
+.platform-chart-surface {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 11rem;
+  overflow-x: clip;
+}
+
+.platform-chart-surface .recharts-responsive-container {
+  margin-inline: auto;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  min-height: 12.5rem;
+}
+
+.platform-chart-surface .recharts-wrapper,
+.platform-chart-surface .recharts-surface {
+  max-width: 100% !important;
+}
+
+.platform-insight-card {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.platform-insight-legend li {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Portrait phones: force single-column stacking; never let page scroll sideways */
+@media (max-width: 1023px) and (orientation: portrait) {
+  .platform-theme,
+  .platform-main {
+    overflow-x: clip;
+  }
+
+  .platform-insight-card .platform-insight-card-header {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: left;
+  }
+
+  .platform-insight-card .platform-insight-card-header > div:first-child {
+    width: 100%;
+  }
+
+  .platform-insight-card .platform-chart-surface {
+    width: 100%;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+
+  .platform-insight-card .platform-insight-legend {
+    justify-content: flex-start;
+  }
+
+  .platform-dashboard-card {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 1023px) {
+  .platform-insight-card .platform-insight-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .platform-insight-card .platform-insight-card-header > div:first-child {
+    width: 100%;
+  }
+
+  .platform-insight-card .platform-chart-surface {
+    width: 100%;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+
+  .platform-insight-card .platform-insight-legend {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 390px) {
+  .platform-insight-card {
+    padding: 0.75rem;
+  }
+
+  .platform-insight-card .recharts-responsive-container {
+    min-height: 11.5rem;
+  }
+}
+
+@media (display-mode: standalone) {
+  .platform-theme {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .platform-main {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .platform-sidebar-footer {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .platform-chart-fade-in,
+  .platform-chart-bar-grow,
+  .platform-progress-ring {
+    animation: none;
+    transition: none;
+  }
+}
+
+.platform-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .platform-scrollbar {
@@ -448,6 +641,45 @@
   border: 1px solid var(--platform-border);
   background-color: var(--platform-card);
   box-shadow: 0 10px 25px rgba(76, 29, 149, 0.12);
+}
+
+/* Account menu portals to document body — define platform tokens locally */
+.platform-account-menu-content {
+  --platform-card: #ffffff;
+  --platform-border: #e9d5ff;
+  --platform-text: #4c1d95;
+  --platform-text-secondary: #7c6b9e;
+  --platform-accent: #8b5cf6;
+  --platform-danger: #dc2626;
+
+  border: 1px solid var(--platform-border) !important;
+  background-color: #ffffff !important;
+  color: var(--platform-text);
+  box-shadow:
+    0 10px 25px rgba(76, 29, 149, 0.14),
+    0 4px 12px rgba(0, 0, 0, 0.06);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Notification center portals to document.body — same local tokens as account menu */
+.platform-notification-panel {
+  --platform-bg: #faf5ff;
+  --platform-bg-secondary: #f5f3ff;
+  --platform-card: #ffffff;
+  --platform-border: #e9d5ff;
+  --platform-text: #4c1d95;
+  --platform-text-secondary: #7c6b9e;
+  --platform-accent: #8b5cf6;
+  --platform-error: #dc2626;
+  --platform-warning: #d97706;
+
+  border: 1px solid var(--platform-border);
+  background-color: #ffffff;
+  color: var(--platform-text);
+  box-shadow:
+    0 10px 25px rgba(76, 29, 149, 0.14),
+    0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
 /* AI Listing Assistant panel */
@@ -946,6 +1178,7 @@
   align-items: center;
   gap: 0.5rem;
   min-height: 2.75rem;
+  min-width: 2.75rem;
   padding: 0.375rem 0.875rem 0.375rem 0.5rem;
   border-radius: 0.5rem;
   border: 1px solid rgba(139, 92, 246, 0.35);
@@ -954,11 +1187,15 @@
   font-weight: 600;
   line-height: 1.25;
   color: var(--platform-text);
+  touch-action: manipulation;
+  cursor: pointer;
   transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease,
-    box-shadow 0.15s ease;
+    background-color 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease,
+    box-shadow 0.12s ease,
+    transform 0.12s ease,
+    opacity 0.12s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -966,6 +1203,13 @@
   background: rgba(139, 92, 246, 0.2);
   border-color: rgba(124, 58, 237, 0.55);
   color: var(--platform-accent-hover);
+}
+
+.platform-back-nav:active,
+.platform-back-nav.back-nav-pending {
+  transform: scale(0.97);
+  opacity: 0.85;
+  background: rgba(139, 92, 246, 0.24);
 }
 
 .platform-back-nav:focus-visible {

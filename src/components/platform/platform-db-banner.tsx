@@ -26,7 +26,19 @@ export function PlatformDbBanner() {
   if (!db) return null;
 
   const freightTableMissing = db.tables?.freight_quote_requests === false;
-  const showBanner = freightTableMissing || Boolean(db.error);
+  const coreDown =
+    db.connected === false ||
+    db.tables?.vehicles === false ||
+    db.tables?.site_content === false ||
+    db.tables?.site_settings === false;
+  const optionalOnlyWarning =
+    Boolean(db.error) &&
+    !coreDown &&
+    typeof db.error === "string" &&
+    db.error.startsWith("Optional tables unavailable");
+
+  // Soften: optional-table warnings stay quiet in the shell; only block on core/freight.
+  const showBanner = freightTableMissing || (Boolean(db.error) && !optionalOnlyWarning);
 
   if (!showBanner) return null;
 
@@ -44,23 +56,22 @@ export function PlatformDbBanner() {
           {freightTableMissing && (
             <p className="text-[var(--platform-text-secondary)]">
               Freight quote requests are not being saved — the{" "}
-              <code className="text-xs">freight_quote_requests</code> table is missing. Run{" "}
-              <code className="text-xs">supabase/migrations/028_company_expansion_foundation.sql</code>{" "}
-              and{" "}
-              <code className="text-xs">036_freight_quote_notifications.sql</code> in Supabase SQL
-              Editor, then refresh.
+              <code className="text-xs">freight_quote_requests</code> table is missing. Confirm
+              freight migrations are applied in Supabase, then refresh.
             </p>
           )}
           {db.error && !freightTableMissing && (
             <p className="text-[var(--platform-text-secondary)]">{db.error}</p>
           )}
-          <p className="text-[var(--platform-text-secondary)]">
-            Existing quotes may be in{" "}
-            <Link href={platformPath("freight/quotes")} className="text-[var(--platform-accent)] hover:underline">
-              Platform → Freight → Quote Requests
-            </Link>{" "}
-            once migrations are applied.
-          </p>
+          {freightTableMissing && (
+            <p className="text-[var(--platform-text-secondary)]">
+              Existing quotes may be in{" "}
+              <Link href={platformPath("freight/quotes")} className="text-[var(--platform-accent)] hover:underline">
+                Platform → Freight → Quote Requests
+              </Link>{" "}
+              once the freight tables are available.
+            </p>
+          )}
         </div>
       </div>
     </div>

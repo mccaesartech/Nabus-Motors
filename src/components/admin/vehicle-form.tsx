@@ -23,6 +23,7 @@ import { formatAdminCurrencyPreviews, formatPlatformPrice } from "@/lib/currency
 import { isValidImageUrl } from "@/lib/data/vehicle-images";
 import { CategoryBadges } from "@/components/admin/category-badges";
 import { SafeVehicleImage } from "@/components/shared/safe-vehicle-image";
+import { VehicleColorField } from "@/components/shared/vehicle-color-field";
 
 export type AdminVehicle = VehicleInput & {
   id?: string;
@@ -75,6 +76,11 @@ export function VehicleForm({ initial, onSave, onCancel, saving }: VehicleFormPr
           engine_size: initial.engine_size ?? "",
           color: initial.color ?? "",
           vin: initial.vin ?? "",
+          seating_capacity: initial.seating_capacity ?? undefined,
+          drivetrain: initial.drivetrain ?? "",
+          horsepower: initial.horsepower ?? "",
+          range: initial.range ?? "",
+          specs: initial.specs ?? [],
           description: initial.description ?? "",
           featured: initial.featured ?? false,
           status: initial.status ?? "available",
@@ -292,11 +298,12 @@ export function VehicleForm({ initial, onSave, onCancel, saving }: VehicleFormPr
           />
         </Field>
         <Field label="Color">
-          <Input
-            value={form.color}
-            onChange={(e) => update("color", e.target.value)}
-            className={inputClass}
-            placeholder="e.g. Pearl White"
+          <VehicleColorField
+            value={form.color ?? ""}
+            onChange={(color) => update("color", color)}
+            primaryImageUrl={form.primary_image_url || form.images?.[0]}
+            selectClassName={inputClass}
+            inputClassName={inputClass}
           />
         </Field>
         <Field label="VIN">
@@ -304,6 +311,46 @@ export function VehicleForm({ initial, onSave, onCancel, saving }: VehicleFormPr
             value={form.vin}
             onChange={(e) => update("vin", e.target.value)}
             className={inputClass}
+          />
+        </Field>
+        <Field label="Seating capacity">
+          <Input
+            type="number"
+            min={1}
+            max={99}
+            value={form.seating_capacity ?? ""}
+            onChange={(e) =>
+              update(
+                "seating_capacity",
+                e.target.value === "" ? null : Number(e.target.value)
+              )
+            }
+            className={inputClass}
+            placeholder="e.g. 5"
+          />
+        </Field>
+        <Field label="Drivetrain">
+          <Input
+            value={form.drivetrain ?? ""}
+            onChange={(e) => update("drivetrain", e.target.value)}
+            className={inputClass}
+            placeholder="e.g. AWD"
+          />
+        </Field>
+        <Field label="Horsepower">
+          <Input
+            value={form.horsepower ?? ""}
+            onChange={(e) => update("horsepower", e.target.value)}
+            className={inputClass}
+            placeholder="e.g. 211 hp"
+          />
+        </Field>
+        <Field label="Range">
+          <Input
+            value={form.range ?? ""}
+            onChange={(e) => update("range", e.target.value)}
+            className={inputClass}
+            placeholder="e.g. 450 km CLTC"
           />
         </Field>
       </div>

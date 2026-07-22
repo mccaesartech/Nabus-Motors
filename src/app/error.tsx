@@ -5,6 +5,10 @@ import {
   attemptRecoverFromLoadFailure,
   hasExceededReloadAttempts,
 } from "@/lib/cache-recovery";
+import {
+  PUBLIC_UNEXPECTED_ERROR_MESSAGE,
+  publicErrorReference,
+} from "@/lib/errors/public-error";
 
 export default function Error({
   error,
@@ -17,6 +21,7 @@ export default function Error({
     typeof window !== "undefined" &&
     !hasExceededReloadAttempts() &&
     attemptRecoverFromLoadFailure(error);
+  const errorReference = publicErrorReference(error);
 
   if (recovering) {
     return (
@@ -32,12 +37,11 @@ export default function Error({
         Something went wrong
       </h1>
       <p className="mt-3 max-w-md text-sm text-muted-foreground">
-        The page failed to load completely. This can happen after an update —
-        please reload to fetch the latest version.
+        {PUBLIC_UNEXPECTED_ERROR_MESSAGE}
       </p>
-      {error?.message ? (
+      {errorReference ? (
         <p className="mt-2 max-w-md text-xs text-muted-foreground/80">
-          {error.message}
+          {errorReference}
         </p>
       ) : null}
       <div className="mt-6 flex gap-3">

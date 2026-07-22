@@ -276,6 +276,7 @@ const VEHICLE_CSV_HEADERS = [
   "body_type",
   "transmission",
   "fuel_type",
+  "color",
   "location",
   "featured",
   "vin",
@@ -293,6 +294,7 @@ export function exportVehiclesCsv(
     body_type?: string;
     transmission?: string;
     fuel_type?: string;
+    color?: string | null;
     location?: string;
     featured?: boolean;
     vin?: string | null;
@@ -311,6 +313,7 @@ export function exportVehiclesCsv(
       body_type: v.body_type ?? "",
       transmission: v.transmission ?? "",
       fuel_type: v.fuel_type ?? "",
+      color: v.color ?? "",
       location: v.location ?? "",
       featured: v.featured ?? "",
       vin: v.vin ?? "",

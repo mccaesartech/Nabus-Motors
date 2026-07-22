@@ -126,7 +126,7 @@ export function FreightAdviceMessagePanel({
       <DialogContent className="max-h-[calc(100dvh-var(--header-height)-2rem)] overflow-y-auto overscroll-contain sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <MessageCircle className="size-5 text-brand-purple" />
+            <MessageCircle className="size-5 text-brand-freight-accent" />
             Personalised freight advice
           </DialogTitle>
           <DialogDescription>
@@ -145,7 +145,7 @@ export function FreightAdviceMessagePanel({
             <div className="flex flex-wrap gap-2">
               <Link
                 href={success.accountUrl}
-                className="inline-flex items-center rounded-md bg-brand-purple px-4 py-2 text-sm font-medium text-white hover:bg-brand-purple-dark"
+                className="inline-flex items-center rounded-md bg-brand-freight-accent px-4 py-2 text-sm font-medium text-white hover:bg-brand-freight-accent-dark"
               >
                 View conversation
               </Link>
@@ -223,8 +223,8 @@ export function FreightAdviceMessagePanel({
                     className={cn(
                       "rounded-full border px-3 py-1.5 text-left text-xs font-medium transition-colors sm:text-sm",
                       selectedQuick === text
-                        ? "border-brand-purple bg-brand-purple text-white shadow-sm"
-                        : "border-brand-purple/25 bg-brand-purple/5 text-brand-purple hover:border-brand-purple/50 hover:bg-brand-purple/10"
+                        ? "border-brand-freight-accent bg-brand-freight-accent text-white shadow-sm"
+                        : "border-brand-freight-accent/25 bg-brand-freight-accent/5 text-brand-freight-accent hover:border-brand-freight-accent/50 hover:bg-brand-freight-accent/10"
                     )}
                   >
                     {text}
@@ -253,7 +253,7 @@ export function FreightAdviceMessagePanel({
             <Button
               type="submit"
               disabled={submitting}
-              className="w-full gap-2 bg-brand-purple text-white hover:bg-brand-purple-dark sm:w-auto"
+              className="w-full gap-2 bg-brand-freight-accent text-white hover:bg-brand-freight-accent-dark sm:w-auto"
             >
               <Send className="size-4" />
               {submitting ? "Sending…" : "Send message"}
@@ -287,7 +287,7 @@ export function FreightAdviceTrigger({
         variant={variant === "outline" ? "outline" : "default"}
         className={cn(
           variant === "default" &&
-            "bg-brand-purple text-white hover:bg-brand-purple-dark",
+            "bg-brand-freight-accent text-white hover:bg-brand-freight-accent-dark",
           className
         )}
         onClick={() => setOpen(true)}

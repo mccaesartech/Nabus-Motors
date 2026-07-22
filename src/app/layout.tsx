@@ -1,15 +1,19 @@
 import { Inter } from "next/font/google";
+import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
-import { ChunkReloadHandler } from "@/components/layout/chunk-reload-handler";
+import { DeferredChunkReloadHandler } from "@/components/layout/deferred-chunk-reload-handler";
 import { ResourceHints } from "@/components/layout/resource-hints";
+import { SkipToContent } from "@/components/layout/skip-to-content";
 import { PublicShell } from "@/components/layout/public-shell";
 import { SiteChrome } from "@/components/layout/site-chrome";
+import { DeferredPwaShell } from "@/components/pwa/deferred-pwa-shell";
+import { DeferredVehiclePreferencesSync } from "@/components/recommendations/deferred-vehicle-preferences-sync";
 import { CurrencyProvider } from "@/context/currency-context";
 import { CustomerAuthProvider } from "@/context/customer-auth-context";
 import { CustomerNotificationsProvider } from "@/context/customer-notifications-context";
 import { PartsCartProvider } from "@/context/parts-cart-context";
-import { VehiclePreferencesSync } from "@/components/recommendations/vehicle-preferences-sync";
 import { CACHE_RECOVERY_INLINE_SCRIPT } from "@/lib/cache-recovery-inline-script";
+import { CUSTOMER_PWA, PWA_BACKGROUND_COLOR, PWA_THEME_COLOR } from "@/lib/pwa/constants";
 import { DEFAULT_SITE_CONTENT } from "@/lib/site-content/defaults";
 import { getPublicSiteUrl } from "@/lib/site-url";
 import "./globals.css";
@@ -23,31 +27,55 @@ const inter = Inter({
   display: "swap",
 });
 
-export const viewport = {
+export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: PWA_THEME_COLOR,
 };
 
-export const metadata = {
+export const metadata: Metadata = {
   metadataBase: new URL(getPublicSiteUrl()),
+  applicationName: CUSTOMER_PWA.name,
   title: {
     default: "True Goshen Company Limited | Vehicles, Freight & Parts",
     template: "%s | True Goshen",
   },
-  description:
-    "True Goshen Company Limited — vehicle imports, freight forwarding, customs clearing, and genuine spare parts for Ghana and beyond.",
+  description: CUSTOMER_PWA.description,
+  manifest: CUSTOMER_PWA.manifestPath,
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: CUSTOMER_PWA.shortName,
+  },
+  formatDetection: {
+    telephone: false,
+  },
   icons: {
     icon: [
       { url: "/favicon.ico" },
+      { url: "/favicon-16.png", sizes: "16x16", type: "image/png" },
       { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
     ],
-    apple: "/apple-touch-icon.png",
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+    ],
   },
   openGraph: {
     type: "website",
     siteName: "True Goshen Company Limited",
     images: [{ url: "/logo.png", width: 1024, height: 374, alt: "True Goshen Company Limited" }],
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-status-bar-style": "default",
+    "msapplication-TileColor": PWA_THEME_COLOR,
+    "msapplication-config": "none",
+    "theme-color": PWA_THEME_COLOR,
+    "background-color": PWA_BACKGROUND_COLOR,
   },
 };
 
@@ -73,12 +101,13 @@ export default function RootLayout({
         />
       </head>
       <body className="flex min-h-full flex-col font-sans">
-        <ChunkReloadHandler />
+        <SkipToContent />
+        <DeferredChunkReloadHandler />
         <CurrencyProvider>
           <CustomerAuthProvider>
             <CustomerNotificationsProvider>
               <PartsCartProvider>
-                <VehiclePreferencesSync />
+                <DeferredVehiclePreferencesSync />
                 <Suspense fallback={<ChromeFallback>{children}</ChromeFallback>}>
                   <PublicShell>{children}</PublicShell>
                 </Suspense>
@@ -86,6 +115,7 @@ export default function RootLayout({
             </CustomerNotificationsProvider>
           </CustomerAuthProvider>
         </CurrencyProvider>
+        <DeferredPwaShell />
       </body>
     </html>
   );

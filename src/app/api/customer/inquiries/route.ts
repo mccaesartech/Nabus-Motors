@@ -4,6 +4,7 @@ import { syncCustomerAccount } from "@/lib/customer/preorder-account";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import type { CustomerInquirySummary } from "@/lib/customer/types";
 import { parseCustomRequestSpecs } from "@/lib/platform/custom-request";
+import { userOrEmailFilter } from "@/lib/security/postgrest-filter";
 
 const PREORDER_SELECT_FULL =
   "id, status, payment_status, down_payment_usd, vehicle_price_usd, created_at, vehicle_slug, vehicle_title, is_custom_request, reference_code, requested_make, requested_model, requested_year, requested_specs, budget_min, budget_max, matched_vehicle_id, vehicle:vehicles(year, make, model, trim, slug), matched_vehicle:vehicles!preorder_inquiries_matched_vehicle_id_fkey(slug, make, model, year)";
@@ -55,7 +56,7 @@ async function runPreorderSelect(
   if (emailOnly) {
     query = query.ilike("email", email);
   } else {
-    query = query.or(`user_id.eq.${userId},email.ilike.${email}`);
+    query = query.or(userOrEmailFilter(userId, email));
   }
 
   const result = await query.order("created_at", { ascending: false }).limit(50);

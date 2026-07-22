@@ -127,10 +127,9 @@ export async function POST(req: NextRequest) {
     if (linkedUserId) {
       const profileReady = await waitForCustomerProfile(linkedUserId);
       if (!profileReady) {
-        console.warn("[preorder] profile missing before insert, saving without user_id:", {
-          userId: linkedUserId,
-          email: trimmedEmail,
-        });
+        console.warn(
+          "[preorder] profile missing before insert; identifiers omitted and inquiry saved without user link"
+        );
         linkedUserId = null;
       }
     }
@@ -182,10 +181,9 @@ export async function POST(req: NextRequest) {
     if (!result.ok) {
       console.error("[preorder] insert failed:", {
         error: result.error,
-        email: trimmedEmail,
-        vehicleId: resolvedVehicleId,
-        userId: linkedUserId,
-        registrationId,
+        hasVehicle: Boolean(resolvedVehicleId),
+        hasUserLink: Boolean(linkedUserId),
+        hasRegistrationId: Boolean(registrationId),
       });
       return jsonError("Could not save pre-order inquiry. Try WhatsApp or call us.");
     }

@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/account-deletion-cleanup",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/correct-vehicle-colors",
+      "schedule": "15 4 * * *"
+    }
+  ]
+}

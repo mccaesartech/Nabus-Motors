@@ -1,26 +1,57 @@
 "use client";
 
+import dynamic from "next/dynamic";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   ExternalLink,
-  LogOut,
+  Download,
   Menu,
   Search,
-  User,
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { adminLoginPath } from "@/lib/admin/paths";
-import { ROLE_LABELS, type PlatformRole } from "@/lib/platform/permissions";
+import {
+  canInstallPlatformApp,
+  hasPermission,
+  type PlatformRole,
+} from "@/lib/platform/permissions";
 import { platformPageTitle } from "@/lib/platform/page-title";
 import { platformPath } from "@/lib/platform/paths";
-import { GlobalSearch } from "@/components/platform/global-search";
-import { NotificationCenter } from "@/components/platform/notification-center";
 import { PlatformCurrencySelector } from "@/components/platform/platform-currency-selector";
 import { BackNav } from "@/components/shared/back-nav";
 import { Logo } from "@/components/shared/logo";
+import { PlatformAccountMenu } from "@/components/platform/platform-account-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { platformMobileBackTarget } from "@/lib/platform/mobile-back";
+import {
+  isStandaloneForVariant,
+  queryInstalledPwaVariants,
+  requestPwaInstallPrompt,
+  triggerPwaInstall,
+} from "@/lib/pwa/install-utils";
+
+const GlobalSearch = dynamic(
+  () =>
+    import("@/components/platform/global-search").then((m) => m.GlobalSearch),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="hidden h-10 min-w-0 flex-1 rounded-md border border-[var(--platform-border)] bg-[var(--platform-card)] lg:ml-auto lg:block lg:max-w-md"
+        aria-hidden
+      />
+    ),
+  }
+);
+
+const NotificationCenter = dynamic(
+  () =>
+    import("@/components/platform/notification-center").then(
+      (m) => m.NotificationCenter
+    ),
+  { ssr: false, loading: () => <span className="inline-flex size-10" aria-hidden /> }
+);
 
 type PlatformTopbarProps = {
   sidebarCollapsed: boolean;
@@ -37,24 +68,51 @@ export function PlatformTopbar({
   userName,
   userRole,
 }: PlatformTopbarProps) {
-  const router = useRouter();
   const pathname = usePathname() ?? "";
   const pageTitle = platformPageTitle(pathname);
   const mobileBack = platformMobileBackTarget(pathname);
   const showMobileTopbarLogo = !mobileNavOpen && !sidebarCollapsed;
+  const showInstallApp = canInstallPlatformApp(userRole);
+  const showProminentInstallApp =
+    showInstallApp && !hasPermission(userRole, "settings");
+  const [appInstalled, setAppInstalled] = useState(false);
 
-  async function logout() {
-    await fetch("/api/admin/logout", { method: "POST" });
-    router.push(adminLoginPath());
-    router.refresh();
+  useEffect(() => {
+    let active = true;
+
+    async function syncInstallState() {
+      if (isStandaloneForVariant("admin")) {
+        setAppInstalled(true);
+        return;
+      }
+
+      const installed = await queryInstalledPwaVariants();
+      if (active) setAppInstalled(installed.admin);
+    }
+
+    void syncInstallState();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function installApp() {
+    if (appInstalled) return;
+
+    const result = await triggerPwaInstall("admin");
+    if (result === "installed") {
+      setAppInstalled(true);
+    } else if (result === "unavailable") {
+      requestPwaInstallPrompt("admin");
+    }
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-[var(--platform-border)] bg-[var(--platform-bg)] px-3 sm:gap-3 sm:px-4 lg:px-6">
+    <header className="sticky top-0 z-30 flex h-14 min-w-0 max-w-full shrink-0 items-center gap-1.5 overflow-x-hidden border-b border-[var(--platform-border)] bg-[var(--platform-bg)] px-2 sm:gap-3 sm:px-4 lg:px-6">
       {showMobileTopbarLogo && (
         <Link
           href="/platform/dashboard"
-          className="flex shrink-0 items-center lg:hidden"
+          className="hidden shrink-0 items-center sm:flex lg:hidden"
           aria-label="True Goshen Admin"
         >
           <Logo
@@ -115,7 +173,7 @@ export function PlatformTopbar({
 
       <GlobalSearch className="relative z-20 hidden min-w-0 flex-1 lg:ml-auto lg:block lg:max-w-md" />
 
-      <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+      <div className="flex min-w-0 shrink-0 items-center gap-0.5 sm:gap-1">
         <Link
           href={platformPath("search")}
           className="platform-btn-ghost inline-flex size-10 p-0 text-[var(--platform-text)] lg:hidden"
@@ -124,7 +182,9 @@ export function PlatformTopbar({
           <Search className="size-5 shrink-0" strokeWidth={2} aria-hidden />
         </Link>
 
-        <PlatformCurrencySelector />
+        <div className="hidden sm:block">
+          <PlatformCurrencySelector />
+        </div>
 
         <NotificationCenter />
 
@@ -137,32 +197,38 @@ export function PlatformTopbar({
           <span className="hidden md:inline">Public site</span>
         </Link>
 
-        <div className="relative group">
+        {showProminentInstallApp ? (
           <button
             type="button"
-            className="flex items-center gap-2 rounded-md border border-[var(--platform-border)] bg-[var(--platform-card)] px-2 py-1.5 text-sm transition-colors hover:border-[#c4b5fd]"
+            onClick={() => void installApp()}
+            disabled={appInstalled}
+            className="platform-btn-ghost min-h-11 shrink-0 px-2 text-[var(--platform-text)] disabled:cursor-default disabled:opacity-70"
+            aria-label={appInstalled ? "Platform web app installed" : "Install platform web app"}
           >
-            <span className="flex size-7 items-center justify-center rounded-md bg-[rgba(139,92,246,0.12)] text-[var(--platform-accent)]">
-              <User className="size-4" />
-            </span>
-            <span className="hidden text-left md:block">
-              <span className="block text-[var(--platform-text)]">{userName}</span>
-              <span className="block text-[10px] text-[var(--platform-text-secondary)]">
-                {ROLE_LABELS[userRole]}
-              </span>
+            <Download className="size-4" aria-hidden />
+            <span className="hidden sm:inline">
+              {appInstalled ? "App installed" : "Install app"}
             </span>
           </button>
-          <div className="invisible absolute right-0 top-full z-50 mt-1 min-w-[10rem] rounded-lg border border-[var(--platform-border)] bg-[var(--platform-card)] py-1 opacity-0 shadow-lg transition-all group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
-            <button
-              type="button"
-              onClick={logout}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--platform-text-secondary)] hover:bg-[rgba(76,29,149,0.06)] hover:text-[var(--platform-text)]"
-            >
-              <LogOut className="size-4" />
-              Sign out
-            </button>
-          </div>
-        </div>
+        ) : null}
+
+        <PlatformAccountMenu
+          userName={userName}
+          userRole={userRole}
+          className="shrink-0"
+          menuActions={
+            showInstallApp && !showProminentInstallApp ? (
+              <DropdownMenuItem
+                onClick={installApp}
+                disabled={appInstalled}
+                className="min-h-11 cursor-pointer gap-2 px-3 py-2 text-[var(--platform-text-secondary)] focus:bg-[rgba(76,29,149,0.06)] focus:text-[var(--platform-text)]"
+              >
+                <Download className="size-4" aria-hidden />
+                {appInstalled ? "Web app installed" : "Install web app"}
+              </DropdownMenuItem>
+            ) : null
+          }
+        />
       </div>
     </header>
   );

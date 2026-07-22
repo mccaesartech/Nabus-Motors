@@ -73,6 +73,25 @@ async function tryTermiiSmsFallback(
     });
   }
 }
+function buildLogDetail(input: {
+  reason?: string;
+  waMeUrl?: string;
+  waMeText?: string;
+  technical?: string;
+}): string {
+  if (input.waMeUrl || input.waMeText) {
+    return JSON.stringify({
+      reason: input.reason,
+      waMeUrl: input.waMeUrl,
+      waMeText: input.waMeText,
+    });
+  }
+  if (input.technical) {
+    return JSON.stringify({ reason: input.reason ?? input.technical });
+  }
+  return input.reason ?? "";
+}
+
 async function logNotification(row: {
   sourceTable?: string;
   sourceId?: string;
@@ -149,7 +168,9 @@ export async function notifyCustomer(
       result.whatsappDeferred = true;
       result.whatsappStatus = "deferred";
       result.whatsappReason = sanitizeNotificationReason(wa.reason);
-      console.info("[notifyCustomer] WhatsApp deferred (manual):", wa.waMeUrl);
+      console.info(
+        "[notifyCustomer] WhatsApp deferred for manual follow-up; recipient and message omitted"
+      );
       await logNotification({
         sourceTable: params.sourceTable,
         sourceId: params.sourceId,
@@ -157,7 +178,11 @@ export async function notifyCustomer(
         channel: "whatsapp",
         status: "deferred",
         recipient: phone,
-        detail: `${wa.reason ?? "API not configured"} | ${wa.waMeUrl}`,
+        detail: buildLogDetail({
+          reason: "WhatsApp API not configured",
+          waMeUrl: wa.waMeUrl,
+          waMeText: content.whatsapp,
+        }),
       });
     } else {
       result.whatsappStatus = "failed";
@@ -169,7 +194,10 @@ export async function notifyCustomer(
         channel: "whatsapp",
         status: "failed",
         recipient: phone,
-        detail: wa.reason,
+        detail: buildLogDetail({
+          reason: sanitizeNotificationReason(wa.reason),
+          technical: wa.reason,
+        }),
       });
       await tryTermiiSmsFallback(phone, content.whatsapp, params, result);
     }
@@ -198,7 +226,9 @@ export async function notifyCustomer(
       const treatAsFailed = params.emailRequired || !(whatsappCapable && phone);
       result.emailStatus = treatAsFailed ? "failed" : "skipped";
       result.emailReason = sanitizeNotificationReason(mail.emailError);
-      console.info("[notifyCustomer] email not sent:", mail.emailError);
+      console.info("[notifyCustomer] email not sent; recipient and provider detail omitted", {
+        status: result.emailStatus,
+      });
       await logNotification({
         sourceTable: params.sourceTable,
         sourceId: params.sourceId,

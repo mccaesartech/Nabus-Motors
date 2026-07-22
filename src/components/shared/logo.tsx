@@ -95,7 +95,7 @@ function CroppedWordmarkImage({
         width={frameWidth}
         height={imageHeight}
         sizes={`${frameWidth}px`}
-        priority={priority}
+        preload={priority}
         quality={quality}
         className={cn(
           "absolute left-0 top-0 max-w-none object-cover object-left-top",
@@ -169,7 +169,7 @@ export function Logo({
           alt={resolvedAlt}
           fill
           sizes={`${dimensions.width}px`}
-          priority={priority}
+          preload={priority}
           quality={quality}
           className={imageClassName}
         />
@@ -229,7 +229,7 @@ export function LogoWordmark({
         width={FULL_LOGO_WIDTH}
         height={FULL_LOGO_HEIGHT}
         sizes="(max-width: 639px) 120px, (max-width: 1023px) 140px, 180px"
-        priority={priority}
+        preload={priority}
         quality={quality}
         className={cn(
           "h-[calc(100%*374/308)] w-full max-w-none object-cover object-left-top",
@@ -244,7 +244,7 @@ export function LogoWordmark({
       width={FULL_LOGO_WIDTH}
       height={FULL_LOGO_HEIGHT}
       sizes="(max-width: 639px) 120px, (max-width: 1023px) 140px, 180px"
-      priority={priority}
+      preload={priority}
       quality={quality}
       className={cn(
         "h-9 w-auto shrink-0 object-contain object-left sm:h-[var(--header-logo-size)]",

@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 import {
@@ -16,6 +17,7 @@ import {
 import { ROUTES } from "@/lib/routes";
 import type { SortOption } from "@/lib/types";
 import { InventoryMobileFilters } from "@/components/inventory/inventory-mobile-filters";
+import { ActiveFilterChips } from "@/components/inventory/active-filter-chips";
 
 interface SortBarProps {
   total: number;
@@ -38,16 +40,25 @@ export function SortBar({ total }: SortBarProps) {
   }
 
   return (
-    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="mb-6 space-y-3">
+      <Suspense fallback={null}>
+        <ActiveFilterChips />
+      </Suspense>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <p className="text-sm text-muted-foreground">
         {total} vehicle{total !== 1 ? "s" : ""} found
         {isPending && " · Updating..."}
       </p>
       <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
         <InventoryMobileFilters />
-        <span className="text-xs text-muted-foreground">Sort by</span>
+        <span id="inventory-sort-label" className="text-xs text-muted-foreground">
+          Sort by
+        </span>
         <Select value={sort} onValueChange={(v) => handleSortChange(v ?? "newest")}>
-          <SelectTrigger className="w-full min-w-0 sm:w-[180px]">
+          <SelectTrigger
+            className="w-full min-w-0 sm:w-[180px]"
+            aria-labelledby="inventory-sort-label"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -61,6 +72,7 @@ export function SortBar({ total }: SortBarProps) {
           </SelectContent>
         </Select>
       </div>
+    </div>
     </div>
   );
 }

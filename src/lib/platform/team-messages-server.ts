@@ -248,6 +248,51 @@ async function buildUnreadAndLastMessage(
   return { lastMessageByConversation, unreadByConversation };
 }
 
+/**
+ * Cheap unread badge count for sidebar polling — two reads, no channel
+ * provisioning, membership sync writes, user maps, or recipient loads.
+ */
+export async function countUnreadTeamMessages(
+  supabase: SupabaseAdmin,
+  auth: PlatformAuthContext
+): Promise<number> {
+  const filter = actorIsOwner(auth)
+    ? { column: "is_owner" as const, value: true }
+    : { column: "user_id" as const, value: actorUserId(auth)! };
+
+  const { data: myMemberships } = await supabase
+    .from("platform_conversation_members")
+    .select("conversation_id, last_read_at")
+    .eq(filter.column, filter.value);
+
+  if (!myMemberships?.length) return 0;
+
+  const conversationIds = myMemberships.map((m) => m.conversation_id);
+  const lastReadByConversation = new Map(
+    myMemberships.map((m) => [m.conversation_id, m.last_read_at])
+  );
+
+  // Recent messages are enough for a badge; caps payload on long histories.
+  const { data: messages } = await supabase
+    .from("platform_messages")
+    .select("conversation_id, created_at, sender_is_owner, sender_user_id")
+    .in("conversation_id", conversationIds)
+    .order("created_at", { ascending: false })
+    .limit(500);
+
+  let unread = 0;
+  for (const msg of messages ?? []) {
+    const isMine = actorIsOwner(auth)
+      ? msg.sender_is_owner
+      : !msg.sender_is_owner && msg.sender_user_id === actorUserId(auth);
+    if (isMine) continue;
+    const lastRead = lastReadByConversation.get(msg.conversation_id);
+    if (lastRead && msg.created_at <= lastRead) continue;
+    unread += 1;
+  }
+  return unread;
+}
+
 export async function buildChannelSummaries(
   supabase: SupabaseAdmin,
   auth: PlatformAuthContext,

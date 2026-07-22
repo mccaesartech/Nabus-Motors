@@ -422,10 +422,7 @@ export async function sendSupabaseAuthPasswordReset(
     return false;
   }
 
-  console.info("[password-reset] Supabase auth reset email triggered:", {
-    email: trimmedEmail,
-    redirectTo,
-  });
+  console.info("[password-reset] Supabase auth reset email triggered; recipient omitted");
   await logPasswordResetEvent({
     sourceTable: logContext?.sourceTable,
     sourceId: logContext?.sourceId,
@@ -502,11 +499,9 @@ export async function sendCustomerPasswordReset(params: {
     emailDeliveryMethod = "resend";
     notification = { ...notify, emailStatus: "sent" };
   } else if (!emailSent) {
-    const priorReason = notify.emailReason ?? "Resend delivery failed";
     console.warn("[password-reset] Supabase + Resend both failed:", {
-      email: params.email,
-      priorReason,
       whatsappSent: notify.whatsappSent,
+      deliveryDetailOmitted: true,
     });
   } else if (emailSent && notify.emailSent) {
     // Supabase sent; Resend was skipped — reflect Supabase in notification payload.

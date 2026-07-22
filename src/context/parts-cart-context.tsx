@@ -561,12 +561,12 @@ export function PartsCartProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const flush = () => flushServerSync();
-    window.addEventListener("pagehide", flush);
-    document.addEventListener("visibilitychange", () => {
+    const onVisibilityChange = () => {
       if (document.visibilityState === "hidden") flush();
-    });
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
-      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [flushServerSync]);
 
@@ -637,8 +637,9 @@ export function usePartsCart() {
 }
 
 export function usePartsCartCount() {
-  const { itemCount, loaded } = usePartsCart();
-  return { cartCount: itemCount, loaded };
+  const ctx = useContext(CartContext);
+  if (!ctx) return { cartCount: 0, loaded: false };
+  return { cartCount: ctx.itemCount, loaded: ctx.loaded };
 }
 
 export const CartProvider = PartsCartProvider;

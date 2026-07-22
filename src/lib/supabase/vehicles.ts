@@ -13,10 +13,22 @@ import {
 } from "@/lib/admin/vehicle-pending-changes";
 import type { CartVehicleCatalogState } from "@/lib/parts/cart-types";
 import { PUBLIC_VEHICLE_STATUSES } from "@/lib/vehicles/availability";
+import { isLocallyAvailableForBanner } from "@/lib/vehicles/local-availability";
 import { notDeletedFilter } from "@/lib/platform/trash-types";
 import { splitVehicleIdentifiers } from "@/lib/vehicles/identifier-map";
+import { allowDemoData } from "@/lib/runtime-mode";
 
 const FETCH_TIMEOUT_MS = 5000;
+
+function developmentVehicleFallback(): Vehicle[] {
+  if (!allowDemoData()) return [];
+  return mockVehicles.filter(
+    (vehicle) =>
+      !vehicle.status ||
+      vehicle.status === "available" ||
+      vehicle.status === "pre_order"
+  );
+}
 
 /** Cache tag for on-demand invalidation after admin inventory changes. */
 export const PUBLIC_VEHICLES_CACHE_TAG = "public-vehicles";
@@ -42,7 +54,8 @@ function isVehicleTrustColumnsSchemaError(message?: string | null): boolean {
     lower.includes("financing_available") ||
     lower.includes("shipment_available") ||
     lower.includes("customs_clearing_available") ||
-    lower.includes("available_locally")
+    lower.includes("available_locally") ||
+    lower.includes("local_availability_at")
   );
 }
 
@@ -168,7 +181,7 @@ async function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
 
 /** Listing/card views — omit heavy JSON columns (specs, history, description, gallery). */
 const PUBLIC_LISTING_SELECT_WITH_IMAGES =
-  "id, slug, make, model, year, trim, price, mileage, fuel_type, transmission, condition, body_type, location, featured, images, primary_image_url, additional_images, status, trust_badges, country_of_origin, financing_available, shipment_available, customs_clearing_available, available_locally, created_at";
+  "id, slug, make, model, year, trim, price, mileage, fuel_type, transmission, condition, body_type, location, featured, images, primary_image_url, additional_images, status, trust_badges, country_of_origin, financing_available, shipment_available, customs_clearing_available, available_locally, local_availability_at, created_at";
 
 const PUBLIC_LISTING_SELECT_LEGACY =
   "id, slug, make, model, year, trim, price, mileage, fuel_type, transmission, condition, body_type, location, featured, images, status, created_at";
@@ -186,7 +199,7 @@ function publicListingSelect(): string {
   return PUBLIC_LISTING_SELECT_WITH_IMAGES;
 }
 
-interface VehicleRow {
+export interface VehicleRow {
   id: string;
   slug: string;
   make: string;
@@ -221,10 +234,11 @@ interface VehicleRow {
   warranty_notes?: string | null;
   walkaround_video_url?: string | null;
   available_locally?: boolean | null;
+  local_availability_at?: string | null;
   created_at: string;
 }
 
-function mapRow(row: VehicleRow): Vehicle {
+export function mapRow(row: VehicleRow): Vehicle {
   const gallery = resolveVehicleGallery({
     gallery: row.gallery as VehicleGalleryData | null,
     images: row.images ?? [],
@@ -271,23 +285,31 @@ function mapRow(row: VehicleRow): Vehicle {
     trustBadges: parseTrustBadges(row.trust_badges),
     inspectionSummary: row.inspection_summary ?? null,
     countryOfOrigin: (row.country_of_origin as CountryOfOrigin | null) ?? null,
-    financingAvailable: row.financing_available ?? true,
-    shipmentAvailable: row.shipment_available ?? true,
-    customsClearingAvailable: row.customs_clearing_available ?? true,
+    financingAvailable: row.financing_available ?? false,
+    shipmentAvailable: row.shipment_available ?? false,
+    customsClearingAvailable: row.customs_clearing_available ?? false,
     warrantyNotes: row.warranty_notes ?? null,
     walkaroundVideoUrl: row.walkaround_video_url ?? null,
     availableLocally: row.available_locally ?? false,
+    localAvailabilityAt: row.local_availability_at ?? null,
     createdAt: row.created_at.split("T")[0],
   };
 }
 
 async function fetchAllVehiclesUncached(): Promise<Vehicle[]> {
+  // One-shot sync of vehicles.color from audited primary photos (idempotent).
+  void import("@/lib/vehicles/apply-photo-color-corrections")
+    .then(({ applyInventoryPhotoColorCorrections }) =>
+      applyInventoryPhotoColorCorrections()
+    )
+    .catch((err) => {
+      console.error("[vehicles] photo color correction failed:", err);
+    });
+
   const supabase = createServerSupabase();
 
   if (!supabase) {
-    return mockVehicles.filter(
-      (v) => !v.status || v.status === "available" || v.status === "pre_order"
-    );
+    return developmentVehicleFallback();
   }
 
   try {
@@ -309,17 +331,13 @@ async function fetchAllVehiclesUncached(): Promise<Vehicle[]> {
       if (error) console.error("Supabase fetch failed, using mock data:", error.message);
       return isSupabaseConfigured() && data?.length === 0
         ? []
-        : mockVehicles.filter(
-            (v) => !v.status || v.status === "available" || v.status === "pre_order"
-          );
+        : developmentVehicleFallback();
     }
 
     return data.map((row) => mapRow(row as VehicleRow));
   } catch (err) {
     console.error("Supabase fetch failed, using mock data:", err);
-    return mockVehicles.filter(
-      (v) => !v.status || v.status === "available" || v.status === "pre_order"
-    );
+    return developmentVehicleFallback();
   }
 }
 
@@ -342,6 +360,7 @@ export const fetchVehicleBySlug = reactCache(async (slug: string): Promise<Vehic
   const supabase = createServerSupabase();
 
   if (!supabase) {
+    if (!allowDemoData()) return null;
     return (
       mockVehicles.find(
         (v) =>
@@ -386,6 +405,39 @@ export async function fetchFeaturedVehicles(): Promise<Vehicle[]> {
   return all.filter((v) => v.featured);
 }
 
+function sortLocallyAvailableVehicles(vehicles: Vehicle[]): Vehicle[] {
+  return [...vehicles].sort((a, b) => {
+    const aTime = a.localAvailabilityAt
+      ? new Date(a.localAvailabilityAt).getTime()
+      : 0;
+    const bTime = b.localAvailabilityAt
+      ? new Date(b.localAvailabilityAt).getTime()
+      : 0;
+    if (bTime !== aTime) return bTime - aTime;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+}
+
+const getCachedLocallyAvailableVehicles = unstable_cache(
+  async () => {
+    const all = await fetchAllVehiclesUncached();
+    return sortLocallyAvailableVehicles(all.filter(isLocallyAvailableForBanner));
+  },
+  ["public-vehicles-locally-available"],
+  {
+    revalidate: PUBLIC_VEHICLES_REVALIDATE_SECONDS,
+    tags: [PUBLIC_VEHICLES_CACHE_TAG],
+  }
+);
+
+/** Public vehicles marked as locally available — cached with inventory listings. */
+export const getLocallyAvailableVehicles = reactCache(() =>
+  getCachedLocallyAvailableVehicles()
+);
+
+/** @deprecated Use getLocallyAvailableVehicles */
+export const fetchLocallyAvailableVehicles = getLocallyAvailableVehicles;
+
 export type CheckoutVehicleRecord = {
   id: string;
   slug: string;
@@ -398,6 +450,7 @@ export type CheckoutVehicleRecord = {
 };
 
 function matchMockByIdentifiers(identifiers: string[]): Vehicle[] {
+  if (!allowDemoData()) return [];
   const idSet = new Set(identifiers);
   return mockVehicles.filter((v) => idSet.has(v.id) || idSet.has(v.slug));
 }

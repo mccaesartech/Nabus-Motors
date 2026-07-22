@@ -300,7 +300,7 @@ export function FreightQuoteForm({ initialServiceType }: FreightQuoteFormProps) 
       <Button
         type="submit"
         disabled={submitting}
-        className="w-full bg-brand-purple text-white hover:bg-brand-purple-dark sm:w-auto"
+        className="w-full bg-brand-freight-accent text-white hover:bg-brand-freight-accent-dark sm:w-auto"
       >
         {submitting ? "Submitting…" : "Request quote"}
       </Button>

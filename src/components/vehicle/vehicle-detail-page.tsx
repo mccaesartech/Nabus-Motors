@@ -1,25 +1,48 @@
 import { notFound } from "next/navigation";
-import {
-  Calendar,
-  Fuel,
-  Gauge,
-  MapPin,
-  Settings,
-  Shield,
-} from "lucide-react";
+import dynamic from "next/dynamic";
 import { Container } from "@/components/shared/container";
-import { FullPageLink } from "@/components/shared/full-page-link";
+import Link from "next/link";
 import { VehicleGallery } from "@/components/vehicle/vehicle-gallery";
-import { VehicleWalkaroundVideo } from "@/components/vehicle/vehicle-walkaround-video";
-import { VehicleDetailSidebar } from "@/components/vehicle/vehicle-detail-sidebar";
 import { VehicleInspectionSummary } from "@/components/vehicle/vehicle-inspection-summary";
 import { VehicleWarrantyInfo } from "@/components/vehicle/vehicle-warranty-info";
-import { VehicleOwnershipCosts } from "@/components/vehicle/vehicle-ownership-costs";
 import { VehicleCompatibleParts } from "@/components/vehicle/vehicle-compatible-parts";
-import { RelatedVehiclesSection } from "@/components/vehicle/related-vehicles-section";
 import { fetchVehicleBySlug } from "@/lib/supabase/vehicles";
 import { ROUTES } from "@/lib/routes";
 import { formatMileage, formatVehicleName } from "@/lib/format";
+import { resolveExteriorColor } from "@/lib/vehicles/vehicle-colors";
+import { ExteriorColorValue } from "@/components/shared/vehicle-color-swatch";
+
+const VehicleWalkaroundVideo = dynamic(
+  () =>
+    import("@/components/vehicle/vehicle-walkaround-video").then((m) => ({
+      default: m.VehicleWalkaroundVideo,
+    })),
+  { loading: () => null }
+);
+
+const VehicleDetailSidebar = dynamic(
+  () =>
+    import("@/components/vehicle/vehicle-detail-sidebar").then((m) => ({
+      default: m.VehicleDetailSidebar,
+    })),
+  { loading: () => <div className="min-h-[24rem] animate-pulse rounded-lg bg-muted/40" aria-hidden /> }
+);
+
+const VehicleOwnershipCosts = dynamic(
+  () =>
+    import("@/components/vehicle/vehicle-ownership-costs").then((m) => ({
+      default: m.VehicleOwnershipCosts,
+    })),
+  { loading: () => null }
+);
+
+const RelatedVehiclesSection = dynamic(
+  () =>
+    import("@/components/vehicle/related-vehicles-section").then((m) => ({
+      default: m.RelatedVehiclesSection,
+    })),
+  { loading: () => null }
+);
 
 interface VehicleDetailPageProps {
   slug: string;
@@ -43,9 +66,9 @@ export async function VehicleDetailPage({ slug }: VehicleDetailPageProps) {
     <div className="py-10 sm:py-14">
       <Container>
         <nav className="mb-6 hidden text-sm text-muted-foreground sm:block">
-          <FullPageLink href={ROUTES.auto.inventory} className="hover:text-foreground">
+          <Link href={ROUTES.auto.inventory} prefetch className="hover:text-foreground">
             Inventory
-          </FullPageLink>
+          </Link>
           <span className="mx-2">/</span>
           <span className="text-foreground">{formatVehicleName(vehicle)}</span>
         </nav>
@@ -79,7 +102,7 @@ export async function VehicleDetailPage({ slug }: VehicleDetailPageProps) {
                 ))}
                 <div className="flex justify-between bg-white px-4 py-3 text-sm">
                   <span className="text-muted-foreground">Exterior Color</span>
-                  <span className="font-medium">{vehicle.color}</span>
+                  <ExteriorColorValue color={resolveExteriorColor(vehicle)} />
                 </div>
                 <div className="flex justify-between bg-white px-4 py-3 text-sm">
                   <span className="text-muted-foreground">VIN</span>

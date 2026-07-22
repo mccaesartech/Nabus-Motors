@@ -1,7 +1,8 @@
-import Image from "next/image";
+import Image, { getImageProps } from "next/image";
 import Link from "next/link";
+import { CorporateStatValue } from "@/components/corporate/corporate-stat-value";
 import { Container } from "@/components/shared/container";
-import { HeroBackgroundVideo } from "@/components/shared/hero-background-video";
+import { DeferredHeroBackgroundVideo } from "@/components/shared/deferred-hero-background-video";
 import { SectionHeader } from "@/components/shared/section-header";
 import { ServiceImageCardGrid } from "@/components/shared/service-image-card";
 import { Button } from "@/components/ui/button";
@@ -22,11 +23,36 @@ export function CorporateHero({ content }: CorporateHeroProps) {
   const videoUrl = normalizeMediaUrl(content.heroVideoUrl) || CORPORATE_HERO_VIDEO_URL;
   const posterUrl = normalizeMediaUrl(content.heroPosterUrl) || CORPORATE_HERO_POSTER_URL;
   const video = { type: "file" as const, url: videoUrl };
+  const { props: posterPreload } = getImageProps({
+    src: posterUrl,
+    alt: "",
+    fill: true,
+    priority: true,
+    sizes: "100vw",
+  });
 
   return (
     <section className="relative min-h-[calc(100dvh-var(--header-height))] w-full overflow-hidden bg-brand-charcoal-dark">
+      <link
+        rel="preload"
+        as="image"
+        href={posterPreload.src}
+        imageSrcSet={posterPreload.srcSet}
+        imageSizes={posterPreload.sizes}
+        fetchPriority="high"
+      />
       <div className="absolute inset-0 z-0 overflow-hidden">
-        <HeroBackgroundVideo
+        <Image
+          src={posterUrl}
+          alt=""
+          aria-hidden
+          fill
+          priority
+          sizes="100vw"
+          decoding="async"
+          className="object-cover object-center"
+        />
+        <DeferredHeroBackgroundVideo
           video={video}
           poster={posterUrl}
           objectFit="cover"
@@ -57,7 +83,7 @@ export function CorporateHero({ content }: CorporateHeroProps) {
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap">
             <Button
               size="lg"
-              className="min-h-12 border-2 border-brand-cta-gold/90 bg-brand-cta-gold px-6 font-bold uppercase tracking-[0.12em] text-white hover:bg-brand-cta-gold-hover"
+              className="min-h-12 border-2 border-brand-cta-gold/90 bg-brand-cta-gold px-6 font-bold uppercase tracking-[0.12em] text-brand-primary hover:bg-brand-cta-gold-hover"
               render={<Link href={content.ctaPrimaryHref} />}
             >
               {content.ctaPrimaryLabel}
@@ -143,12 +169,14 @@ type CorporateStatsProps = {
 
 export function CorporateStats({ content }: CorporateStatsProps) {
   return (
-    <section className="border-b border-border bg-brand-black py-14 sm:py-16">
+    <section className="border-b border-border bg-brand-primary py-14 sm:py-16">
       <Container>
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {content.items.map((stat) => (
             <div key={stat.id} className="text-center">
-              <p className="text-3xl font-bold text-brand-cta-gold sm:text-4xl">{stat.value}</p>
+              <p className="text-3xl font-bold text-brand-cta-gold sm:text-4xl">
+                <CorporateStatValue value={stat.value} />
+              </p>
               <p className="mt-2 text-sm text-white/70">{stat.label}</p>
             </div>
           ))}
@@ -203,7 +231,11 @@ export function CorporateContactCta({ content }: CorporateContactCtaProps) {
             className="mx-auto"
           />
           <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Button size="lg" render={<Link href={content.contactCtaPrimaryHref} />}>
+            <Button
+              size="lg"
+              className="bg-brand-primary hover:bg-brand-charcoal"
+              render={<Link href={content.contactCtaPrimaryHref} />}
+            >
               {content.contactCtaPrimaryLabel}
             </Button>
             <Button

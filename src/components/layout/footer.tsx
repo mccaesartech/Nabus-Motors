@@ -9,6 +9,7 @@ import {
   footerLegalLinks,
   isValidExternalHref,
 } from "@/components/layout/footer-links";
+import { InstallCustomerAppButton } from "@/components/pwa/install-customer-app-button";
 import { GOOGLE_MAPS_URL } from "@/lib/constants";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
@@ -82,7 +83,7 @@ export function Footer({ content, showInventory = false, brand = "corporate" }: 
   ].filter((social) => isValidExternalHref(social.href));
 
   return (
-    <footer className="relative z-10 border-t border-white/10 bg-brand-charcoal text-white">
+    <footer className="relative z-10 border-t border-white/10 bg-brand-primary text-white">
       <Container className="py-12 lg:py-14">
         <div
           className={cn(
@@ -138,7 +139,7 @@ export function Footer({ content, showInventory = false, brand = "corporate" }: 
                   </a>
                   <a
                     href={`tel:${phoneTel}`}
-                    className="inline-flex w-fit text-sm font-medium text-brand-cta-gold transition-colors hover:text-brand-cta-gold-hover"
+                    className="inline-flex w-fit text-sm font-medium text-white/90 transition-colors hover:text-white"
                   >
                     Call now
                   </a>
@@ -164,6 +165,9 @@ export function Footer({ content, showInventory = false, brand = "corporate" }: 
 
           <FooterSection title="Company">
             <ul className="space-y-0.5">
+              <li>
+                <InstallCustomerAppButton display="footer" />
+              </li>
               {footerCompanyLinks.map((link) => (
                 <li key={link.href}>
                   <FullPageLink href={link.href} className={footerLinkClass}>
@@ -220,7 +224,7 @@ export function Footer({ content, showInventory = false, brand = "corporate" }: 
 
         {/* Copyright & legal */}
         <div className="mt-10 flex flex-col items-center gap-4 border-t border-white/10 pt-8 text-center sm:flex-row sm:justify-between sm:text-left lg:mt-12 lg:pt-8">
-          <p className="text-xs text-white/55">
+          <p className="text-xs text-white/70">
             © {new Date().getFullYear()} {global.siteName}. All rights
             reserved.
           </p>

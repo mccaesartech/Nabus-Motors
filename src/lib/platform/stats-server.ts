@@ -3,6 +3,7 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { computeInventoryChartSegments } from "@/lib/platform/inventory-chart";
+import { countLeadPipelineStages } from "@/lib/platform/lead-pipeline";
 import { countOpenInquiries } from "@/lib/platform/notifications";
 import { getAdminSiteSettings, isLowStock, toOperationalSettings } from "@/lib/platform/site-settings";
 import { notDeletedFilter } from "@/lib/platform/trash-types";
@@ -41,6 +42,12 @@ export type PlatformStatsPayload = {
   newPreorder: number;
   pendingFinance: number;
   pendingAppraisal: number;
+  leadPipelineNew: number;
+  leadPipelineContacted: number;
+  leadPipelineQualified: number;
+  leadPipelineWon: number;
+  leadPipelineLost: number;
+  leadPipelineTotal: number;
   newsletter: number;
   totalLeads: number;
   estimatedRevenue: number;
@@ -117,6 +124,7 @@ async function computePlatformStats(): Promise<PlatformStatsPayload | null> {
     totalPreorderInquiries,
     downPaymentPaidCount,
     openInquiries,
+    leadPipeline,
     newsletter,
     soldVehiclesData,
     unreadNotifications,
@@ -131,6 +139,7 @@ async function computePlatformStats(): Promise<PlatformStatsPayload | null> {
     count("preorder_inquiries"),
     count("preorder_inquiries", { column: "payment_status", value: "down_payment_paid" }),
     countOpenInquiries(supabase),
+    countLeadPipelineStages(supabase),
     count("newsletter_subscribers"),
     notDeletedFilter(supabase.from("vehicles").select("price")).eq("status", "sold"),
     supabase
@@ -182,6 +191,12 @@ async function computePlatformStats(): Promise<PlatformStatsPayload | null> {
     newPreorder,
     pendingFinance,
     pendingAppraisal,
+    leadPipelineNew: leadPipeline.new,
+    leadPipelineContacted: leadPipeline.contacted,
+    leadPipelineQualified: leadPipeline.qualified,
+    leadPipelineWon: leadPipeline.won,
+    leadPipelineLost: leadPipeline.lost,
+    leadPipelineTotal: leadPipeline.total,
     newsletter,
     totalLeads,
     estimatedRevenue,
