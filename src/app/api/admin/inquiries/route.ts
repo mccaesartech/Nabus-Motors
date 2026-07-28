@@ -30,25 +30,40 @@ export async function GET(req: NextRequest) {
     return data ?? [];
   };
 
-  const data: Record<string, unknown[]> = {};
+  const want = (key: string) => type === "all" || type === key;
 
-  if (type === "all" || type === "contact") {
-    data.contact = await fetchTable("contact_inquiries");
-  }
-  if (type === "all" || type === "finance") {
-    data.finance = await fetchTable("finance_applications");
-  }
-  if (type === "all" || type === "appraisal") {
-    data.appraisal = await fetchTable("appraisal_requests");
-  }
-  if (type === "all" || type === "vehicle") {
-    data.vehicle = await fetchTable("vehicle_inquiries");
-  }
-  if (type === "all" || type === "preorder") {
-    data.preorder = await fetchPreorderInquiries(supabase);
-  }
-  if (type === "all" || type === "order") {
-    const orders = await fetchAdminOrders(supabase);
+  const [
+    contact,
+    finance,
+    appraisal,
+    vehicle,
+    preorder,
+    orders,
+    newsletter,
+    profilesRes,
+  ] = await Promise.all([
+    want("contact") ? fetchTable("contact_inquiries") : Promise.resolve([]),
+    want("finance") ? fetchTable("finance_applications") : Promise.resolve([]),
+    want("appraisal") ? fetchTable("appraisal_requests") : Promise.resolve([]),
+    want("vehicle") ? fetchTable("vehicle_inquiries") : Promise.resolve([]),
+    want("preorder") ? fetchPreorderInquiries(supabase) : Promise.resolve([]),
+    want("order") ? fetchAdminOrders(supabase) : Promise.resolve([]),
+    want("newsletter")
+      ? fetchTable("newsletter_subscribers", "subscribed_at")
+      : Promise.resolve([]),
+    supabase
+      .from("profiles")
+      .select("id, email, registration_id, first_name, last_name, phone")
+      .not("registration_id", "is", null),
+  ]);
+
+  const data: Record<string, unknown[]> = {};
+  if (want("contact")) data.contact = contact;
+  if (want("finance")) data.finance = finance;
+  if (want("appraisal")) data.appraisal = appraisal;
+  if (want("vehicle")) data.vehicle = vehicle;
+  if (want("preorder")) data.preorder = preorder;
+  if (want("order")) {
     data.order = orders.map((order) => ({
       id: order.id,
       name: order.name,
@@ -65,16 +80,14 @@ export async function GET(req: NextRequest) {
       part_count: order.partCount,
     }));
   }
-  if (type === "all" || type === "newsletter") {
-    data.newsletter = await fetchTable("newsletter_subscribers", "subscribed_at");
-  }
+  if (want("newsletter")) data.newsletter = newsletter;
 
-  const { data: profiles } = await supabase
-    .from("profiles")
-    .select("id, email, registration_id, first_name, last_name, phone")
-    .not("registration_id", "is", null);
-
-  return NextResponse.json({ ok: true, configured: true, data, profiles: profiles ?? [] });
+  return NextResponse.json({
+    ok: true,
+    configured: true,
+    data,
+    profiles: profilesRes.data ?? [],
+  });
 }
 
 const TABLE_MAP: Record<string, string> = {

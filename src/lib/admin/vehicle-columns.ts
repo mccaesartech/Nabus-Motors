@@ -72,6 +72,44 @@ export const ADMIN_VEHICLE_SELECT_SAFE = [
   ...APPROVAL_VEHICLE_COLUMNS,
 ].join(", ");
 
+/**
+ * Inventory/sales list reads — omit heavy blobs (gallery, long description, video).
+ * Edit forms must request `fields=full`.
+ */
+export const ADMIN_VEHICLE_SELECT_LIST = [
+  "id",
+  "slug",
+  "make",
+  "model",
+  "year",
+  "trim",
+  "price",
+  "mileage",
+  "fuel_type",
+  "transmission",
+  "condition",
+  "body_type",
+  "location",
+  "engine_size",
+  "color",
+  "vin",
+  "featured",
+  "status",
+  "images",
+  "created_at",
+  "updated_at",
+  ...APPROVAL_VEHICLE_COLUMNS,
+  "primary_image_url",
+  "financing_available",
+  "shipment_available",
+  "customs_clearing_available",
+  "available_locally",
+  "local_availability_at",
+  "price_currency",
+  "listed_price",
+  "stock_quantity",
+].join(", ");
+
 /** PATCH pre-read — includes local availability when migrated (067). */
 export const ADMIN_PATCH_EXISTING_SELECT =
   "id, slug, approval_status, pending_changes, year, make, model, status, available_locally, local_availability_at, shipment_available";
@@ -79,10 +117,12 @@ export const ADMIN_PATCH_EXISTING_SELECT =
 export const ADMIN_PATCH_EXISTING_SELECT_MINIMAL =
   "id, slug, approval_status, pending_changes, year, make, model, status";
 
-export type AdminVehicleSelectMode = "full" | "safe";
+export type AdminVehicleSelectMode = "full" | "safe" | "list";
 
 export function adminVehicleSelectColumns(mode: AdminVehicleSelectMode = "full"): string {
-  return mode === "full" ? ADMIN_VEHICLE_SELECT_FULL : ADMIN_VEHICLE_SELECT_SAFE;
+  if (mode === "list") return ADMIN_VEHICLE_SELECT_LIST;
+  if (mode === "safe") return ADMIN_VEHICLE_SELECT_SAFE;
+  return ADMIN_VEHICLE_SELECT_FULL;
 }
 
 /** PostgREST / Postgres missing-column errors (with or without "schema cache"). */

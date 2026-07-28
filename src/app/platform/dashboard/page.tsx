@@ -240,8 +240,8 @@ export default function PlatformDashboardPage() {
   }, [loadCore, session]);
 
   useEffect(() => {
-    if (session) void loadInsights();
-  }, [loadInsights, session]);
+    if (session && idleReady) void loadInsights();
+  }, [idleReady, loadInsights, session]);
 
   useEffect(() => {
     if (session && idleReady) void loadExtras();

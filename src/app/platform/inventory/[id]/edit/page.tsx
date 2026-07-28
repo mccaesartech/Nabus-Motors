@@ -44,7 +44,7 @@ export default function EditVehiclePage() {
   } | null>(null);
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/admin/vehicles");
+    const res = await fetch("/api/admin/vehicles?fields=full");
     if (isAdminAuthError(res)) {
       router.push(adminLoginPath());
       return;

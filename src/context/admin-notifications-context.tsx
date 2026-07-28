@@ -111,6 +111,8 @@ export function AdminNotificationsProvider({
     },
     onRefresh: load,
     enabled: Boolean(session) && idleReady,
+    // Provider already polls every POLL_MS — avoid 30s realtime fallback thrash.
+    pollFallback: false,
   });
 
   useEffect(() => {

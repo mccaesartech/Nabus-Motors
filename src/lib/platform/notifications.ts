@@ -316,14 +316,22 @@ export async function fetchAdminNotifications(
     }
   }
 
-  const { data: failedDeliveries } = await supabase
-    .from("notification_log")
-    .select("id, template, channel, status, recipient, detail, created_at, source_table, source_id")
-    .in("status", ["failed", "deferred", "undeliverable"])
-    .order("created_at", { ascending: false })
-    .limit(5);
+  const scope = auth ? adminNotificationRecipientScope(auth) : null;
 
-  for (const row of failedDeliveries ?? []) {
+  const [failedDeliveriesRes, trashedIds, dismissedKeys] = await Promise.all([
+    supabase
+      .from("notification_log")
+      .select("id, template, channel, status, recipient, detail, created_at, source_table, source_id")
+      .in("status", ["failed", "deferred", "undeliverable"])
+      .order("created_at", { ascending: false })
+      .limit(5),
+    listTrashedAdminNotificationIds(supabase),
+    scope
+      ? listDismissedAdminNotificationKeys(supabase, scope)
+      : Promise.resolve(new Set<string>()),
+  ]);
+
+  for (const row of failedDeliveriesRes.data ?? []) {
     const mapped = mapNotificationLogToAdminNotification(row);
     const exists = notifications.some((n) => n.id === mapped.id);
     if (exists) continue;
@@ -331,12 +339,9 @@ export async function fetchAdminNotifications(
   }
 
   let finalNotifications = notifications.slice(0, limit);
-  const trashedIds = await listTrashedAdminNotificationIds(supabase);
   finalNotifications = filterOutTrashedAdminNotifications(finalNotifications, trashedIds);
 
-  if (auth) {
-    const scope = adminNotificationRecipientScope(auth);
-    const dismissedKeys = await listDismissedAdminNotificationKeys(supabase, scope);
+  if (auth && dismissedKeys.size > 0) {
     finalNotifications = applyDismissalsToNotifications(finalNotifications, dismissedKeys);
   }
 

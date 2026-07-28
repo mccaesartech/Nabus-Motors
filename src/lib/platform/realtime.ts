@@ -136,6 +136,12 @@ type UseNotificationRealtimeOptions = {
   onNotification: (notification: AdminNotification) => void;
   onRefresh: () => void;
   enabled?: boolean;
+  /**
+   * When false, skip the 30s poll fallback. Prefer this when a parent provider
+   * already polls (AdminNotificationsProvider) to avoid duplicate API thrash.
+   * Realtime INSERT still triggers onRefresh.
+   */
+  pollFallback?: boolean;
 };
 
 export function useNotificationRealtime({
@@ -143,6 +149,7 @@ export function useNotificationRealtime({
   onNotification,
   onRefresh,
   enabled = true,
+  pollFallback = true,
 }: UseNotificationRealtimeOptions) {
   const onNotificationRef = useRef(onNotification);
   const onRefreshRef = useRef(onRefresh);
@@ -181,15 +188,17 @@ export function useNotificationRealtime({
       )
       .subscribe();
 
-    const pollTimer = window.setInterval(() => {
-      if (!realtimeActiveRef.current) {
-        onRefreshRef.current();
-      }
-    }, POLL_FALLBACK_MS);
+    const pollTimer = pollFallback
+      ? window.setInterval(() => {
+          if (!realtimeActiveRef.current) {
+            onRefreshRef.current();
+          }
+        }, POLL_FALLBACK_MS)
+      : null;
 
     return () => {
-      window.clearInterval(pollTimer);
+      if (pollTimer != null) window.clearInterval(pollTimer);
       void client.removeChannel(channel);
     };
-  }, [enabled, session?.type, session?.userId]);
+  }, [enabled, pollFallback, session?.type, session?.userId]);
 }
