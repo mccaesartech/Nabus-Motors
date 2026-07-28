@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { canViewInviteLinks, requirePermission } from "@/lib/admin/auth";
+import { apiFailure, dbFailure } from "@/lib/errors/api";
+import { mapDatabaseError } from "@/lib/errors/db-errors";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { INVITABLE_ROLES, ROLE_LABELS, normalizeRole } from "@/lib/platform/permissions";
 import { generateToken, hashPassword, hashToken } from "@/lib/platform/password";
@@ -62,7 +64,8 @@ function withSchemaMigrationHint(message: string): string {
     });
     return "Could not complete that action. Please try again.";
   }
-  return message;
+  // Never echo the raw Postgres text — map it, or fall back to a safe sentence.
+  return mapDatabaseError({ message }, "Could not complete that action. Please try again.").message;
 }
 
 function notifyPayload(result: TeamNotifyResult) {
@@ -282,8 +285,12 @@ export async function GET(req: NextRequest) {
         user: { id: user.id, email: user.email, name: user.name },
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Could not generate invite link.";
-      return NextResponse.json({ ok: false, message }, { status: 500 });
+      return apiFailure(error, {
+        module: "api.admin.platform-users.GET.inviteLink",
+        message: "Could not generate invite link. Try again.",
+        request: req,
+        actor: { id: auth.auth.userId, role: auth.auth.role, type: auth.auth.type },
+      });
     }
   }
 
@@ -607,6 +614,31 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "Supabase not configured" }, { status: 503 });
   }
 
+  // Privilege-escalation guard: only an owner may grant the owner role or
+  // modify an existing owner account. `users` permission is held by both owner
+  // and super_admin, so without this a super_admin could self-escalate to owner
+  // or disable/demote the real owner.
+  const actorIsOwner = canViewInviteLinks(auth.auth);
+  if (role === "owner" && !actorIsOwner) {
+    return NextResponse.json(
+      { ok: false, message: "Only the owner can assign the owner role." },
+      { status: 403 }
+    );
+  }
+  if (!actorIsOwner && (role || status || name)) {
+    const { data: targetRow } = await supabase
+      .from("platform_users")
+      .select("role")
+      .eq("id", id)
+      .maybeSingle();
+    if (targetRow && normalizeRole(targetRow.role) === "owner") {
+      return NextResponse.json(
+        { ok: false, message: "Only the owner can modify an owner account." },
+        { status: 403 }
+      );
+    }
+  }
+
   let lastNotify: TeamNotifyResult | null = null;
   let updatedRole: string | undefined;
 
@@ -806,11 +838,21 @@ export async function DELETE(req: NextRequest) {
         .eq("id", id)
         .maybeSingle();
       if (fallback.error) {
-        return NextResponse.json({ ok: false, message: fallback.error.message }, { status: 500 });
+        return dbFailure(fallback.error, {
+          module: "api.admin.platform-users.DELETE.load",
+          message: "We could not load that team member. Try again.",
+          request: req,
+          actor: { id: auth.auth.userId, role: auth.auth.role, type: auth.auth.type },
+        });
       }
       user = fallback.data;
     } else if (primary.error) {
-      return NextResponse.json({ ok: false, message: primary.error.message }, { status: 500 });
+      return dbFailure(primary.error, {
+        module: "api.admin.platform-users.DELETE.load",
+        message: "We could not load that team member. Try again.",
+        request: req,
+        actor: { id: auth.auth.userId, role: auth.auth.role, type: auth.auth.type },
+      });
     } else {
       user = primary.data;
     }
@@ -870,7 +912,12 @@ export async function DELETE(req: NextRequest) {
         .eq("id", id);
 
       if (disableError) {
-        return NextResponse.json({ ok: false, message: disableError.message }, { status: 500 });
+        return dbFailure(disableError, {
+          module: "api.admin.platform-users.DELETE.disable",
+          message: "We could not disable that account. Try again.",
+          request: req,
+          actor: { id: auth.auth.userId, role: auth.auth.role, type: auth.auth.type },
+        });
       }
 
       const trash = await recordTrashEntry(

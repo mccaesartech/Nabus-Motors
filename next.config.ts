@@ -60,6 +60,9 @@ const nextConfig: NextConfig = {
       { source: "/auto/pre-order", destination: "/auto/inventory?status=pre_order", permanent: false },
     ];
   },
+  experimental: {
+    optimizePackageImports: ["lucide-react", "recharts"],
+  },
   images: {
     dangerouslyAllowSVG: true,
     contentDispositionType: "attachment",
@@ -92,6 +95,10 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "DENY" },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains",
+          },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           {
             key: "Permissions-Policy",
