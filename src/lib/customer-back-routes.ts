@@ -8,6 +8,10 @@ import {
 export type CustomerBackNavConfig = {
   label: string;
   fallbackHref: string;
+  /** When false, prefer history.back() with fallbackHref as escape hatch. Default true. */
+  preferFallback?: boolean;
+  /** Link target when preferFallback is true (defaults to fallbackHref). */
+  href?: string;
 };
 
 /** Division landing pages — no global back bar. */
@@ -62,7 +66,11 @@ export function getCustomerBackNav(pathname: string): CustomerBackNavConfig | nu
   }
 
   if (isAutoInventoryDetail(pathname)) {
-    return { label: "Back to inventory", fallbackHref: ROUTES.auto.inventory };
+    return {
+      label: "Back",
+      fallbackHref: ROUTES.auto.inventory,
+      preferFallback: false,
+    };
   }
 
   if (pathname === ROUTES.auto.inventory) {
@@ -77,8 +85,36 @@ export function getCustomerBackNav(pathname: string): CustomerBackNavConfig | nu
     return { label: "Back to Auto Division", fallbackHref: ROUTES.auto.home };
   }
 
-  if (pathname === ROUTES.auto.cart || pathname.startsWith(`${ROUTES.auto.cart}/`)) {
-    return { label: "Back to inventory", fallbackHref: ROUTES.auto.inventory };
+  if (pathname === ROUTES.auto.cartComplete) {
+    return {
+      label: "Back to cart",
+      fallbackHref: ROUTES.auto.cart,
+      href: ROUTES.auto.cart,
+    };
+  }
+
+  if (pathname === ROUTES.auto.cart) {
+    return {
+      label: "Back",
+      fallbackHref: ROUTES.auto.inventory,
+      preferFallback: false,
+    };
+  }
+
+  if (pathname.startsWith(`${ROUTES.auto.cart}/`)) {
+    return {
+      label: "Back to cart",
+      fallbackHref: ROUTES.auto.cart,
+      href: ROUTES.auto.cart,
+    };
+  }
+
+  if (pathname === ROUTES.auto.compare) {
+    return {
+      label: "Back",
+      fallbackHref: ROUTES.auto.inventory,
+      preferFallback: false,
+    };
   }
 
   const autoSubpages = [

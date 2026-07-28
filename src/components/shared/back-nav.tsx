@@ -31,17 +31,10 @@ const variantClass: Record<BackNavVariant, string> = {
   platform: "platform-back-nav",
 };
 
-/** Same-origin referrer or short history — history.length alone is unreliable. */
+/** In-tab history stack — length alone is enough for same-session back. */
 function canUseHistoryBack(): boolean {
   if (typeof window === "undefined") return false;
-  if (window.history.length <= 1) return false;
-  try {
-    const referrer = document.referrer;
-    if (!referrer) return false;
-    return new URL(referrer).origin === window.location.origin;
-  } catch {
-    return false;
-  }
+  return window.history.length > 1;
 }
 
 export function BackNav({

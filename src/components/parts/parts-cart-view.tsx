@@ -29,6 +29,7 @@ import {
   collectCartVehicleLookupKeys,
   matchCartVehicleToLookup,
   buildLookupVehicleMap,
+  resolveCartVehicleDetailHref,
   resolveCartVehicleDisplayState,
   vehicleAvailabilityBadgeLabel,
 } from "@/lib/vehicles/cart-lookup";
@@ -833,6 +834,7 @@ export function PartsCartView() {
             });
             const showPreorderPanel = displayState === "preorder";
             const availabilityBadge = vehicleAvailabilityBadgeLabel(displayState);
+            const vehicleDetailHref = resolveCartVehicleDetailHref(line);
 
             return (
               <li
@@ -855,12 +857,16 @@ export function PartsCartView() {
 
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Link
-                        href={ROUTES.auto.inventoryDetail(line.slug)}
-                        className="font-semibold text-foreground hover:text-brand-purple"
-                      >
-                        {line.name}
-                      </Link>
+                      {vehicleDetailHref ? (
+                        <Link
+                          href={vehicleDetailHref}
+                          className="font-semibold text-foreground hover:text-brand-purple"
+                        >
+                          {line.name}
+                        </Link>
+                      ) : (
+                        <span className="font-semibold text-foreground">{line.name}</span>
+                      )}
                       <Badge
                         variant="outline"
                         className="border-brand-purple/30 text-brand-purple"
