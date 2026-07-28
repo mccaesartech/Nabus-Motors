@@ -222,6 +222,7 @@ export function permissionForPath(pathname: string): PlatformPermission | null {
   if (pathname.startsWith(`${PLATFORM_PREFIX}/tracking`)) return "leads";
   if (pathname.startsWith(`${PLATFORM_PREFIX}/users`)) return "users";
   if (pathname.startsWith(`${PLATFORM_PREFIX}/site-content`)) return "site_content";
+  if (pathname.startsWith(`${PLATFORM_PREFIX}/error-log`)) return "activity";
   if (pathname.startsWith(`${PLATFORM_PREFIX}/settings`)) return "settings";
   if (pathname.startsWith(`${PLATFORM_PREFIX}/reports`)) return "reports";
   if (pathname.startsWith(`${PLATFORM_PREFIX}/trash`)) return "trash";
@@ -268,6 +269,7 @@ export function navPermissionForHref(href: string): PlatformPermission {
     users: "users",
     settings: "settings",
     "site-content": "site_content",
+    "error-log": "activity",
     trash: "trash",
     "account-lifecycle": "account_lifecycle",
   };

@@ -13,6 +13,7 @@ import {
   Package,
   Palette,
   Settings,
+  ShieldAlert,
   Ship,
   ShoppingCart,
   Tags,
@@ -286,6 +287,13 @@ const administrationGroup: PlatformNavGroup = {
       href: platformPath("users"),
       icon: UserCog,
       description: "Team and permissions",
+      groupId: "administration",
+    },
+    {
+      label: "Error Log",
+      href: platformPath("error-log"),
+      icon: ShieldAlert,
+      description: "Handled failures & support references",
       groupId: "administration",
     },
     {
