@@ -56,7 +56,9 @@ not as Vercel secrets. You still need:
 | `NEXT_PUBLIC_SITE_URL` | `https://truegoshen.vercel.app` |
 
 Setup steps: `docs/GOOGLE_AUTH.md` (includes Google consent-screen branding and
-Supabase **Custom Domain** so mobile Google sign-in does not show `*.supabase.co`).
+Supabase **Custom Domain** on **`auth.truegoshen.com`** so mobile Google sign-in
+does not show `*.supabase.co`). Paste checklist:
+`docs/SUPABASE_AUTH_DOMAIN.md#chosen-configuration-copy-paste`.
 Email signup checks: `docs/EMAIL_VALIDATION.md`.
 
 ### Option B — Vercel Dashboard

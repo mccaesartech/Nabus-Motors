@@ -11,7 +11,7 @@ via Supabase Auth OAuth. Platform admin login and passkeys are unchanged.
 | Default Auth / API URL | `https://ddrknhvkhmgdtavpuiiq.supabase.co` |
 | Google redirect URI (what Google displays) | `https://ddrknhvkhmgdtavpuiiq.supabase.co/auth/v1/callback` |
 | Production `NEXT_PUBLIC_SUPABASE_URL` | Still the default `*.supabase.co` URL (live HTML preconnect confirms) |
-| Fix that removes Supabase from Google’s screen | **Supabase Custom Domain** + Google redirect URI + Vercel env + **redeploy** |
+| Fix that removes Supabase from Google’s screen | **Supabase Custom Domain** (`auth.truegoshen.com`) + Google redirect URI + Vercel env + **redeploy** |
 
 **Step-by-step DNS / Dashboard runbook:** [SUPABASE_AUTH_DOMAIN.md](./SUPABASE_AUTH_DOMAIN.md)
 
@@ -20,7 +20,8 @@ Google reads the redirect host from Supabase’s OAuth client configuration, not
 from your app’s `redirectTo` (`/auth/callback` on `truegoshen.vercel.app`).
 
 **`truegoshen.vercel.app` cannot replace `*.supabase.co` on the Google screen**
-without a custom auth subdomain on a domain you own (e.g. `auth.truegoshen.com`).
+without the chosen custom auth subdomain **`auth.truegoshen.com`** (DNS + Supabase
+Custom Domain must be Active first).
 See [SUPABASE_AUTH_DOMAIN.md § vercel.app](./SUPABASE_AUTH_DOMAIN.md#what-vercelapp-cannot-do).
 
 ---
@@ -38,7 +39,7 @@ See [SUPABASE_AUTH_DOMAIN.md § vercel.app](./SUPABASE_AUTH_DOMAIN.md#what-verce
 
 | Variable | Purpose |
 |----------|---------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL — use your **Custom Domain** URL in production when configured (see below) |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL — production target **`https://auth.truegoshen.com`** after Custom Domain is Active ([runbook](./SUPABASE_AUTH_DOMAIN.md)); until then use `https://ddrknhvkhmgdtavpuiiq.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (browser); unchanged when you add a custom domain |
 | `NEXT_PUBLIC_SITE_URL` | Canonical app origin for metadata, invites, and OAuth callback fallback (e.g. `https://truegoshen.vercel.app`) |
 
@@ -46,9 +47,9 @@ Google **Client ID** and **Client Secret** are configured in the **Supabase
 dashboard**, not as Next.js env vars (unless you also use them elsewhere).
 
 The browser Supabase client reads `NEXT_PUBLIC_SUPABASE_URL` for all Auth
-requests. After you activate a Supabase **Custom Domain**, set this env var to
-that domain (e.g. `https://auth.truegoshen.com`) and redeploy so OAuth and
-token refresh use the branded host.
+requests. After **`auth.truegoshen.com`** is Active in Supabase, set this env var to
+`https://auth.truegoshen.com` and redeploy so OAuth and token refresh use the
+branded host.
 
 ---
 
@@ -118,7 +119,7 @@ section **E** / [SUPABASE_AUTH_DOMAIN.md](./SUPABASE_AUTH_DOMAIN.md).
 | Name | `True Goshen Supabase Auth` |
 | **Authorized JavaScript origins** | `https://truegoshen.vercel.app`, custom domains you serve, `http://localhost:3000` |
 | **Authorized redirect URIs** | `https://ddrknhvkhmgdtavpuiiq.supabase.co/auth/v1/callback` **always keep this** |
-| | **Plus** after custom domain: `https://auth.truegoshen.com/auth/v1/callback` (or `auth.truegoshenauto.com`) |
+| | `https://auth.truegoshen.com/auth/v1/callback` **add when Custom Domain is Active** |
 
 Project ref for this app: **`ddrknhvkhmgdtavpuiiq`** (Supabase **Project Settings → API**).
 
@@ -138,9 +139,10 @@ Copy **Client ID** and **Client Secret** into Supabase (next section).
 |---------|--------|
 | **Site URL** | `https://truegoshen.vercel.app` |
 | **Redirect URLs** | `https://truegoshen.vercel.app/auth/callback` |
-| | `https://truegoshen.vercel.app/**` (optional wildcard) |
-| | Production custom domains, e.g. `https://truegoshenauto.com/auth/callback` |
+| | `https://truegoshen.com/auth/callback` |
+| | `https://truegoshenauto.com/auth/callback` |
 | | `http://localhost:3000/auth/callback` |
+| | `https://truegoshen.vercel.app/**` (optional wildcard) |
 
 The app sends users to `/auth/callback?redirect=…` after Google; that page
 exchanges the `code` for a session via `supabase.auth.exchangeCodeForSession`.
@@ -156,9 +158,9 @@ supported way to show your domain on Google’s OAuth screen instead of
 Full checklist (DNS CNAME, SSL, Google URI, Vercel env, verify on phone):
 **[SUPABASE_AUTH_DOMAIN.md](./SUPABASE_AUTH_DOMAIN.md)**
 
-Summary:
+Summary ([full paste list](./SUPABASE_AUTH_DOMAIN.md#chosen-configuration-copy-paste)):
 
-1. Supabase → **Custom Domains** → e.g. `auth.truegoshen.com` → add DNS → **Active**
+1. Supabase → **Custom Domains** → **`auth.truegoshen.com`** → add DNS → **Active**
 2. Google → add redirect URI `https://auth.truegoshen.com/auth/v1/callback`
 3. Vercel → `NEXT_PUBLIC_SUPABASE_URL=https://auth.truegoshen.com` → **redeploy**
 
@@ -220,7 +222,7 @@ That message means the browser Supabase client is `null` — usually because
 or empty on Vercel** (not embedded in the client bundle after build).
 
 1. **Vercel** → project **truegoshenauto** → **Settings → Environment Variables**
-   - `NEXT_PUBLIC_SUPABASE_URL` = `https://ddrknhvkhmgdtavpuiiq.supabase.co` (or your custom auth domain)
+   - `NEXT_PUBLIC_SUPABASE_URL` = `https://ddrknhvkhmgdtavpuiiq.supabase.co` until Custom Domain is Active, then `https://auth.truegoshen.com`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = anon public key from Supabase
    - `SUPABASE_SERVICE_ROLE_KEY` = service role (server only)
 2. Or locally: copy `.env.supabase-restore.example` → `.env.supabase-restore`, paste keys, run `node scripts/restore-vercel-supabase-env.mjs`

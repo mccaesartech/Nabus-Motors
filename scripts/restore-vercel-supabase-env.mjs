@@ -3,6 +3,8 @@
  *
  * 1. Copy .env.supabase-restore.example → .env.supabase-restore
  * 2. Paste keys from Supabase Dashboard → Project Settings → API
+ *    For production after Custom Domain: set NEXT_PUBLIC_SUPABASE_URL=https://auth.truegoshen.com
+ *    in .env.supabase-restore (only when auth.truegoshen.com is Active in Supabase).
  * 3. node scripts/restore-vercel-supabase-env.mjs
  *
  * Does not print secret values.

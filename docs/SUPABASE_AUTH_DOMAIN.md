@@ -13,6 +13,47 @@ providers, redirect URLs).
 
 ---
 
+## Chosen configuration (copy-paste)
+
+True Goshen Auto uses **`auth.truegoshen.com`** as the Supabase custom auth
+hostname. Complete Supabase Custom Domain + DNS first; only then point Vercel at
+this URL and redeploy.
+
+| Where | Value |
+|-------|--------|
+| **Supabase Custom Domain** | `auth.truegoshen.com` |
+| **Google — Authorized redirect URIs** | `https://ddrknhvkhmgdtavpuiiq.supabase.co/auth/v1/callback` (keep) |
+| | `https://auth.truegoshen.com/auth/v1/callback` (add) |
+| **Vercel — `NEXT_PUBLIC_SUPABASE_URL`** (Production + Preview) | `https://auth.truegoshen.com` |
+| **Supabase — Site URL** | `https://truegoshen.vercel.app` |
+| **Supabase — Redirect URLs** | See list below |
+
+**Supabase → Authentication → URL Configuration → Redirect URLs** (app
+`/auth/callback`, one per line):
+
+```
+https://truegoshen.vercel.app/auth/callback
+https://truegoshen.com/auth/callback
+https://truegoshenauto.com/auth/callback
+http://localhost:3000/auth/callback
+```
+
+Optional wildcard (same project): `https://truegoshen.vercel.app/**`
+
+**Vercel env (Dashboard or CLI after `vercel login`):**
+
+```powershell
+npx vercel env update NEXT_PUBLIC_SUPABASE_URL production --value https://auth.truegoshen.com --yes
+npx vercel env update NEXT_PUBLIC_SUPABASE_URL preview --value https://auth.truegoshen.com --yes
+npx vercel --prod --yes
+```
+
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` stay unchanged.
+Alternate hostname `auth.truegoshenauto.com` is not used unless you change DNS
+and repeat the same steps for that subdomain.
+
+---
+
 ## True Goshen project facts (from this repo)
 
 | Item | Value |
@@ -22,6 +63,7 @@ providers, redirect URLs).
 | Google OAuth redirect (default) | `https://ddrknhvkhmgdtavpuiiq.supabase.co/auth/v1/callback` |
 | Vercel project | `mccaesartech/truegoshenauto` |
 | Canonical app URL (`NEXT_PUBLIC_SITE_URL`) | `https://truegoshen.vercel.app` |
+| **Chosen Supabase auth hostname** | `auth.truegoshen.com` |
 | Custom domains in routing docs | `truegoshen.com`, `truegoshenauto.com`, `auto.truegoshen.com` |
 
 **Production check:** As of the last deploy, the live site HTML still preconnects
@@ -51,25 +93,12 @@ So:
 
 ---
 
-## Recommended auth hostname
-
-Pick **one** subdomain on a domain you own (not `vercel.app`):
-
-| Option | Example | Notes |
-|--------|---------|--------|
-| Corporate | `auth.truegoshen.com` | Matches HQ domain in `DEPLOY.md` |
-| Auto division | `auth.truegoshenauto.com` | Fine if DNS is managed there |
-
-Use the same hostname everywhere below. Example uses **`auth.truegoshen.com`**.
-
----
-
 ## Step 1 — Supabase: enable Custom Domain
 
 1. Open [Supabase Dashboard](https://supabase.com/dashboard/project/ddrknhvkhmgdtavpuiiq/settings/general) → project **ddrknhvkhmgdtavpuiiq**.
 2. Go to **Project Settings → Custom Domains** (or **Add-ons → Custom Domain**).
 3. **Requires Supabase Pro** (paid) and the Custom Domain add-on where applicable.
-4. Enter: `auth.truegoshen.com` (or your chosen subdomain).
+4. Enter: **`auth.truegoshen.com`** (chosen for this project).
 5. Supabase shows **DNS records** (typically a **CNAME** pointing at Supabase’s
    target, plus sometimes TXT for verification). Copy them exactly.
 
@@ -77,7 +106,7 @@ Use the same hostname everywhere below. Example uses **`auth.truegoshen.com`**.
 
 ## Step 2 — DNS (registrar / Cloudflare / etc.)
 
-At the DNS provider for **truegoshen.com** (or your chosen apex):
+At the DNS provider for **truegoshen.com**:
 
 1. Add the **CNAME** (and any **TXT**) records Supabase displays.
 2. Wait for propagation (minutes to hours).
@@ -127,6 +156,9 @@ These are **your Next.js** `/auth/callback` routes, not the Google → Supabase
    - `SUPABASE_SERVICE_ROLE_KEY` = **unchanged**
 3. **Redeploy** production (`npx vercel --prod --yes` or redeploy from the Vercel UI).
 
+Optional CLI (same values as [Chosen configuration](#chosen-configuration-copy-paste)):
+`npx vercel env update NEXT_PUBLIC_SUPABASE_URL production --value https://auth.truegoshen.com --yes`
+
 `NEXT_PUBLIC_*` values are embedded at **build time**. Changing env without
 redeploying leaves the old Supabase host in the bundle.
 
@@ -135,8 +167,8 @@ redeploying leaves the old Supabase host in the bundle.
 ## Step 6 — Verify
 
 1. Open production `/login` on a **phone** → **Continue with Google**.
-2. Account chooser should show **`auth.truegoshen.com`** (or your subdomain),
-   not `ddrknhvkhmgdtavpuiiq.supabase.co`.
+2. Account chooser should show **`auth.truegoshen.com`**, not
+   `ddrknhvkhmgdtavpuiiq.supabase.co`.
 3. View page source: `<link rel="preconnect" href="https://auth.truegoshen.com"`.
 4. Sign-in completes and lands on `/account` (or your `redirect` target).
 
