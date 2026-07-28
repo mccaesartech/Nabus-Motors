@@ -259,7 +259,7 @@ export function CartPreorderPanel({
   return (
     <div
       className={cn(
-        "rounded-lg border border-amber-200/80 bg-amber-50/50 px-4 py-4 dark:border-amber-900/40 dark:bg-amber-950/20",
+        "rounded-lg border border-brand-purple/20 bg-brand-purple/5 px-4 py-4",
         className
       )}
     >
@@ -304,7 +304,7 @@ export function CartPreorderPanel({
           </button>
 
           {expanded && (
-            <form onSubmit={handleSubmit} className="mt-4 space-y-4 border-t border-amber-200/60 pt-4">
+            <form onSubmit={handleSubmit} className="mt-4 space-y-4 border-t border-brand-purple/20 pt-4">
               <div className="space-y-1.5">
                 <Label htmlFor={`preorder-name-${line.vehicleId}`}>Full name *</Label>
                 <Input
