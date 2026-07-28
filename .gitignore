@@ -50,3 +50,25 @@ scripts/.photo-color-samples.json
 next-env.d.ts
 
 .vercel
+
+# credentials / recovery codes
+*recovery-codes*.txt
+*recovery_codes*.txt
+*.key
+*.p12
+*.pfx
+*service-account*.json
+*credentials*.json
+
+# local verification & deploy scratch output
+*.log
+verify-*.log
+tsc-*.txt
+build-output.txt
+build-charts-fix.txt
+vercel-*-deploy*.txt
+vercel-deploy*.txt
+lighthouse-*.json
+lighthouse-*.html
+git-push-progress.txt
+pinterest-video-urls.txt
