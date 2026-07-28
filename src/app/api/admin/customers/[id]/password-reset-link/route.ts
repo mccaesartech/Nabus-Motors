@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { apiFailure } from "@/lib/errors/api";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import {
   canCopyCustomerPasswordResetLink,
@@ -67,7 +68,10 @@ export async function POST(_req: NextRequest, context: RouteContext) {
         "One-time reset link generated. It expires soon — send it to the customer via WhatsApp and do not share publicly.",
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not generate reset link.";
-    return NextResponse.json({ ok: false, message }, { status: 500 });
+    return apiFailure(error, {
+      module: "api.admin.customers.reset-link.POST",
+      message: "Could not generate reset link.",
+      request: _req,
+    });
   }
 }

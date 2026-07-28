@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { apiFailure } from "@/lib/errors/api";
 import { canDeleteCustomer, requireAdmin, requirePermission } from "@/lib/admin/auth";
 import { logPlatformActivity } from "@/lib/platform/activity";
 import { createAdminSupabase } from "@/lib/supabase/admin";
@@ -34,8 +35,11 @@ export async function GET(_req: NextRequest, context: RouteContext) {
     }
     return NextResponse.json({ ok: true, customer });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not load customer.";
-    return NextResponse.json({ ok: false, message }, { status: 500 });
+    return apiFailure(error, {
+      module: "api.admin.customers.detail.GET",
+      message: "Could not load customer.",
+      request: _req,
+    });
   }
 }
 
@@ -108,7 +112,10 @@ export async function DELETE(_req: NextRequest, context: RouteContext) {
       message: `${result.name} has been removed from the customer directory.`,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not delete customer.";
-    return NextResponse.json({ ok: false, message }, { status: 500 });
+    return apiFailure(error, {
+      module: "api.admin.customers.detail.DELETE",
+      message: "Could not delete customer.",
+      request: _req,
+    });
   }
 }

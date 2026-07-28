@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { apiFailure } from "@/lib/errors/api";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { canSendCustomerPasswordReset, requireAdmin } from "@/lib/admin/auth";
 import { fetchAdminCustomerDetail } from "@/lib/platform/customers-admin";
@@ -107,7 +108,10 @@ export async function POST(_req: NextRequest, context: RouteContext) {
       notification: result.notification,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not send password reset.";
-    return NextResponse.json({ ok: false, message }, { status: 500 });
+    return apiFailure(error, {
+      module: "api.admin.customers.send-reset.POST",
+      message: "Could not send password reset.",
+      request: _req,
+    });
   }
 }

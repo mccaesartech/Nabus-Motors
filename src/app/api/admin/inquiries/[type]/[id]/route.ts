@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { dbFailure } from "@/lib/errors/api";
 import { requireAdmin } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import {
@@ -31,7 +32,11 @@ export async function GET(_req: NextRequest, context: RouteContext) {
     .maybeSingle();
 
   if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.admin.inquiries.detail.GET",
+      message: "We could not load that lead. Try again.",
+      request: _req,
+    });
   }
 
   if (!data) {
