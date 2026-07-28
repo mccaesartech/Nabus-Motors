@@ -6,6 +6,23 @@ const buildId =
   process.env.VERCEL_DEPLOYMENT_ID ??
   "dev";
 
+/** When NEXT_PUBLIC_SUPABASE_URL is a Custom Domain, allow Next/Image for storage URLs on that host. */
+function supabaseCustomImageRemotePattern():
+  | { protocol: "https"; hostname: string }
+  | null {
+  const raw = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  if (!raw) return null;
+  try {
+    const hostname = new URL(raw).hostname;
+    if (hostname.endsWith(".supabase.co")) return null;
+    return { protocol: "https", hostname };
+  } catch {
+    return null;
+  }
+}
+
+const supabaseCustomImageHost = supabaseCustomImageRemotePattern();
+
 const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_BUILD_ID: buildId,
@@ -63,6 +80,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "lh3.googleusercontent.com" },
       { protocol: "https", hostname: "*.googleusercontent.com" },
       { protocol: "https", hostname: "*.supabase.co" },
+      ...(supabaseCustomImageHost ? [supabaseCustomImageHost] : []),
       { protocol: "https", hostname: "images.craigslist.org" },
       { protocol: "https", hostname: "*.fbcdn.net" },
     ],

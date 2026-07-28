@@ -20,6 +20,7 @@ export function getSupabaseUrl(): string | null {
   if (
     raw.includes("supabase.com/dashboard") ||
     raw.includes("your Project URL") ||
+    raw.includes("your_supabase_project_url") ||
     !raw.startsWith("https://")
   ) {
     return null;
@@ -40,7 +41,14 @@ export function getSupabaseAnonKey(): string | null {
   const key = (
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY
   )?.trim();
-  if (!key || key.includes("anon key") || key.length < 20) return null;
+  if (
+    !key ||
+    key.includes("anon key") ||
+    key.includes("your_supabase_anon_key") ||
+    key.length < 20
+  ) {
+    return null;
+  }
   return key;
 }
 

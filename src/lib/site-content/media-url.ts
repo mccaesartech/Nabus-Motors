@@ -1,4 +1,5 @@
 import { categoryPhotoUrlFor, isValidImageUrl } from "@/lib/data/vehicle-images";
+import { getSupabaseUrl } from "@/lib/supabase/env";
 
 /** True when the URL is a public Supabase Storage object (already CDN-served). */
 export function isSupabaseStoragePublicUrl(url: string): boolean {
@@ -8,7 +9,13 @@ export function isSupabaseStoragePublicUrl(url: string): boolean {
   if (trimmed.startsWith("/storage/v1/")) return true;
 
   try {
-    return new URL(trimmed).hostname.toLowerCase().endsWith(".supabase.co");
+    const host = new URL(trimmed).hostname.toLowerCase();
+    if (host.endsWith(".supabase.co")) return true;
+    const projectUrl = getSupabaseUrl();
+    if (projectUrl && host === new URL(projectUrl).hostname.toLowerCase()) {
+      return true;
+    }
+    return false;
   } catch {
     return false;
   }
