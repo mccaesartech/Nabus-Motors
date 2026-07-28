@@ -135,6 +135,7 @@ export function PlatformVehicleForm({
           description: initial.description ?? "",
           featured: initial.featured ?? false,
           status: initial.status ?? "available",
+          stock_quantity: initial.stock_quantity ?? 1,
           images: initial.images ?? [],
           gallery: galleryFromInput(initial.gallery, initial.images),
           trust_badges: initial.trust_badges ?? { ...DEFAULT_TRUST_BADGES },
@@ -776,6 +777,31 @@ export function PlatformVehicleForm({
               available unit sold, the listing moves to pre-order so more customers can
               request it. Multiple pre-orders per vehicle are allowed.
             </p>
+          </Field>
+          <Field
+            label="Units in stock"
+            hint="How many identical cars this listing covers (same make, model, and year). Each year is its own listing — set the count for this year here. Availability counts and low-stock alerts add these up."
+          >
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={form.stock_quantity ?? ""}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw === "") {
+                  update("stock_quantity", undefined);
+                  return;
+                }
+                const n = Number(raw);
+                update(
+                  "stock_quantity",
+                  Number.isFinite(n) ? Math.max(0, Math.floor(n)) : undefined
+                );
+              }}
+              className="platform-input"
+              placeholder="e.g. 2"
+            />
           </Field>
           <Field
             label="Local availability"

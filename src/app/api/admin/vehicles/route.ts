@@ -27,6 +27,7 @@ import {
   buildVehicleSlug,
   imagesFromGallery,
   localShipmentConflict,
+  normalizeStockQuantity,
   normalizeWalkaroundVideoUrl,
   VEHICLE_STATUSES,
   type VehicleInput,
@@ -72,6 +73,7 @@ const EDITABLE_FIELDS = [
   "description",
   "featured",
   "status",
+  "stock_quantity",
   "images",
   "specs",
   "gallery",
@@ -96,6 +98,9 @@ function pickUpdates(body: Record<string, unknown>) {
   if (updates.year !== undefined) updates.year = Number(updates.year);
   if (updates.price !== undefined) updates.price = Number(updates.price);
   if (updates.mileage !== undefined) updates.mileage = Number(updates.mileage);
+  if (updates.stock_quantity !== undefined) {
+    updates.stock_quantity = normalizeStockQuantity(updates.stock_quantity);
+  }
   if (updates.trim === "") updates.trim = null;
   if (updates.engine_size === "") updates.engine_size = null;
   if (updates.color === "") updates.color = null;
@@ -288,7 +293,10 @@ export async function GET() {
 
   const operational = toOperationalSettings(await getAdminSiteSettings());
   const vehicles = (data ?? []) as unknown as DbVehicle[];
-  const availableCount = vehicles.filter((v) => v.status === "available").length;
+  // Fleet stock = sum of per-listing units (stock_quantity, migration 082); legacy rows count as 1.
+  const availableCount = vehicles
+    .filter((v) => v.status === "available")
+    .reduce((sum, v) => sum + normalizeStockQuantity(v.stock_quantity), 0);
 
   return NextResponse.json({
     ok: true,

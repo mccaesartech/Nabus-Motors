@@ -194,6 +194,7 @@ export default function EditVehiclePage() {
           description: formVehicle.description ?? undefined,
           featured: formVehicle.featured,
           status: formVehicle.status,
+          stock_quantity: formVehicle.stock_quantity ?? 1,
           images: formVehicle.images,
           primary_image_url: formVehicle.primary_image_url ?? undefined,
           additional_images: formVehicle.additional_images ?? undefined,

@@ -56,6 +56,8 @@ export type VehicleInput = {
   description?: string;
   featured?: boolean;
   status?: string;
+  /** Units in stock for this listing (same make/model/year). Defaults to 1. */
+  stock_quantity?: number;
   images?: string[];
   primary_image_url?: string;
   additional_images?: string[];
@@ -166,6 +168,7 @@ export function emptyVehicleForm(defaultPriceCurrency = "GHS"): VehicleInput {
     description: "",
     featured: false,
     status: "available",
+    stock_quantity: 1,
     images: [],
     primary_image_url: "",
     additional_images: [],
@@ -177,6 +180,14 @@ export function emptyVehicleForm(defaultPriceCurrency = "GHS"): VehicleInput {
     shipment_available: false,
     customs_clearing_available: false,
   };
+}
+
+/** Clamp units in stock to a whole number ≥ 0 (DB check 082). Missing/legacy = 1 unit. */
+export function normalizeStockQuantity(value: unknown, fallback = 1): number {
+  if (value === null || value === undefined || value === "") return fallback;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(0, Math.floor(n));
 }
 
 /** Local stock and shipment inventory are mutually exclusive (DB check 069). */

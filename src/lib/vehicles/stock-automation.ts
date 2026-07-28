@@ -5,7 +5,7 @@ import {
   maybeNotifyVehicleStockAction,
   refreshFleetLowStockAlert,
 } from "@/lib/platform/vehicle-stock-notifications";
-import { stockGroupKey } from "@/lib/vehicles/low-stock";
+import { listingUnitCount, stockGroupKey } from "@/lib/vehicles/low-stock";
 
 export type VehicleStockIdentity = {
   id: string;
@@ -23,12 +23,29 @@ export type SoldStatusTransition = {
 
 export { stockGroupKey };
 
-/** Other approved listings of the same type still marked available. */
+/** Available units on other listings of the same make/model/year (sums stock_quantity). */
 export async function countAvailableSiblings(
   supabase: SupabaseClient,
   vehicle: Pick<VehicleStockIdentity, "id" | "make" | "model" | "year">
 ): Promise<number> {
-  const { count, error } = await supabase
+  const { data, error } = await supabase
+    .from("vehicles")
+    .select("id, stock_quantity")
+    .eq("make", vehicle.make)
+    .eq("model", vehicle.model)
+    .eq("year", vehicle.year)
+    .eq("status", "available")
+    .neq("id", vehicle.id);
+
+  if (!error) {
+    return (data ?? []).reduce(
+      (sum, row) => sum + listingUnitCount(row as { stock_quantity?: number | null }),
+      0
+    );
+  }
+
+  // stock_quantity column missing (migration 082 not run) → legacy row count.
+  const { count, error: countError } = await supabase
     .from("vehicles")
     .select("id", { count: "exact", head: true })
     .eq("make", vehicle.make)
@@ -37,8 +54,8 @@ export async function countAvailableSiblings(
     .eq("status", "available")
     .neq("id", vehicle.id);
 
-  if (error) {
-    console.error("[stock-automation] countAvailableSiblings:", error.message);
+  if (countError) {
+    console.error("[stock-automation] countAvailableSiblings:", countError.message);
     return 0;
   }
 

@@ -13,6 +13,7 @@ import {
   buildFleetLowStockMessage,
   fleetIsLowStock,
 } from "@/lib/vehicles/low-stock";
+import { countAvailableVehicleUnits } from "@/lib/vehicles/available-units";
 
 export {
   buildVehicleStockActionCopy,
@@ -66,17 +67,15 @@ async function clearFleetLowStockNotifications(supabase: SupabaseClient): Promis
  */
 export async function refreshFleetLowStockAlert(supabase: SupabaseClient): Promise<void> {
   const settings = await getSiteSettings();
-  const { count, error: countError } = await supabase
-    .from("vehicles")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "available");
+  // Units, not rows: each listing contributes its stock_quantity (migration 082).
+  const availableUnits = await countAvailableVehicleUnits(supabase);
 
-  if (countError) {
-    console.error("[vehicle-stock] fleet available count failed:", countError.message);
+  if (availableUnits === null) {
+    console.error("[vehicle-stock] fleet available count failed");
     return;
   }
 
-  const availableVehicles = count ?? 0;
+  const availableVehicles = availableUnits;
   if (
     !fleetIsLowStock(
       availableVehicles,

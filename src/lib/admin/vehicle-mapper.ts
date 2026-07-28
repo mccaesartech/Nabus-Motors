@@ -3,6 +3,7 @@ import {
   galleryFromInput,
   imagesFromGallery,
   localShipmentConflict,
+  normalizeStockQuantity,
   normalizeWalkaroundVideoUrl,
   primaryAndAdditionalFromVehicle,
   syncVehicleImagesFromPrimaryAndAdditional,
@@ -81,6 +82,7 @@ export function rowFromInput(
       },
     ],
     status: input.status || "available",
+    stock_quantity: normalizeStockQuantity(input.stock_quantity),
     trust_badges: input.trust_badges ?? DEFAULT_TRUST_BADGES,
     inspection_summary: input.inspection_summary?.trim() || null,
     country_of_origin: input.country_of_origin?.trim() || null,
@@ -110,6 +112,12 @@ export function validateVehicleInput(
     return { ok: false, message: "Mileage is required." };
   }
   if (!input.location?.trim()) return { ok: false, message: "Location is required." };
+  if (
+    input.stock_quantity !== undefined &&
+    (!Number.isFinite(Number(input.stock_quantity)) || Number(input.stock_quantity) < 0)
+  ) {
+    return { ok: false, message: "Units in stock must be zero or greater." };
+  }
   if (localShipmentConflict(input.available_locally, input.shipment_available)) {
     return {
       ok: false,

@@ -7,6 +7,7 @@ import { countLeadPipelineStages } from "@/lib/platform/lead-pipeline";
 import { countOpenInquiries } from "@/lib/platform/notifications";
 import { getAdminSiteSettings, isLowStock, toOperationalSettings } from "@/lib/platform/site-settings";
 import { notDeletedFilter } from "@/lib/platform/trash-types";
+import { countAvailableVehicleUnits } from "@/lib/vehicles/available-units";
 
 const OPEN_STATUSES = ["new", "pending"];
 
@@ -131,7 +132,8 @@ async function computePlatformStats(): Promise<PlatformStatsPayload | null> {
     inventoryChart,
   ] = await Promise.all([
     count("vehicles"),
-    count("vehicles", { column: "status", value: "available" }),
+    // Available units (sums per-listing stock_quantity, migration 082).
+    countAvailableVehicleUnits(supabase).then((units) => units ?? 0),
     count("vehicles", { column: "featured", value: true }),
     count("vehicles", { column: "status", value: "sold" }),
     count("vehicles", { column: "status", value: "reserved" }),

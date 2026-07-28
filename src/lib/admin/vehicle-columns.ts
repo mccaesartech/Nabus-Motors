@@ -56,6 +56,7 @@ export const OPTIONAL_VEHICLE_COLUMNS = [
   "local_availability_at",
   "price_currency",
   "listed_price",
+  "stock_quantity",
 ] as const;
 
 const OPTIONAL_COLUMN_SET = new Set<string>(OPTIONAL_VEHICLE_COLUMNS);
@@ -159,6 +160,7 @@ const OPTIONAL_MIGRATION_HINTS: Record<string, string> = {
   local_availability_at: "067_vehicle_interest_local_availability.sql",
   price_currency: "081_vehicle_price_currency.sql",
   listed_price: "081_vehicle_price_currency.sql",
+  stock_quantity: "082_vehicle_stock_quantity.sql",
 };
 
 export function optionalVehicleColumnWarning(message: string): string {

@@ -72,6 +72,8 @@ export type DbVehicle = {
   specs?: { label: string; value: string }[] | null;
   featured: boolean;
   status: string;
+  /** Units in stock for this listing (migration 082). Missing/legacy rows = 1 unit. */
+  stock_quantity?: number | null;
   approval_status?: string;
   approval_note?: string | null;
   pending_changes?: Record<string, unknown> | null;

@@ -2,7 +2,8 @@ import { isLowStock } from "@/lib/platform/site-settings";
 
 /**
  * Stock model (True Goshen Auto):
- * Vehicles are one-row-per-VIN unit. There is no per-vehicle `current_stock`.
+ * Each listing row carries `stock_quantity` units (migration 082). Legacy rows
+ * without the column count as 1 unit (one-row-per-VIN).
  *
  * - Fleet low stock: total `status = available` units < `inventory_low_stock_threshold`
  * - Model low stock: available units of the same make + model + year ≤ MODEL_LOW_STOCK_THRESHOLD
@@ -23,9 +24,20 @@ export type StockIdentity = {
   model: string;
   year: number;
   status?: string | null;
+  /** Units in stock for this listing (migration 082). Missing/legacy rows = 1 unit. */
+  stock_quantity?: number | null;
 };
 
-/** Available unit count per make|model|year. */
+/** Units on one listing: `stock_quantity` when set, else 1 (legacy one-row-per-unit). */
+export function listingUnitCount(vehicle: Pick<StockIdentity, "stock_quantity">): number {
+  const quantity = vehicle.stock_quantity;
+  if (quantity === null || quantity === undefined) return 1;
+  const n = Number(quantity);
+  if (!Number.isFinite(n)) return 1;
+  return Math.max(0, Math.floor(n));
+}
+
+/** Available unit count per make|model|year (sums per-listing stock_quantity). */
 export function buildAvailableStockCounts(
   vehicles: StockIdentity[]
 ): Map<string, number> {
@@ -33,7 +45,7 @@ export function buildAvailableStockCounts(
   for (const vehicle of vehicles) {
     if (vehicle.status !== "available") continue;
     const key = stockGroupKey(vehicle.make, vehicle.model, vehicle.year);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
+    counts.set(key, (counts.get(key) ?? 0) + listingUnitCount(vehicle));
   }
   return counts;
 }
