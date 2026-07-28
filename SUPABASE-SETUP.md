@@ -91,7 +91,7 @@ To test **today without domain verification**: configure Supabase SMTP (even Sup
 
 ---
 
-## Step 4b — Auth URL configuration (password reset)
+## Step 4b — Auth URL configuration (password reset + Google OAuth)
 
 In Supabase: **Authentication → URL Configuration**
 
@@ -100,12 +100,23 @@ In Supabase: **Authentication → URL Configuration**
 | **Site URL** | `https://truegoshen.vercel.app` |
 | **Redirect URLs** | `https://truegoshen.vercel.app/auth/callback` |
 | **Redirect URLs** | `https://truegoshen.vercel.app/reset-password` |
+| | `https://truegoshenauto.com/auth/callback` |
 | | `https://truegoshenauto.com/reset-password` |
 | | `https://truegoshenauto.com/**` (optional wildcard) |
+| | `http://localhost:3000/auth/callback` (local Google OAuth) |
 
 If **Site URL** is `http://localhost:3000`, password-reset emails will send users to localhost even in production. After changing these values, request a **new** reset email — old links keep the previous redirect.
 
 The app builds reset links with `redirectTo` = `{site}/reset-password` using `NEXT_PUBLIC_AUTO_SITE_URL`, then Vercel production URL, then `https://truegoshen.vercel.app` — never localhost outside `npm run dev`.
+
+### Google sign-in (customer `/login` + `/register`)
+
+1. Create a Google Cloud **OAuth Web client** and set the authorized redirect URI to
+   `https://<PROJECT_REF>.supabase.co/auth/v1/callback`.
+2. Supabase → **Authentication → Providers → Google** — enable and paste Client ID + Secret.
+3. Full checklist: **`docs/GOOGLE_AUTH.md`**.
+
+Signup email checks (format, disposable domains, MX): **`docs/EMAIL_VALIDATION.md`**.
 
 Platform team invitations do not use Supabase Auth email templates or its Site
 URL. The application creates a token in `platform_user_invites`, sends

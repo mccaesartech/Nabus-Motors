@@ -59,6 +59,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const result = await syncCustomerAccount(user.id, user.email);
+  const result = await syncCustomerAccount(user.id, user.email, {
+    fullName:
+      (typeof user.user_metadata?.full_name === "string"
+        ? user.user_metadata.full_name
+        : null) ||
+      (typeof user.user_metadata?.name === "string"
+        ? user.user_metadata.name
+        : null),
+    phone:
+      typeof user.user_metadata?.phone === "string"
+        ? user.user_metadata.phone
+        : null,
+  });
   return NextResponse.json({ ok: true, ...result });
 }

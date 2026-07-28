@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Loader2, LogOut } from "lucide-react";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { clearPlatformHistoryGuard } from "@/lib/platform/history-guard";
 import { requestPlatformLogout } from "@/lib/admin/logout-client";
 import { cn } from "@/lib/utils";
 
@@ -55,7 +56,10 @@ export function PlatformLogoutAction({
   variant,
   collapsed = false,
   requestLogout = requestPlatformLogout,
-  onRedirect = (href) => window.location.assign(href),
+  onRedirect = (href) => {
+    clearPlatformHistoryGuard();
+    window.location.replace(href);
+  },
 }: PlatformLogoutActionProps) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");

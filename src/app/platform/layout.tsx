@@ -7,6 +7,7 @@ import { AdminPwaShell } from "@/components/pwa/admin-pwa-shell";
 import { getPlatformAuth } from "@/lib/admin/auth";
 import { adminLoginPath } from "@/lib/admin/paths";
 import { buildSessionPermissions } from "@/lib/platform/permissions";
+import { getSiteSettings } from "@/lib/platform/site-settings-server";
 import { ADMIN_PWA, ADMIN_PWA_THEME_COLOR } from "@/lib/pwa/constants";
 import "./platform.css";
 
@@ -74,6 +75,8 @@ export default async function PlatformLayout({
     redirect(adminLoginPath());
   }
 
+  const settings = await getSiteSettings();
+
   return (
     <PlatformShell
       userName={auth.name}
@@ -82,6 +85,7 @@ export default async function PlatformLayout({
       permissions={buildSessionPermissions(auth.role)}
       authType={auth.type}
       authUserId={auth.type === "user" ? auth.userId : undefined}
+      defaultCurrencyDisplay={settings.default_currency_display}
     >
       <SkipToContent />
       {children}

@@ -17,12 +17,16 @@ import {
   X,
 } from "lucide-react";
 import { PasswordInput } from "@/components/ui/password-input";
+import {
+  ConfirmDialog,
+  DELETE_CONFIRM_PHRASE,
+} from "@/components/platform/confirm-dialog";
 import { PageHeader } from "@/components/platform/page-header";
 import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
 import { PLATFORM_INVITE_EXPIRY_LABEL } from "@/lib/platform/invite-ttl";
 import { ROLE_LABELS } from "@/lib/platform/permissions";
-import type { PlatformUserInviteInfo, PlatformUserRow } from "@/lib/platform/modules";
+import type { PlatformUserInviteInfo, PlatformUserNotifyInfo, PlatformUserRow } from "@/lib/platform/modules";
 import { formatPlatformDate } from "@/lib/platform/datetime";
 import { PlatformDateTime } from "@/components/platform/platform-datetime";
 
@@ -35,6 +39,12 @@ type EmailConfig = {
   missing: string[];
 };
 
+type SmsConfig = {
+  ready: boolean;
+  preferred: boolean;
+  configured: boolean;
+};
+
 type InvitePanel = {
   userId: string;
   email: string;
@@ -42,7 +52,27 @@ type InvitePanel = {
   link: string;
   emailSent: boolean;
   emailError?: string;
+  notify?: PlatformUserNotifyInfo;
 };
+
+function notifyBadge(notify?: PlatformUserNotifyInfo | null) {
+  if (!notify) return null;
+  const styles: Record<string, string> = {
+    sent: "bg-emerald-500/10 text-emerald-700",
+    skipped_no_phone: "bg-amber-500/10 text-amber-800",
+    skipped_not_configured: "bg-slate-500/10 text-slate-600",
+    failed: "bg-red-500/10 text-red-700",
+    pending: "bg-amber-500/10 text-amber-700",
+  };
+  return (
+    <span
+      className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${styles[notify.status] ?? styles.pending}`}
+      title={notify.label}
+    >
+      {notify.label}
+    </span>
+  );
+}
 
 function statusBadge(status: string) {
   const styles: Record<string, string> = {
@@ -257,9 +287,11 @@ export default function UsersPage() {
   const [roles, setRoles] = useState<string[]>([]);
   const [roleLabels, setRoleLabels] = useState<RoleLabels>({});
   const [emailConfig, setEmailConfig] = useState<EmailConfig | null>(null);
+  const [smsConfig, setSmsConfig] = useState<SmsConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [role, setRole] = useState("manager");
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
@@ -278,7 +310,7 @@ export default function UsersPage() {
   const [expandedInvitePanel, setExpandedInvitePanel] = useState(false);
   const [rowActionId, setRowActionId] = useState<string | null>(null);
   const [canViewInviteLinks, setCanViewInviteLinks] = useState(false);
-  const [inviteSchemaWarning, setInviteSchemaWarning] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<PlatformUserRow | null>(null);
 
   function ownerCanViewInviteLinks(
     usersPayload: { canViewInviteLinks?: boolean },
@@ -321,18 +353,22 @@ export default function UsersPage() {
     }
     const json = await usersRes.json();
     const sessionJson = sessionRes.ok ? await sessionRes.json() : { ok: false };
-    setUsers(json.users ?? []);
+    setUsers((prev) => {
+      const next = (json.users ?? []) as PlatformUserRow[];
+      // Preserve per-row notify status from this browser session across reloads.
+      const notifyById = new Map(
+        prev.filter((u) => u.notify).map((u) => [u.id, u.notify!] as const)
+      );
+      return next.map((user) =>
+        notifyById.has(user.id) ? { ...user, notify: notifyById.get(user.id) } : user
+      );
+    });
     setRoles(json.roles ?? []);
     setRoleLabels(json.roleLabels ?? ROLE_LABELS);
     setEmailConfig(json.emailConfig ?? null);
+    setSmsConfig(json.smsConfig ?? null);
     const ownerViewer = ownerCanViewInviteLinks(json, sessionJson);
     setCanViewInviteLinks(ownerViewer);
-    setInviteSchemaWarning(
-      ownerViewer && json.inviteLinksSchemaReady === false
-        ? (json.inviteLinksSchemaError ??
-            "Invite links are unavailable until database migration 026 is applied in Supabase.")
-        : null
-    );
     if (json.roles?.length) setRole(json.roles.includes(role) ? role : json.roles[0]);
     setLoading(false);
   }, [router, role]);
@@ -357,7 +393,13 @@ export default function UsersPage() {
     userId: string,
     invitedEmail: string,
     invitedName: string,
-    json: { inviteLink?: string; inviteUrl?: string; emailSent?: boolean; emailError?: string },
+    json: {
+      inviteLink?: string;
+      inviteUrl?: string;
+      emailSent?: boolean;
+      emailError?: string;
+      notify?: PlatformUserNotifyInfo;
+    },
     resent = false
   ) {
     const link = json.inviteLink ?? json.inviteUrl ?? "";
@@ -370,28 +412,47 @@ export default function UsersPage() {
       link,
       emailSent: Boolean(json.emailSent),
       emailError: json.emailError,
+      notify: json.notify,
     });
     setExpandedInvitePanel(false);
 
-    setToastVariant(json.emailSent ? "success" : "warning");
+    const notifyLabel = json.notify?.label;
+    const smsSkipped = json.notify?.status === "skipped_no_phone";
+    const warn =
+      !json.emailSent ||
+      smsSkipped ||
+      json.notify?.status === "failed" ||
+      json.notify?.status === "skipped_not_configured";
+    setToastVariant(warn ? "warning" : "success");
+
+    const parts: string[] = [];
     if (json.emailSent) {
-      setToast(
+      parts.push(
         resent
-          ? `Invite re-sent to ${invitedEmail}.`
-          : `Invite emailed to ${invitedEmail}.`
+          ? `Invite re-sent to ${invitedEmail}`
+          : `Invite emailed to ${invitedEmail}`
       );
     } else {
-      setToast(
+      parts.push(
         json.emailError
           ? `Invite link ready for ${invitedEmail}, but email could not be sent: ${json.emailError}`
-          : `Invite link ready for ${invitedEmail}. Copy the link to share manually.`
+          : `Invite link ready for ${invitedEmail}. Copy the link to share manually`
       );
     }
+    if (notifyLabel) parts.push(notifyLabel);
+    setToast(`${parts.join(". ")}.`);
   }
 
   async function inviteUser(e: React.FormEvent) {
     e.preventDefault();
     setNewPasswordError("");
+
+    if (smsConfig?.preferred && !phone.trim()) {
+      setNewPasswordError("Phone number is required when SMS invites are enabled.");
+      setToastVariant("warning");
+      setToast("Add a phone number so the invite SMS can be sent.");
+      return;
+    }
 
     if (newPassword || newPasswordConfirm) {
       if (newPassword.length < 8) {
@@ -406,6 +467,7 @@ export default function UsersPage() {
 
     const invitedEmail = email.trim().toLowerCase();
     const invitedName = name.trim();
+    const invitedPhone = phone.trim();
     const res = await fetch("/api/admin/platform-users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -413,6 +475,7 @@ export default function UsersPage() {
         name: invitedName,
         email: invitedEmail,
         role,
+        ...(invitedPhone ? { phone: invitedPhone } : {}),
         ...(newPassword
           ? { password: newPassword, confirmPassword: newPasswordConfirm }
           : {}),
@@ -423,13 +486,27 @@ export default function UsersPage() {
     if (res.ok) {
       setName("");
       setEmail("");
+      setPhone("");
       setNewPassword("");
       setNewPasswordConfirm("");
       if (json.passwordSet) {
-        setToastVariant("success");
-        setToast(
-          `${invitedEmail} created with a password. They can sign in immediately.`
+        const notifyLabel = json.notify?.label;
+        setToastVariant(
+          json.notify?.status === "skipped_no_phone" || json.notify?.status === "failed"
+            ? "warning"
+            : "success"
         );
+        setToast(
+          notifyLabel
+            ? `${invitedEmail} created with a password. ${notifyLabel}.`
+            : `${invitedEmail} created with a password. They can sign in immediately.`
+        );
+        if (json.user) {
+          setUsers((prev) => [
+            { ...json.user, notify: json.notify },
+            ...prev.filter((user) => user.id !== json.user.id),
+          ]);
+        }
         load();
         return;
       }
@@ -441,6 +518,7 @@ export default function UsersPage() {
           setUsers((prev) => [
             {
               ...json.user,
+              notify: json.notify,
               invite: {
                 status: "active" as const,
                 inviteUrl: link,
@@ -451,8 +529,12 @@ export default function UsersPage() {
           ]);
         }
       } else {
-        setToastVariant("success");
-        setToast(`Invite sent to ${invitedEmail}.`);
+        setToastVariant(json.notify?.status === "skipped_no_phone" ? "warning" : "success");
+        setToast(
+          json.notify?.label
+            ? `Invite sent to ${invitedEmail}. ${json.notify.label}.`
+            : `Invite sent to ${invitedEmail}.`
+        );
       }
       load();
     } else {
@@ -510,6 +592,13 @@ export default function UsersPage() {
         const link = json.inviteLink ?? json.inviteUrl ?? "";
         setCanViewInviteLinks(true);
         applyInviteToUser(user.id, link, json.expiresAt);
+        if (json.notify) {
+          setUsers((prev) =>
+            prev.map((row) =>
+              row.id === user.id ? { ...row, notify: json.notify } : row
+            )
+          );
+        }
         showInvitePanel(user.id, user.email, user.name, json, true);
         load();
       } else {
@@ -534,6 +623,13 @@ export default function UsersPage() {
         const link = json.inviteLink ?? json.inviteUrl ?? "";
         setCanViewInviteLinks(true);
         applyInviteToUser(user.id, link, json.expiresAt);
+        if (json.notify) {
+          setUsers((prev) =>
+            prev.map((row) =>
+              row.id === user.id ? { ...row, notify: json.notify } : row
+            )
+          );
+        }
         showInvitePanel(user.id, user.email, user.name, json, true);
       } else {
         setToastVariant("warning");
@@ -593,12 +689,48 @@ export default function UsersPage() {
   }
 
   async function updateRole(id: string, newRole: string) {
-    await fetch("/api/admin/platform-users", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, role: newRole }),
-    });
-    load();
+    const previous = users.find((user) => user.id === id);
+    setUsers((prev) =>
+      prev.map((user) => (user.id === id ? { ...user, role: newRole } : user))
+    );
+    setRowActionId(id);
+    try {
+      const res = await fetch("/api/admin/platform-users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, role: newRole }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (previous) {
+          setUsers((prev) =>
+            prev.map((user) => (user.id === id ? { ...user, role: previous.role } : user))
+          );
+        }
+        setToastVariant("warning");
+        setToast(json.message ?? "Could not update role.");
+        return;
+      }
+      const roleName = roleLabels[newRole] ?? newRole;
+      const notify = json.notify as PlatformUserNotifyInfo | undefined;
+      if (notify) {
+        setUsers((prev) =>
+          prev.map((user) => (user.id === id ? { ...user, role: newRole, notify } : user))
+        );
+      }
+      setToastVariant(
+        notify?.status === "skipped_no_phone" || notify?.status === "failed"
+          ? "warning"
+          : "success"
+      );
+      setToast(
+        notify?.label
+          ? `Role updated to ${roleName}. ${notify.label}.`
+          : `Role updated to ${roleName}.`
+      );
+    } finally {
+      setRowActionId(null);
+    }
   }
 
   async function toggleUserStatus(user: PlatformUserRow) {
@@ -626,20 +758,33 @@ export default function UsersPage() {
     }
   }
 
-  async function removeUser(id: string) {
-    const res = await fetch(`/api/admin/platform-users?id=${encodeURIComponent(id)}`, {
-      method: "DELETE",
-    });
-    if (!res.ok) {
+  async function removeUser(user: PlatformUserRow) {
+    setRowActionId(user.id);
+    setToastVariant("success");
+    setToast("Moving user to trash…");
+    try {
+      const res = await fetch(`/api/admin/platform-users?id=${encodeURIComponent(user.id)}`, {
+        method: "DELETE",
+      });
       const json = await res.json().catch(() => ({}));
-      setToastVariant("warning");
-      setToast(json.message ?? "Could not remove user.");
-      return;
+      if (!res.ok) {
+        setToastVariant("warning");
+        setToast(json.message ?? "Could not move user to trash.");
+        return;
+      }
+      if (invitePanel?.userId === user.id) {
+        setInvitePanel(null);
+      }
+      setToastVariant("success");
+      setToast(
+        json.message ??
+          `${user.email} moved to trash. Restore from Platform → Trash if needed.`
+      );
+      load();
+    } finally {
+      setRowActionId(null);
+      setDeleteTarget(null);
     }
-    if (invitePanel?.userId === id) {
-      setInvitePanel(null);
-    }
-    load();
   }
 
   if (loading) {
@@ -661,33 +806,6 @@ export default function UsersPage() {
           </Link>
         }
       />
-
-      {inviteSchemaWarning && (
-        <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-4 text-red-950">
-          <p className="text-sm font-semibold">Invite links need a database update</p>
-          <p className="mt-1 text-sm text-red-900/90">
-            Open Supabase → SQL Editor → paste and run{" "}
-            <code className="rounded bg-red-500/20 px-1">026_platform_production_schema_fixes.sql</code>.
-            Delete user and stored invite links will not work until this runs.
-          </p>
-          <p className="mt-2 font-mono text-xs text-red-900/80">{inviteSchemaWarning}</p>
-        </div>
-      )}
-
-      {canViewInviteLinks && !inviteSchemaWarning && (
-        <details className="platform-card rounded-xl px-4 py-3 text-sm text-[var(--platform-text-secondary)]">
-          <summary className="cursor-pointer font-medium text-[var(--platform-text)]">
-            After running migration 026 — quick checklist
-          </summary>
-          <ol className="mt-3 list-decimal space-y-1.5 pl-5">
-            <li>Hard-refresh this page (Ctrl+Shift+R).</li>
-            <li>Confirm the red database banner above is gone.</li>
-            <li>For existing pending users, click <strong>Regenerate</strong> once to reveal stored links.</li>
-            <li>New invites show the link immediately in the card at the top of this page.</li>
-            <li>Test delete on a pending test user — it should succeed without schema errors.</li>
-          </ol>
-        </details>
-      )}
 
       {!emailConfigured && (
         <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-4 text-amber-950">
@@ -735,6 +853,11 @@ export default function UsersPage() {
               <p className="mt-0.5 text-xs text-[var(--platform-text-secondary)]">
                 {invitePanel.name} · pending · link valid {PLATFORM_INVITE_EXPIRY_LABEL}
               </p>
+              {invitePanel.notify && (
+                <p className="mt-1 text-xs text-[var(--platform-text-secondary)]">
+                  Notification: {invitePanel.notify.label}
+                </p>
+              )}
               {!invitePanel.emailSent && (
                 <p className="mt-2 text-xs text-amber-800">
                   {invitePanel.emailError ??
@@ -905,6 +1028,19 @@ export default function UsersPage() {
           />
         </label>
         <label className="block space-y-1.5 sm:col-span-1">
+          <span className="text-xs text-[var(--platform-text-secondary)]">
+            Phone{smsConfig?.preferred ? " (required for SMS)" : " (optional)"}
+          </span>
+          <input
+            type="tel"
+            required={Boolean(smsConfig?.preferred)}
+            className="platform-input w-full"
+            placeholder="0244…"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
+        </label>
+        <label className="block space-y-1.5 sm:col-span-1">
           <span className="text-xs text-[var(--platform-text-secondary)]">Role</span>
           <select
             className="platform-select w-full"
@@ -918,8 +1054,8 @@ export default function UsersPage() {
             ))}
           </select>
         </label>
-        <div className="flex items-end sm:col-span-1">
-          <button type="submit" className="platform-btn-primary w-full">
+        <div className="flex items-end sm:col-span-4">
+          <button type="submit" className="platform-btn-primary w-full sm:w-auto">
             <UserPlus className="size-4" />
             {newPassword ? "Create user" : "Send invite"}
           </button>
@@ -952,6 +1088,9 @@ export default function UsersPage() {
         <p className="text-xs text-[var(--platform-text-secondary)] sm:col-span-4">
           Set a password to activate the account immediately — no invite email needed. Leave
           blank to send an invite link instead.
+          {smsConfig?.preferred
+            ? " SMS invites are enabled — a phone number is required so Arkesel can deliver the invite."
+            : " Add a phone number if you want SMS/WhatsApp notify when messaging is configured."}
         </p>
         {newPasswordError && (
           <p className="text-sm text-red-600 sm:col-span-4">{newPasswordError}</p>
@@ -990,24 +1129,34 @@ export default function UsersPage() {
                   <td className="px-4 py-3 font-medium">{user.name}</td>
                   <td className="px-4 py-3 text-[var(--platform-text-secondary)]">{user.email}</td>
                   <td className="px-4 py-3">
-                    <select
-                      className="platform-select"
-                      value={user.role}
-                      onChange={(e) => updateRole(user.id, e.target.value)}
-                      disabled={user.role === "owner"}
-                    >
-                      {user.role === "owner" ? (
-                        <option value="owner">Owner</option>
-                      ) : (
-                        roles.map((r) => (
-                          <option key={r} value={r}>
-                            {roleLabels[r] ?? r}
-                          </option>
-                        ))
-                      )}
-                    </select>
+                    <div className="space-y-1">
+                      <select
+                        className="platform-select"
+                        value={user.role}
+                        onChange={(e) => updateRole(user.id, e.target.value)}
+                        disabled={user.role === "owner" || rowActionId === user.id}
+                      >
+                        {user.role === "owner" ? (
+                          <option value="owner">Owner</option>
+                        ) : (
+                          roles.map((r) => (
+                            <option key={r} value={r}>
+                              {roleLabels[r] ?? r}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                      <div className="text-[10px] text-[var(--platform-text-secondary)]">
+                        {roleLabels[user.role] ?? user.role}
+                      </div>
+                    </div>
                   </td>
-                  <td className="px-4 py-3">{statusBadge(user.status ?? "pending")}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-col items-start gap-1">
+                      {statusBadge(user.status ?? "pending")}
+                      {notifyBadge(user.notify)}
+                    </div>
+                  </td>
                   {canViewInviteLinks && (
                     <td className="px-4 py-3 align-top">
                       <InviteLinkCell
@@ -1078,9 +1227,11 @@ export default function UsersPage() {
                       {user.role !== "owner" && (
                         <button
                           type="button"
-                          onClick={() => removeUser(user.id)}
+                          onClick={() => setDeleteTarget(user)}
+                          disabled={rowActionId === user.id}
                           className="inline-flex min-h-11 min-w-11 items-center justify-center text-[var(--platform-text-secondary)] hover:text-[var(--platform-error)]"
-                          aria-label="Delete user"
+                          aria-label="Move user to trash"
+                          title="Move to trash"
                         >
                           <Trash2 className="size-4" />
                         </button>
@@ -1093,6 +1244,25 @@ export default function UsersPage() {
           </tbody>
         </table>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="Move user to trash?"
+        description={
+          deleteTarget
+            ? `Move ${deleteTarget.name} (${deleteTarget.email}) to trash? They will lose platform access until restored from Platform → Trash.`
+            : ""
+        }
+        confirmLabel="Move to trash"
+        destructive
+        confirmPhrase={DELETE_CONFIRM_PHRASE}
+        onConfirm={async () => {
+          if (deleteTarget) await removeUser(deleteTarget);
+        }}
+      />
     </div>
   );
 }

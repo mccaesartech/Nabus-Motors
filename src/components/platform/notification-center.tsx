@@ -49,6 +49,7 @@ const TYPE_ICONS: Record<string, typeof Bell> = {
   support_ticket_reopened: MessageSquare,
   support_ticket_claimed: MessageSquare,
   vehicle_pending_approval: Car,
+  vehicle_stock_action: Package,
   freight_quote: Ship,
   delivery_deferred: AlertTriangle,
   delivery_failed: AlertTriangle,
@@ -59,6 +60,7 @@ export type NotificationCategory = "urgent" | "warning" | "info" | "completed";
 const URGENT_TYPES = new Set([
   "low_stock",
   "vehicle_pending_approval",
+  "vehicle_stock_action",
   "support_ticket_reopened",
 ]);
 

@@ -36,6 +36,29 @@ When prompted for environment variables, add:
 | `AUTO_DIVISION_HOSTS` | `truegoshenauto.com,truegoshenauto.vercel.app,auto.truegoshen.com` |
 | `NEXT_PUBLIC_WHATSAPP_NUMBER` | Your WhatsApp number (digits only, e.g. `233244876784`) |
 
+For production WhatsApp Cloud API (outbound notifications + webhook), also set
+`WHATSAPP_PROVIDER=meta`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`,
+`WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, and apply migration
+`077_whatsapp_delivery_tracking.sql`. Full checklist: `docs/WHATSAPP.md`.
+
+For **SMS via Arkesel** (preferred path), set `SMS_PROVIDER=arkesel`,
+`ARKESEL_API_KEY`, and `ARKESEL_SENDER_ID`. Details: `docs/SMS.md`.
+
+### Customer Google sign-in
+
+Google Client ID/Secret live in the **Supabase dashboard** (Auth → Providers → Google),
+not as Vercel secrets. You still need:
+
+| Name | Value |
+|------|-------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase Project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your Supabase anon key |
+| `NEXT_PUBLIC_SITE_URL` | `https://truegoshen.vercel.app` |
+
+Setup steps: `docs/GOOGLE_AUTH.md` (includes Google consent-screen branding and
+Supabase **Custom Domain** so mobile Google sign-in does not show `*.supabase.co`).
+Email signup checks: `docs/EMAIL_VALIDATION.md`.
+
 ### Option B — Vercel Dashboard
 
 1. Go to **[vercel.com/new](https://vercel.com/new)**

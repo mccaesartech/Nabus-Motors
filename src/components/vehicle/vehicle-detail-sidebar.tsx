@@ -68,7 +68,13 @@ export function VehicleDetailSidebar({ vehicle }: VehicleDetailSidebarProps) {
         </h1>
 
         <div className="mt-3">
-          <VehiclePriceSection usdAmount={vehicle.price} />
+          <VehiclePriceSection
+            vehicle={{
+              price: vehicle.price,
+              priceCurrency: vehicle.priceCurrency,
+              listedPrice: vehicle.listedPrice,
+            }}
+          />
         </div>
 
         {showPreorder && (

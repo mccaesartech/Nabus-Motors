@@ -1,5 +1,6 @@
 import type { User } from "@supabase/supabase-js";
 import { customerLoginErrorMessage } from "@/lib/customer/login-errors";
+import { validateEmailForSignup } from "@/lib/email/validate-email-server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createServerSupabase } from "@/lib/supabase/server";
 
@@ -157,9 +158,18 @@ export async function resolvePreorderAccount({
     };
   }
 
+  const emailCheck = await validateEmailForSignup(email);
+  if (!emailCheck.ok || !emailCheck.normalized) {
+    return {
+      userId: null,
+      registrationId: null,
+      error: emailCheck.message,
+    };
+  }
+
   const admin = createAdminSupabase();
   const serverSupabase = createServerSupabase();
-  const trimmedEmail = email.trim();
+  const trimmedEmail = emailCheck.normalized;
 
   if (serverSupabase) {
     const { data: signInData, error: signInError } =
@@ -311,7 +321,8 @@ export async function linkCustomerPreordersByEmail(
 /** Ensure profile email is set and orphan pre-orders are linked on login/account load. */
 export async function syncCustomerAccount(
   userId: string,
-  email: string
+  email: string,
+  options?: { fullName?: string | null; phone?: string | null }
 ): Promise<{
   registrationId: string | null;
   linkedPreorders: number;
@@ -324,6 +335,17 @@ export async function syncCustomerAccount(
   }
 
   const trimmedEmail = email.trim();
+  const displayName =
+    options?.fullName?.trim() ||
+    trimmedEmail.split("@")[0] ||
+    "Customer";
+
+  let registrationId = await ensureCustomerProfile(
+    userId,
+    trimmedEmail,
+    displayName,
+    options?.phone?.trim() || undefined
+  );
 
   const { data: profile } = await admin
     .from("profiles")
@@ -331,7 +353,7 @@ export async function syncCustomerAccount(
     .eq("id", userId)
     .maybeSingle();
 
-  let registrationId = profile?.registration_id ?? null;
+  registrationId = profile?.registration_id ?? registrationId;
 
   if (!profile?.email && trimmedEmail) {
     await admin

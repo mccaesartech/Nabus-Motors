@@ -1,24 +1,30 @@
-import { swatchHexForColor } from "@/lib/vehicles/vehicle-colors";
+import {
+  swatchEdgeClass,
+  swatchHexForColor,
+} from "@/lib/vehicles/vehicle-colors";
 
 type VehicleColorSwatchProps = {
   color: string;
   className?: string;
   size?: "sm" | "md";
+  /** When set, skip label lookup and paint this hex directly. */
+  hex?: string | null;
 };
 
 export function VehicleColorSwatch({
   color,
   className = "",
   size = "sm",
+  hex: hexOverride,
 }: VehicleColorSwatchProps) {
-  const hex = swatchHexForColor(color);
+  const hex = hexOverride ?? swatchHexForColor(color);
   if (!hex) return null;
 
   const dim = size === "md" ? "size-4" : "size-3";
 
   return (
     <span
-      className={`inline-block shrink-0 rounded-full border border-black/15 ${dim} ${className}`}
+      className={`inline-block shrink-0 rounded-full border ${swatchEdgeClass(hex)} ${dim} ${className}`}
       style={{ backgroundColor: hex }}
       title={color}
       aria-hidden

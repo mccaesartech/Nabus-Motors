@@ -10,6 +10,7 @@ import {
   managerCanDeleteVehicle,
   managerNeedsApproval,
 } from "@/lib/admin/vehicle-approval";
+import { rolePublishesImmediately } from "@/lib/admin/vehicle-publish-gates";
 import {
   hasPendingEdits,
   mergeVehicleWithPending,
@@ -38,12 +39,20 @@ import {
 } from "@/lib/admin/vehicle-specs";
 import { sanitizeGallery, primaryAndAdditionalToGallery } from "@/lib/data/vehicle-images";
 import { notifyVehiclePendingApproval } from "@/lib/platform/vehicle-approval-notifications";
-import { notDeletedFilter, softDeleteEntity } from "@/lib/platform/trash";
+import { notDeletedFilter, normalizeBatchIds, softDeleteEntities } from "@/lib/platform/trash";
 import type { VehicleGalleryData } from "@/lib/types";
 import { createAdminSupabase } from "@/lib/supabase/admin";
-import { resolveRequestedSoldStatus } from "@/lib/vehicles/stock-automation";
+import {
+  countAvailableSiblings,
+  resolveRequestedSoldStatus,
+} from "@/lib/vehicles/stock-automation";
+import {
+  maybeNotifyVehicleStockAction,
+  refreshFleetLowStockAlert,
+} from "@/lib/platform/vehicle-stock-notifications";
 import { notifyVehicleLocallyAvailable } from "@/lib/vehicle-interest/server";
 import type { DbVehicle } from "@/lib/platform/types";
+import { getAdminSiteSettings, toOperationalSettings } from "@/lib/platform/site-settings";
 
 const EDITABLE_FIELDS = [
   "make",
@@ -277,7 +286,23 @@ export async function GET() {
     );
   }
 
-  return NextResponse.json({ ok: true, configured: true, vehicles: data ?? [] });
+  const operational = toOperationalSettings(await getAdminSiteSettings());
+  const vehicles = (data ?? []) as unknown as DbVehicle[];
+  const availableCount = vehicles.filter((v) => v.status === "available").length;
+
+  return NextResponse.json({
+    ok: true,
+    configured: true,
+    vehicles,
+    stock: {
+      availableCount,
+      lowStockThreshold: operational.lowStockThreshold,
+      notifyLowStockEnabled: operational.notifyLowStockEnabled,
+      fleetLowStock:
+        operational.notifyLowStockEnabled &&
+        availableCount < operational.lowStockThreshold,
+    },
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -294,15 +319,34 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const body = (await req.json()) as Partial<VehicleInput>;
-  const validated = validateVehicleInput(body);
+  const body = (await req.json()) as Partial<VehicleInput> & {
+    publishConfirmed?: boolean;
+  };
+  const { publishConfirmed, ...vehicleBody } = body;
+  const validated = validateVehicleInput(vehicleBody);
   if (!validated.ok) {
     return NextResponse.json({ ok: false, message: validated.message }, { status: 400 });
   }
 
+  const approvalStatus = defaultApprovalStatusForCreate(auth.auth.role);
+  if (
+    rolePublishesImmediately(auth.auth.role) &&
+    approvalStatus === "approved" &&
+    publishConfirmed !== true
+  ) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          "Confirm the full vehicle details and photos before publishing to the public website.",
+        code: "PUBLISH_CONFIRMATION_REQUIRED",
+      },
+      { status: 400 }
+    );
+  }
+
   const slug = buildVehicleSlug(validated.data);
   const row = rowFromInput(validated.data, slug);
-  const approvalStatus = defaultApprovalStatusForCreate(auth.auth.role);
   row.approval_status = approvalStatus;
   if (managerNeedsApproval(auth.auth.role) && auth.auth.type === "user") {
     row.submitted_by = auth.auth.userId ?? null;
@@ -384,7 +428,10 @@ export async function PATCH(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { id, ...rest } = body as { id: string } & Record<string, unknown>;
+  const { id, publishConfirmed, ...rest } = body as {
+    id: string;
+    publishConfirmed?: boolean;
+  } & Record<string, unknown>;
 
   if (!id) {
     return NextResponse.json({ ok: false, message: "Missing vehicle id" }, { status: 400 });
@@ -478,6 +525,22 @@ export async function PATCH(req: NextRequest) {
     (existing.approval_status === "approved" ||
       existing.approval_status === "rejected" ||
       hasPendingEdits(existing.pending_changes));
+
+  if (
+    rolePublishesImmediately(auth.auth.role) &&
+    !stashPendingEdits &&
+    publishConfirmed !== true
+  ) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          "Confirm the full vehicle details and photos before publishing changes to the public website.",
+        code: "PUBLISH_CONFIRMATION_REQUIRED",
+      },
+      { status: 400 }
+    );
+  }
 
   if (stashPendingEdits) {
     const priorPending = hasPendingEdits(existing.pending_changes)
@@ -643,6 +706,31 @@ export async function PATCH(req: NextRequest) {
     });
   }
 
+  if (requestedStatus === "sold") {
+    try {
+      const availableSiblings = await countAvailableSiblings(supabase, {
+        id: vehicle.id,
+        make: vehicle.make,
+        model: vehicle.model,
+        year: vehicle.year,
+      });
+      await maybeNotifyVehicleStockAction(supabase, {
+        id: vehicle.id,
+        slug: vehicle.slug,
+        year: vehicle.year,
+        make: vehicle.make,
+        model: vehicle.model,
+        availableSiblings,
+        autoPreOrder,
+        source: "sold",
+        sourceDetail: "admin_status_change",
+      });
+      await refreshFleetLowStockAlert(supabase);
+    } catch (err) {
+      console.error("[vehicles] stock action notify failed:", err);
+    }
+  }
+
   const becamePending =
     managerNeedsApproval(auth.auth.role) &&
     existing.approval_status === "rejected" &&
@@ -727,16 +815,27 @@ export async function DELETE(req: NextRequest) {
     );
   }
 
-  const id = req.nextUrl.searchParams.get("id");
-  if (!id) {
+  const queryId = req.nextUrl.searchParams.get("id");
+  let ids: string[] = [];
+  if (queryId?.trim()) {
+    ids = [queryId.trim()];
+  } else {
+    const body = (await req.json().catch(() => ({}))) as { ids?: unknown; id?: unknown };
+    if (typeof body.id === "string" && body.id.trim()) {
+      ids = [body.id.trim()];
+    } else {
+      ids = normalizeBatchIds(body.ids);
+    }
+  }
+
+  if (ids.length === 0) {
     return NextResponse.json({ ok: false, message: "Missing id" }, { status: 400 });
   }
 
-  const { data: existing, error: existingError } = await supabase
+  const { data: existingRows, error: existingError } = await supabase
     .from("vehicles")
     .select("id, approval_status")
-    .eq("id", id)
-    .maybeSingle();
+    .in("id", ids);
 
   if (existingError) {
     return NextResponse.json(
@@ -745,33 +844,70 @@ export async function DELETE(req: NextRequest) {
     );
   }
 
-  if (!existing) {
-    return NextResponse.json({ ok: false, message: "Vehicle not found." }, { status: 404 });
+  const byId = new Map(
+    (existingRows ?? []).map((row) => [row.id as string, row] as const)
+  );
+  const allowedIds: string[] = [];
+  const failed: Array<{ id: string; message: string }> = [];
+
+  for (const id of ids) {
+    const existing = byId.get(id);
+    if (!existing) {
+      failed.push({ id, message: "Vehicle not found." });
+      continue;
+    }
+    if (
+      !canManageTrash(auth.auth) &&
+      !managerCanDeleteVehicle(auth.auth.role, existing.approval_status)
+    ) {
+      failed.push({
+        id,
+        message: "Managers can only remove vehicles that are pending approval or rejected.",
+      });
+      continue;
+    }
+    allowedIds.push(id);
   }
 
-  if (
-    !canManageTrash(auth.auth) &&
-    !managerCanDeleteVehicle(auth.auth.role, existing.approval_status)
-  ) {
+  if (allowedIds.length === 0) {
+    const status = failed.some((f) => f.message.includes("Managers")) ? 403 : 404;
     return NextResponse.json(
       {
         ok: false,
-        message: "Managers can only remove vehicles that are pending approval or rejected.",
+        message: failed[0]?.message ?? "No vehicles deleted.",
+        failed,
+        deletedIds: [],
       },
-      { status: 403 }
+      { status }
     );
   }
 
-  const result = await softDeleteEntity(supabase, auth.auth, "vehicle", id);
+  const batch = await softDeleteEntities(supabase, auth.auth, "vehicle", allowedIds);
+  failed.push(...batch.failed);
 
-  if (!result.ok) {
+  if (batch.deletedIds.length > 0) {
+    await logPlatformActivity(
+      auth.auth,
+      "vehicle_deleted",
+      batch.deletedIds.length === 1 ? batch.deletedIds[0] : `${batch.deletedIds.length} vehicles`
+    );
+  }
+
+  if (batch.deletedIds.length === 0) {
     return NextResponse.json(
-      { ok: false, message: friendlyAdminDbError(result.message) },
-      { status: result.status ?? 500 }
+      {
+        ok: false,
+        message: failed[0]?.message ?? "Could not move vehicles to trash.",
+        failed,
+        deletedIds: [],
+      },
+      { status: 500 }
     );
   }
 
-  revalidatePublicSite();
-  await logPlatformActivity(auth.auth, "vehicle_deleted", id);
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({
+    ok: true,
+    deletedIds: batch.deletedIds,
+    failed,
+  });
 }

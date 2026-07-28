@@ -81,7 +81,7 @@ export default function AcceptInvitePage() {
     }
 
     setRedirecting(true);
-    window.location.assign(json.redirect ?? adminDashboardPath());
+    window.location.replace(json.redirect ?? adminDashboardPath());
   }
 
   return (

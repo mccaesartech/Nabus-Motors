@@ -23,11 +23,14 @@ const ENTITY_TABLE: Record<TrashEntityType, string | null> = {
   order: "parts_orders",
   vehicle: "vehicles",
   customer: null,
+  platform_user: "platform_users",
   lead_contact: "contact_inquiries",
   lead_finance: "finance_applications",
   lead_appraisal: "appraisal_requests",
   lead_vehicle: "vehicle_inquiries",
   preorder: "preorder_inquiries",
+  support_ticket: "customer_conversations",
+  admin_notification: "admin_notifications",
 };
 
 export type TrashListFilters = {
@@ -49,6 +52,12 @@ export type TrashSummary = {
 
 export type RestoreTrashOptions = {
   vehicleStatus?: "available" | "pre_order" | "sold" | "reserved";
+  /** When true, caller is responsible for revalidation (e.g. batch ops). */
+  skipRevalidate?: boolean;
+};
+
+export type PermanentDeleteTrashOptions = {
+  skipRevalidate?: boolean;
 };
 
 function actorFields(auth: PlatformAuthContext) {
@@ -83,12 +92,32 @@ export function buildEntityLabel(
       const name = `${first} ${last}`.trim();
       return name || String(row.email ?? "Customer");
     }
+    case "platform_user": {
+      const name = String(row.name ?? "").trim();
+      const email = String(row.email ?? "").trim();
+      if (name && email) return `${name} (${email})`;
+      return name || email || TRASH_ENTITY_LABELS.platform_user;
+    }
     case "lead_contact":
     case "lead_finance":
     case "lead_appraisal":
     case "lead_vehicle":
     case "preorder":
       return String(row.name ?? row.email ?? TRASH_ENTITY_LABELS[entityType]);
+    case "support_ticket": {
+      const subject = String(row.subject ?? "").trim();
+      const customer =
+        String(row.customer_name ?? "").trim() ||
+        String(row.customer_email ?? "").trim();
+      if (subject && customer) return `${subject} — ${customer}`;
+      return subject || customer || TRASH_ENTITY_LABELS.support_ticket;
+    }
+    case "admin_notification": {
+      const title = String(row.title ?? "").trim();
+      if (title) return title;
+      const message = String(row.message ?? "").trim();
+      return message ? message.slice(0, 80) : TRASH_ENTITY_LABELS.admin_notification;
+    }
     default:
       return TRASH_ENTITY_LABELS[entityType];
   }
@@ -113,17 +142,22 @@ async function markEntityDeleted(
   entityId: string,
   auth: PlatformAuthContext,
   now: string
-) {
+): Promise<{ ok: true } | { ok: false; message: string }> {
   const table = ENTITY_TABLE[entityType];
-  if (!table) return;
+  if (!table) return { ok: true };
 
-  await supabase
+  const { error } = await supabase
     .from(table)
     .update({
       deleted_at: now,
       deleted_by_user_id: auth.type === "user" ? auth.userId ?? null : null,
     })
     .eq("id", entityId);
+
+  if (error) {
+    return { ok: false, message: error.message };
+  }
+  return { ok: true };
 }
 
 async function clearEntityDeleted(
@@ -165,6 +199,7 @@ async function restoreCustomer(
       .update({
         deleted_at: null,
         deleted_by_user_id: null,
+        account_status: "active",
         first_name: profile.first_name ?? null,
         last_name: profile.last_name ?? null,
         phone: profile.phone ?? null,
@@ -240,8 +275,14 @@ export async function softDeleteEntity(
   const now = new Date().toISOString();
   const entityLabel = buildEntityLabel(entityType, row);
   const snapshot = { ...row };
+  if (entityType === "platform_user") {
+    delete snapshot.password_hash;
+  }
 
-  await markEntityDeleted(supabase, entityType, entityId, auth, now);
+  const marked = await markEntityDeleted(supabase, entityType, entityId, auth, now);
+  if (!marked.ok) {
+    return { ok: false, message: marked.message, status: 500 };
+  }
 
   const trash = await recordTrashEntry(
     supabase,
@@ -257,6 +298,180 @@ export async function softDeleteEntity(
   }
 
   return { ok: true, trashId: trash.id };
+}
+
+const BATCH_CONCURRENCY = 6;
+const MAX_BATCH_IDS = 100;
+
+async function mapPool<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  if (items.length === 0) return [];
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex++;
+      results[index] = await fn(items[index], index);
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    () => worker()
+  );
+  await Promise.all(workers);
+  return results;
+}
+
+export function normalizeBatchIds(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  for (const value of raw) {
+    if (typeof value !== "string") continue;
+    const id = value.trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+    if (ids.length >= MAX_BATCH_IDS) break;
+  }
+  return ids;
+}
+
+export type SoftDeleteBatchResult = {
+  deletedIds: string[];
+  failed: Array<{ id: string; message: string }>;
+};
+
+/**
+ * Soft-delete many entities of one type. Revalidates the public site once when
+ * any vehicle/sale/preorder is moved to trash.
+ */
+export async function softDeleteEntities(
+  supabase: SupabaseClient,
+  auth: PlatformAuthContext,
+  entityType: TrashEntityType,
+  entityIds: string[]
+): Promise<SoftDeleteBatchResult> {
+  const ids = normalizeBatchIds(entityIds);
+  const failed: SoftDeleteBatchResult["failed"] = [];
+  const deletedIds: string[] = [];
+
+  if (ids.length === 0) {
+    return { deletedIds, failed };
+  }
+
+  const results = await mapPool(ids, BATCH_CONCURRENCY, async (entityId) => {
+    const result = await softDeleteEntity(supabase, auth, entityType, entityId);
+    return { entityId, result };
+  });
+
+  for (const { entityId, result } of results) {
+    if (result.ok) deletedIds.push(entityId);
+    else failed.push({ id: entityId, message: result.message });
+  }
+
+  if (
+    deletedIds.length > 0 &&
+    (entityType === "vehicle" || entityType === "sale" || entityType === "preorder")
+  ) {
+    revalidatePublicSite();
+  }
+
+  return { deletedIds, failed };
+}
+
+export type TrashBatchResult = {
+  succeededIds: string[];
+  failed: Array<{ id: string; message: string }>;
+};
+
+/**
+ * Permanently delete many trash entries. Revalidates once when needed.
+ */
+export async function permanentlyDeleteTrashEntries(
+  supabase: SupabaseClient,
+  auth: PlatformAuthContext,
+  trashIds: string[],
+  options: { skipRevalidate?: boolean } = {}
+): Promise<TrashBatchResult> {
+  const ids = normalizeBatchIds(trashIds);
+  const failed: TrashBatchResult["failed"] = [];
+  const succeededIds: string[] = [];
+  let needsRevalidate = false;
+
+  if (ids.length === 0) {
+    return { succeededIds, failed };
+  }
+
+  const results = await mapPool(ids, BATCH_CONCURRENCY, async (trashId) => {
+    const result = await permanentlyDeleteTrashEntry(supabase, auth, trashId, {
+      skipRevalidate: true,
+    });
+    return { trashId, result };
+  });
+
+  for (const { trashId, result } of results) {
+    if (result.ok) {
+      succeededIds.push(trashId);
+      if (result.needsRevalidate) needsRevalidate = true;
+    } else {
+      failed.push({ id: trashId, message: result.message });
+    }
+  }
+
+  if (needsRevalidate && !options.skipRevalidate) {
+    revalidatePublicSite();
+  }
+
+  return { succeededIds, failed };
+}
+
+/**
+ * Restore many trash entries. Revalidates once when needed.
+ */
+export async function restoreTrashEntries(
+  supabase: SupabaseClient,
+  auth: PlatformAuthContext,
+  trashIds: string[],
+  options: RestoreTrashOptions & { skipRevalidate?: boolean } = {}
+): Promise<TrashBatchResult> {
+  const ids = normalizeBatchIds(trashIds);
+  const failed: TrashBatchResult["failed"] = [];
+  const succeededIds: string[] = [];
+  let needsRevalidate = false;
+  const { skipRevalidate, ...restoreOptions } = options;
+
+  if (ids.length === 0) {
+    return { succeededIds, failed };
+  }
+
+  const results = await mapPool(ids, BATCH_CONCURRENCY, async (trashId) => {
+    const result = await restoreTrashEntry(supabase, auth, trashId, {
+      ...restoreOptions,
+      skipRevalidate: true,
+    });
+    return { trashId, result };
+  });
+
+  for (const { trashId, result } of results) {
+    if (result.ok) {
+      succeededIds.push(trashId);
+      if (result.needsRevalidate) needsRevalidate = true;
+    } else {
+      failed.push({ id: trashId, message: result.message });
+    }
+  }
+
+  if (needsRevalidate && !skipRevalidate) {
+    revalidatePublicSite();
+  }
+
+  return { succeededIds, failed };
 }
 
 export async function countActiveTrash(supabase: SupabaseClient): Promise<number> {
@@ -374,7 +589,10 @@ export async function restoreTrashEntry(
   auth: PlatformAuthContext,
   trashId: string,
   options: RestoreTrashOptions = {}
-): Promise<{ ok: true } | { ok: false; message: string; status?: number }> {
+): Promise<
+  | { ok: true; needsRevalidate: boolean }
+  | { ok: false; message: string; status?: number }
+> {
   const { data: entry, error } = await supabase
     .from("platform_trash")
     .select("*")
@@ -398,6 +616,17 @@ export async function restoreTrashEntry(
   } else {
     await clearEntityDeleted(supabase, entityType, entityId);
 
+    if (entityType === "platform_user") {
+      const priorStatus =
+        typeof snapshot.status === "string" && snapshot.status.trim()
+          ? snapshot.status
+          : "active";
+      await supabase
+        .from("platform_users")
+        .update({ status: priorStatus })
+        .eq("id", entityId);
+    }
+
     if (entityType === "vehicle" && options.vehicleStatus) {
       await supabase
         .from("vehicles")
@@ -409,7 +638,10 @@ export async function restoreTrashEntry(
   const now = new Date().toISOString();
   await supabase.from("platform_trash").update({ restored_at: now }).eq("id", trashId);
 
-  if (entityType === "vehicle" || entityType === "sale" || entityType === "preorder") {
+  const needsRevalidate =
+    entityType === "vehicle" || entityType === "sale" || entityType === "preorder";
+
+  if (needsRevalidate && !options.skipRevalidate) {
     revalidatePublicSite();
   }
 
@@ -420,14 +652,18 @@ export async function restoreTrashEntry(
     vehicleStatus: options.vehicleStatus,
   });
 
-  return { ok: true };
+  return { ok: true, needsRevalidate };
 }
 
 export async function permanentlyDeleteTrashEntry(
   supabase: SupabaseClient,
   auth: PlatformAuthContext,
-  trashId: string
-): Promise<{ ok: true } | { ok: false; message: string; status?: number }> {
+  trashId: string,
+  options: PermanentDeleteTrashOptions = {}
+): Promise<
+  | { ok: true; needsRevalidate: boolean }
+  | { ok: false; message: string; status?: number }
+> {
   const { data: entry, error } = await supabase
     .from("platform_trash")
     .select("*")
@@ -455,7 +691,10 @@ export async function permanentlyDeleteTrashEntry(
     await hardDeleteEntity(supabase, entityType, entityId);
   }
 
-  if (entityType === "vehicle" || entityType === "sale" || entityType === "preorder") {
+  const needsRevalidate =
+    entityType === "vehicle" || entityType === "sale" || entityType === "preorder";
+
+  if (needsRevalidate && !options.skipRevalidate) {
     revalidatePublicSite();
   }
 
@@ -468,7 +707,7 @@ export async function permanentlyDeleteTrashEntry(
     trashId,
   });
 
-  return { ok: true };
+  return { ok: true, needsRevalidate };
 }
 
 export { notDeletedFilter } from "@/lib/platform/trash-types";

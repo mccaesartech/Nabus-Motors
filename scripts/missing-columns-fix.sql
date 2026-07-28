@@ -97,5 +97,17 @@ CREATE INDEX IF NOT EXISTS idx_vehicles_filter_origin
 CREATE INDEX IF NOT EXISTS idx_vehicles_trust_badges_gin
   ON vehicles USING GIN (trust_badges);
 
+-- 081: per-listing price currency
+ALTER TABLE vehicles
+  ADD COLUMN IF NOT EXISTS price_currency TEXT NOT NULL DEFAULT 'USD';
+
+ALTER TABLE vehicles
+  ADD COLUMN IF NOT EXISTS listed_price INTEGER;
+
+UPDATE vehicles
+SET listed_price = price
+WHERE listed_price IS NULL
+  AND price_currency = 'USD';
+
 -- Notify PostgREST to reload schema
 NOTIFY pgrst, 'reload schema';

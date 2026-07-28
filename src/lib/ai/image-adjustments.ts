@@ -6,6 +6,7 @@ export const IMAGE_ADJUST_PRESETS = [
   "contrast",
   "vibrant",
   "muted",
+  "enhance",
 ] as const;
 
 export type ImageAdjustPreset = (typeof IMAGE_ADJUST_PRESETS)[number];
@@ -18,7 +19,11 @@ export const IMAGE_ADJUST_LABELS: Record<ImageAdjustPreset, string> = {
   contrast: "Increase contrast",
   vibrant: "More vibrant",
   muted: "Mute colors",
+  enhance: "Enhance photos (4K)",
 };
+
+/** Exact quick-action chip / short-circuit label for 4K enhance. */
+export const ENHANCE_PHOTOS_4K_ACTION = IMAGE_ADJUST_LABELS.enhance;
 
 const PRESET_PATTERNS: Array<{ preset: ImageAdjustPreset; patterns: RegExp[] }> = [
   {
@@ -75,6 +80,9 @@ export function parseColorAdjustPreset(message: string): ImageAdjustPreset | nul
   const text = message.trim();
   if (!text) return null;
 
+  // Quality enhance / 4K is not a color filter preset.
+  if (isImageEnhanceRequest(text)) return null;
+
   for (const { preset, patterns } of PRESET_PATTERNS) {
     if (patterns.some((p) => p.test(text))) return preset;
   }
@@ -90,6 +98,9 @@ export function isColorAdjustRequest(message: string): boolean {
   const text = message.trim();
   if (!text) return false;
 
+  // Quality / 4K enhance is a separate pipeline — do not treat as color filter.
+  if (isImageEnhanceRequest(text)) return false;
+
   if (parseColorAdjustPreset(text)) return true;
 
   return (
@@ -98,6 +109,56 @@ export function isColorAdjustRequest(message: string): boolean {
   );
 }
 
+/**
+ * Detect “upgrade / enhance / 4K / upscale / higher quality” photo requests.
+ * Must win over Gemini listing-fill chat so we never refuse with “I cannot enhance”.
+ */
+export function isImageEnhanceRequest(message: string): boolean {
+  const text = message.trim();
+  if (!text) return false;
+
+  if (text === ENHANCE_PHOTOS_4K_ACTION) return true;
+
+  // Description / copy rewrites are not image enhance.
+  if (
+    /\b(description|listing\s+copy|title|warranty|inspection)\b/i.test(text) &&
+    !/\b(photo|image|picture|gallery|4k|upscale|resolution)\b/i.test(text)
+  ) {
+    return false;
+  }
+
+  if (/\b(4k|uhd|ultra[\s-]*hd)\b/i.test(text)) return true;
+  if (/\b(upscale|up[\s-]*scale)\b/i.test(text)) return true;
+  if (/\b(higher|better|improve[d]?|upgrade[d]?)\s+(image\s+|photo\s+|picture\s+)?(quality|resolution|clarity)\b/i.test(text)) {
+    return true;
+  }
+  if (/\b(enhance|enhancement)\b/i.test(text) && /\b(photo|image|picture|gallery|quality|resolution|clarity)\b/i.test(text)) {
+    return true;
+  }
+  if (/\b(enhance|enhancement)\b/i.test(text) && !/\b(description|listing|title|warranty|inspection|field)\b/i.test(text)) {
+    return true;
+  }
+  if (/\b(sharpen|make\s+sharper)\b/i.test(text) && /\b(photo|image|picture|gallery)\b/i.test(text)) {
+    return true;
+  }
+  if (
+    /\b(make|upgrade|increase|boost)\b/i.test(text) &&
+    /\b(quality|resolution|clarity)\b/i.test(text) &&
+    /\b(photo|image|picture|gallery|this)\b/i.test(text)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 export function colorAdjustReply(preset: ImageAdjustPreset): string {
-  return `Applied “${IMAGE_ADJUST_LABELS[preset]}” filter to your photo. This adjusts brightness, contrast, and saturation — not AI image generation.`;
+  if (preset === "enhance") {
+    return enhanceImageReply();
+  }
+  return `Ready to apply “${IMAGE_ADJUST_LABELS[preset]}” to your photo. Review the before/after preview, then Approve to update the gallery — nothing changes until you confirm. This adjusts brightness, contrast, and saturation — not AI image generation.`;
+}
+
+export function enhanceImageReply(): string {
+  return `Ready to enhance this photo toward ~4K listing clarity (longest side up to 3840px) with sharpening and contrast. Review the before/after preview, then Approve to update the gallery — nothing changes until you confirm. This is Sharp resize + clarity enhance for web/listing sharpness — not generative AI inventing missing detail.`;
 }

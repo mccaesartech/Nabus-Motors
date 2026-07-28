@@ -19,7 +19,15 @@ import {
   type VehicleInput,
 } from "@/lib/admin/vehicle-fields";
 import { makes } from "@/lib/data/catalog-meta";
-import { formatAdminCurrencyPreviews, formatPlatformPrice } from "@/lib/currency";
+import {
+  BASE_CURRENCY,
+  convertBetweenCurrencies,
+  DEFAULT_DISPLAY_CURRENCY,
+  formatAmount,
+  formatUsdPrice,
+  LISTING_PRICE_CURRENCIES,
+  toStoredVehiclePrice,
+} from "@/lib/currency";
 import { isValidImageUrl } from "@/lib/data/vehicle-images";
 import { CategoryBadges } from "@/components/admin/category-badges";
 import { SafeVehicleImage } from "@/components/shared/safe-vehicle-image";
@@ -67,6 +75,7 @@ export function VehicleForm({ initial, onSave, onCancel, saving }: VehicleFormPr
           year: initial.year,
           trim: initial.trim ?? "",
           price: initial.price,
+          price_currency: initial.price_currency || DEFAULT_DISPLAY_CURRENCY,
           mileage: initial.mileage,
           fuel_type: initial.fuel_type,
           transmission: initial.transmission,
@@ -86,7 +95,7 @@ export function VehicleForm({ initial, onSave, onCancel, saving }: VehicleFormPr
           status: initial.status ?? "available",
           images: initial.images ?? [],
         }
-      : emptyVehicleForm()
+      : emptyVehicleForm(DEFAULT_DISPLAY_CURRENCY)
   );
   const [imageText, setImageText] = useState(() => imagesToInput(initial?.images));
   const [error, setError] = useState("");
@@ -94,6 +103,19 @@ export function VehicleForm({ initial, onSave, onCancel, saving }: VehicleFormPr
 
   function update<K extends keyof VehicleInput>(key: K, value: VehicleInput[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function setPriceCurrency(nextCurrency: string) {
+    setForm((prev) => {
+      const from = prev.price_currency || DEFAULT_DISPLAY_CURRENCY;
+      const to = nextCurrency.toUpperCase();
+      if (from === to) return { ...prev, price_currency: to };
+      const converted =
+        prev.price > 0
+          ? Math.round(convertBetweenCurrencies(prev.price, from, to))
+          : prev.price;
+      return { ...prev, price_currency: to, price: converted };
+    });
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -183,23 +205,47 @@ export function VehicleForm({ initial, onSave, onCancel, saving }: VehicleFormPr
           />
         </Field>
         <Field label="List price *">
-          <Input
-            type="number"
-            min={0}
-            value={form.price || ""}
-            onChange={(e) => update("price", Number(e.target.value))}
-            required
-            className={inputClass}
-          />
-          {form.price > 0 && (
-            <p className="mt-1.5 text-xs text-white/50">
-              Default display: {formatPlatformPrice(form.price)}
-              <span className="text-white/35">
-                {" "}
-                · {formatAdminCurrencyPreviews(form.price)}
-              </span>
-            </p>
-          )}
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              type="number"
+              min={0}
+              value={form.price || ""}
+              onChange={(e) => update("price", Number(e.target.value))}
+              required
+              className={inputClass}
+            />
+            <select
+              value={form.price_currency || DEFAULT_DISPLAY_CURRENCY}
+              onChange={(e) => setPriceCurrency(e.target.value)}
+              className={selectClass + " sm:w-32"}
+              aria-label="Listing price currency"
+            >
+              {LISTING_PRICE_CURRENCIES.map((code) => (
+                <option key={code} value={code}>
+                  {code}
+                </option>
+              ))}
+            </select>
+          </div>
+          {form.price > 0 &&
+            (() => {
+              const listingCurrency =
+                form.price_currency || DEFAULT_DISPLAY_CURRENCY;
+              const stored = toStoredVehiclePrice(form.price, listingCurrency);
+              return (
+                <p className="mt-1.5 text-xs text-white/50">
+                  Listing {formatAmount(form.price, listingCurrency)}
+                  {listingCurrency !== BASE_CURRENCY && (
+                    <> · stores as ≈ {formatAmount(stored.price, BASE_CURRENCY)}</>
+                  )}
+                  <span className="text-white/35">
+                    {" "}
+                    · {formatUsdPrice(stored.price, "USD")} ·{" "}
+                    {formatUsdPrice(stored.price, "EUR")}
+                  </span>
+                </p>
+              );
+            })()}
         </Field>
         <Field label="Mileage (km) *">
           <Input
@@ -302,7 +348,7 @@ export function VehicleForm({ initial, onSave, onCancel, saving }: VehicleFormPr
             value={form.color ?? ""}
             onChange={(color) => update("color", color)}
             primaryImageUrl={form.primary_image_url || form.images?.[0]}
-            selectClassName={inputClass}
+            selectClassName={selectClass}
             inputClassName={inputClass}
           />
         </Field>

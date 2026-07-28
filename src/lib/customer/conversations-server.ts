@@ -57,6 +57,7 @@ type ConversationRow = {
   resolution_note: string | null;
   customer_last_read_at: string | null;
   staff_last_read_at: string | null;
+  deleted_at?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -385,6 +386,7 @@ export async function buildConversationSummaries(
   let query = supabase
     .from("customer_conversations")
     .select("*")
+    .is("deleted_at", null)
     .order("updated_at", { ascending: false })
     .limit(200);
 
@@ -392,7 +394,31 @@ export async function buildConversationSummaries(
     query = query.eq("user_id", userIdFilter);
   }
 
-  const { data: conversations, error } = await query;
+  let { data: conversations, error } = await query;
+
+  // Graceful fallback when migration 079 (deleted_at) is not applied yet.
+  if (error && /deleted_at/i.test(error.message)) {
+    const { reportSchemaIssue } = await import("@/lib/observability/schema-issue");
+    reportSchemaIssue({
+      table: "customer_conversations",
+      column: "deleted_at",
+      migration: "079_support_ticket_soft_delete.sql",
+      source: "conversations-server.list",
+      message: error.message,
+    });
+    let fallback = supabase
+      .from("customer_conversations")
+      .select("*")
+      .order("updated_at", { ascending: false })
+      .limit(200);
+    if (userIdFilter) {
+      fallback = fallback.eq("user_id", userIdFilter);
+    }
+    const retry = await fallback;
+    conversations = retry.data;
+    error = retry.error;
+  }
+
   if (error || !conversations?.length) return [];
 
   const rows = conversations as ConversationRow[];
@@ -440,11 +466,22 @@ export async function buildCustomerConversationSummaries(
   supabase: SupabaseClient,
   customerUserId: string
 ): Promise<CustomerConversation[]> {
-  const { data: conversations, error } = await supabase
+  let { data: conversations, error } = await supabase
     .from("customer_conversations")
     .select("*")
     .eq("user_id", customerUserId)
+    .is("deleted_at", null)
     .order("updated_at", { ascending: false });
+
+  if (error && /deleted_at/i.test(error.message)) {
+    const retry = await supabase
+      .from("customer_conversations")
+      .select("*")
+      .eq("user_id", customerUserId)
+      .order("updated_at", { ascending: false });
+    conversations = retry.data;
+    error = retry.error;
+  }
 
   if (error || !conversations?.length) return [];
 
@@ -501,7 +538,9 @@ export async function getConversationRow(
     .select("*")
     .eq("id", conversationId)
     .maybeSingle();
-  return (data as ConversationRow | null) ?? null;
+  const row = (data as ConversationRow | null) ?? null;
+  if (row?.deleted_at) return null;
+  return row;
 }
 
 export async function claimSupportTicket(
@@ -874,7 +913,9 @@ export async function insertStaffMessage(
       .eq("id", conversationId)
       .maybeSingle();
     conversation = (data as ConversationRow | null) ?? null;
-    if (!conversation) return { error: "Conversation not found." };
+    if (!conversation || conversation.deleted_at) {
+      return { error: "Conversation not found." };
+    }
     if (!staffCanReplyToTicket(auth, conversation)) {
       return {
         error: conversation.status === "closed"

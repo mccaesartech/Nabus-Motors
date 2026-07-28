@@ -12,6 +12,8 @@ import {
   dismissAllEphemeralAdminNotifications,
   isEphemeralAdminNotificationId,
 } from "@/lib/platform/notification-read-state";
+import { softDeleteAdminNotifications } from "@/lib/platform/admin-notification-trash";
+import { normalizeBatchIds } from "@/lib/platform/trash";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin();
@@ -152,7 +154,7 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const auth = await requireAdmin();
   if (!auth.ok) {
-    return NextResponse.json({ ok: false }, { status: auth.status });
+    return NextResponse.json({ ok: false, message: auth.message }, { status: auth.status });
   }
 
   const supabase = createAdminSupabase();
@@ -160,17 +162,60 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "Not configured" }, { status: 503 });
   }
 
-  const id = req.nextUrl.searchParams.get("id");
-  if (!id || id === "low-stock") {
+  const queryId = req.nextUrl.searchParams.get("id");
+  let ids: string[] = [];
+  let snapshotsById: Record<string, Record<string, unknown>> | undefined;
+
+  if (queryId?.trim()) {
+    ids = [queryId.trim()];
+  } else {
+    const body = (await req.json().catch(() => ({}))) as {
+      ids?: unknown;
+      id?: unknown;
+      snapshots?: unknown;
+    };
+    if (typeof body.id === "string" && body.id.trim()) {
+      ids = [body.id.trim()];
+    } else {
+      ids = normalizeBatchIds(body.ids);
+    }
+    if (body.snapshots && typeof body.snapshots === "object" && !Array.isArray(body.snapshots)) {
+      snapshotsById = body.snapshots as Record<string, Record<string, unknown>>;
+    }
+  }
+
+  if (ids.length === 0) {
     return NextResponse.json({ ok: false, message: "Missing id" }, { status: 400 });
   }
 
-  const { error } = await supabase.from("admin_notifications").delete().eq("id", id);
-  if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+  const batch = await softDeleteAdminNotifications(
+    supabase,
+    auth.auth,
+    ids,
+    snapshotsById
+  );
+
+  if (batch.deletedIds.length === 0) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: batch.failed[0]?.message ?? "Could not move notification(s) to trash.",
+        failed: batch.failed,
+        deletedIds: [],
+      },
+      { status: batch.failed[0]?.message?.includes("cannot be deleted") ? 400 : 500 }
+    );
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({
+    ok: true,
+    deletedIds: batch.deletedIds,
+    failed: batch.failed,
+    message:
+      batch.deletedIds.length === 1
+        ? "Notification moved to trash."
+        : `${batch.deletedIds.length} notifications moved to trash.`,
+  });
 }
 
 export type { AdminNotification };

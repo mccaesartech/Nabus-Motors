@@ -7,7 +7,10 @@ import { ChevronDown, ChevronRight, Search, Trash2 } from "lucide-react";
 import { ContactEmailAction, ContactPhoneAction } from "@/components/platform/contact-actions";
 import { CustomerInvoicePrintButton } from "@/components/platform/customer-invoice-print";
 import { CustomerDataTrustNote } from "@/components/forms/customer-data-trust-note";
-import { ConfirmDialog } from "@/components/platform/confirm-dialog";
+import {
+  ConfirmDialog,
+  DELETE_CONFIRM_PHRASE,
+} from "@/components/platform/confirm-dialog";
 import { PageHeader } from "@/components/platform/page-header";
 import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
@@ -342,6 +345,7 @@ export default function CustomersPage() {
         }
         confirmLabel="Delete customer"
         destructive
+        confirmPhrase={DELETE_CONFIRM_PHRASE}
         onConfirm={() => {
           if (!deleteTarget) return;
           return deleteCustomer(deleteTarget);

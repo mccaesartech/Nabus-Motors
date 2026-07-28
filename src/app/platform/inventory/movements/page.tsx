@@ -190,10 +190,9 @@ export default function InventoryMovementsPage() {
       />
 
       {migrationRequired ? (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-          Database migration required. Apply{" "}
-          <code className="text-xs">supabase/migrations/076_inventory_movements.sql</code> in
-          Supabase, then refresh this page.
+        <div className="rounded-xl border border-[var(--platform-border)] bg-[var(--platform-surface)] px-4 py-3 text-sm text-[var(--platform-text-secondary)]">
+          Movement history is temporarily unavailable. Records will appear here once setup is
+          complete — no action needed on this page.
         </div>
       ) : null}
 

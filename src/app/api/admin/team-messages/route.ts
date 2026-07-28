@@ -33,7 +33,7 @@ import {
 import { ROLE_LABELS } from "@/lib/platform/permissions";
 
 const TEAM_CHAT_SETUP_MESSAGE =
-  "Team chat setup required — run migration 017 in Supabase. Open Supabase Dashboard → SQL Editor, paste and run supabase/migrations/017_platform_team_channels.sql, then refresh this page.";
+  "Group channels are temporarily unavailable. Direct messages still work.";
 
 function isChannelTypeSchemaError(message: string): boolean {
   const lower = message.toLowerCase();
@@ -45,6 +45,17 @@ function isChannelTypeSchemaError(message: string): boolean {
   );
 }
 
+function reportTeamChatSchemaIssue(message: string) {
+  void import("@/lib/observability/schema-issue").then(({ reportSchemaIssue }) => {
+    reportSchemaIssue({
+      table: "platform_conversations",
+      migration: "017_platform_team_channels.sql",
+      source: "api.admin.team-messages",
+      message,
+    });
+  });
+}
+
 async function checkTeamChannelsReady(
   supabase: NonNullable<ReturnType<typeof createAdminSupabase>>
 ): Promise<{ ready: true } | { ready: false; message: string }> {
@@ -52,11 +63,12 @@ async function checkTeamChannelsReady(
 
   if (!error) return { ready: true };
 
-  const message = isChannelTypeSchemaError(error.message)
-    ? TEAM_CHAT_SETUP_MESSAGE
-    : friendlyAdminDbError(error.message);
+  if (isChannelTypeSchemaError(error.message)) {
+    reportTeamChatSchemaIssue(error.message);
+    return { ready: false, message: TEAM_CHAT_SETUP_MESSAGE };
+  }
 
-  return { ready: false, message };
+  return { ready: false, message: friendlyAdminDbError(error.message) };
 }
 
 export async function GET(req: NextRequest) {

@@ -15,6 +15,7 @@ import {
   PLATFORM_SESSION_TTL_SEC,
 } from "@/lib/platform/session";
 import { consumeRateLimit, requestIp } from "@/lib/security/rate-limit";
+import { notifyTeamWelcomeWhatsApp } from "@/lib/notifications/platform-team-whatsapp";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -115,6 +116,13 @@ export async function POST(req: NextRequest) {
     }),
     logPlatformActivity(authContext, "login"),
   ]);
+
+  notifyTeamWelcomeWhatsApp({
+    phone,
+    name: user.name,
+    role: normalizeRole(user.role),
+    userId: user.id,
+  });
 
   const sessionValue = await buildPlatformSessionCookieValue(
     user.id,

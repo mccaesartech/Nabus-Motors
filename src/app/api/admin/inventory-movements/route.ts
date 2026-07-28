@@ -11,6 +11,7 @@ import type {
   MovementPeriod,
 } from "@/lib/platform/inventory-movements/types";
 import { createAdminSupabase } from "@/lib/supabase/admin";
+import { reportSchemaIssue } from "@/lib/observability/schema-issue";
 
 const PERIODS: MovementPeriod[] = ["day", "week", "month", "year", "range"];
 
@@ -81,11 +82,16 @@ export async function GET(req: NextRequest) {
 
   if (error) {
     if (isMovementsTableMissing(error.message)) {
+      reportSchemaIssue({
+        table: "inventory_movements",
+        migration: "076_inventory_movements.sql",
+        source: "api.admin.inventory-movements",
+        message: error.message,
+      });
       return NextResponse.json({
         ok: true,
         configured: false,
         migrationRequired: true,
-        message: "Apply supabase/migrations/076_inventory_movements.sql",
         movements: [],
         summary: summarizeMovements([]),
         buckets: [],

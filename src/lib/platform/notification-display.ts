@@ -154,6 +154,11 @@ export function resolveNotificationSourceLink(
       };
     case "parts_orders":
       return { link: platformPath(`leads/order/${sourceId}`), label: "View order" };
+    case "vehicles":
+      return {
+        link: platformPath(`inventory/${sourceId}/edit`),
+        label: "Edit vehicle / set fulfillment",
+      };
     case "checkout_appointments":
     case "appointments":
       return { link: platformPath("appointments"), label: "View appointment" };
@@ -188,11 +193,13 @@ function buildDeliveryDisplay(input: {
   const parsed = parseDeliveryDetail(input.detail);
   const { link, label } = resolveNotificationSourceLink(input.sourceTable, input.sourceId);
   const isDeferred = input.status === "deferred";
-  const isFailed = input.status === "failed";
+  const isFailed = input.status === "failed" || input.status === "undeliverable";
   const setupIssue = isWhatsAppSetupIssue(parsed.reason);
 
   let title: string;
-  if (input.channel === "whatsapp" && (isDeferred || isFailed)) {
+  if (input.channel === "whatsapp" && input.status === "undeliverable") {
+    title = `WhatsApp undeliverable — ${eventLabel}`;
+  } else if (input.channel === "whatsapp" && (isDeferred || isFailed)) {
     title = isDeferred
       ? `WhatsApp not sent automatically — ${eventLabel}`
       : `Could not send WhatsApp — ${eventLabel}`;
@@ -327,7 +334,11 @@ export function formatAdminNotificationForDisplay(
   }
 
   let severity: NotificationSeverity = "info";
-  if (notification.type === "low_stock" || notification.type === "vehicle_pending_approval") {
+  if (
+    notification.type === "low_stock" ||
+    notification.type === "vehicle_pending_approval" ||
+    notification.type === "vehicle_stock_action"
+  ) {
     severity = "urgent";
   } else if (
     ["preorder", "finance", "freight_quote", "appraisal", "delivery_failed", "delivery_deferred"].includes(
@@ -337,6 +348,13 @@ export function formatAdminNotificationForDisplay(
     severity = "warning";
   }
 
+  const displayLinkLabel =
+    notification.type === "vehicle_stock_action"
+      ? "Set Ghana availability, pre-order, or import"
+      : notification.type === "low_stock"
+        ? "Review low stock & add inventory"
+        : linkLabel;
+
   return {
     title,
     message: notification.message,
@@ -344,7 +362,7 @@ export function formatAdminNotificationForDisplay(
     severityLabel:
       severity === "urgent" ? "Urgent" : severity === "warning" ? "Warning" : "Info",
     link,
-    linkLabel,
+    linkLabel: displayLinkLabel,
   };
 }
 

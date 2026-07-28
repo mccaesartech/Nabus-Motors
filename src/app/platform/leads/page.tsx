@@ -5,7 +5,10 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ExternalLink, MessageSquare, Search, ShoppingBag, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/platform/page-header";
-import { ConfirmDialog } from "@/components/platform/confirm-dialog";
+import {
+  ConfirmDialog,
+  DELETE_CONFIRM_PHRASE,
+} from "@/components/platform/confirm-dialog";
 import { PaymentStatusBadge, StatusBadge } from "@/components/platform/status-badge";
 import { SafeVehicleImage } from "@/components/shared/safe-vehicle-image";
 import { adminLoginPath } from "@/lib/admin/paths";
@@ -27,6 +30,10 @@ const TYPE_TABS: Array<{ value: string; label: string }> = [
   { value: "appraisal", label: "Trade-in" },
 ];
 
+function rowKey(lead: UnifiedLead) {
+  return `${lead.type}-${lead.id}`;
+}
+
 export default function LeadsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -42,6 +49,11 @@ export default function LeadsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
   const [deleteTarget, setDeleteTarget] = useState<UnifiedLead | null>(null);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [deleting, setDeleting] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [toastError, setToastError] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/inquiries");
@@ -113,6 +125,33 @@ export default function LeadsPage() {
     });
   }, [leads, search, statusFilter, typeFilter, sourceFilter, customFilter]);
 
+  const allVisibleSelected =
+    filtered.length > 0 && filtered.every((lead) => selectedIds.has(rowKey(lead)));
+
+  function removeLeadsOptimistically(targets: UnifiedLead[]) {
+    const byType = new Map<UnifiedLead["type"], Set<string>>();
+    for (const lead of targets) {
+      const set = byType.get(lead.type) ?? new Set<string>();
+      set.add(lead.id);
+      byType.set(lead.type, set);
+    }
+    setInquiries((prev) => {
+      if (!prev) return prev;
+      const next: InquiryData = { ...prev };
+      for (const [type, ids] of byType) {
+        const rows = next[type];
+        if (!rows) continue;
+        next[type] = rows.filter((row) => !ids.has(String(row.id)));
+      }
+      return next;
+    });
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const lead of targets) next.delete(rowKey(lead));
+      return next;
+    });
+  }
+
   async function updateLead(
     lead: UnifiedLead,
     updates: { status?: string; follow_up_notes?: string; source?: string }
@@ -125,20 +164,84 @@ export default function LeadsPage() {
     load();
   }
 
-  async function deleteLead(lead: UnifiedLead) {
-    const res = await fetch(
-      `/api/admin/inquiries?type=${encodeURIComponent(lead.type)}&id=${encodeURIComponent(lead.id)}`,
-      { method: "DELETE" }
+  async function deleteLeads(targets: UnifiedLead[]) {
+    if (targets.length === 0) return;
+
+    setDeleteTarget(null);
+    setBulkDeleteConfirm(false);
+    removeLeadsOptimistically(targets);
+    setDeleting(true);
+    setToastError(false);
+    setToast(
+      targets.length === 1
+        ? "Moving lead to trash…"
+        : `Moving ${targets.length} leads to trash…`
     );
-    if (res.ok) {
-      setDeleteTarget(null);
-      load();
+
+    const results = await Promise.all(
+      targets.map(async (lead) => {
+        try {
+          const res = await fetch(
+            `/api/admin/inquiries?type=${encodeURIComponent(lead.type)}&id=${encodeURIComponent(lead.id)}`,
+            { method: "DELETE" }
+          );
+          return { lead, ok: res.ok };
+        } catch {
+          return { lead, ok: false };
+        }
+      })
+    );
+
+    const failed = results.filter((r) => !r.ok).map((r) => r.lead);
+    const deletedCount = targets.length - failed.length;
+
+    await load();
+
+    setDeleting(false);
+    if (failed.length === 0) {
+      setToastError(false);
+      setToast(
+        deletedCount === 1
+          ? "Lead moved to trash. Restore it from Platform → Trash if needed."
+          : `Moved ${deletedCount} leads to trash. Restore from Platform → Trash if needed.`
+      );
+    } else if (deletedCount > 0) {
+      setToastError(true);
+      setToast(
+        `Moved ${deletedCount} of ${targets.length} leads to trash. Some deletions failed.`
+      );
+    } else {
+      setToastError(true);
+      setToast("Could not move lead(s) to trash.");
     }
   }
 
-  function rowKey(lead: UnifiedLead) {
-    return `${lead.type}-${lead.id}`;
+  function toggleSelected(key: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   }
+
+  function toggleSelectAllVisible() {
+    const visibleKeys = filtered.map(rowKey);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        visibleKeys.forEach((key) => next.delete(key));
+      } else {
+        visibleKeys.forEach((key) => next.add(key));
+      }
+      return next;
+    });
+  }
+
+  const selectedLeads = useMemo(
+    () => leads.filter((lead) => selectedIds.has(rowKey(lead))),
+    [leads, selectedIds]
+  );
 
   if (loading) {
     return <p className="text-sm text-[var(--platform-text-secondary)]">Loading leads…</p>;
@@ -274,11 +377,60 @@ export default function LeadsPage() {
         </select>
       </div>
 
+      {toast && (
+        <div
+          role="status"
+          className={cn(
+            "rounded-lg border px-4 py-3 text-sm",
+            toastError
+              ? "border-red-500/40 bg-red-500/10 text-red-800"
+              : "border-[var(--platform-success)]/30 bg-[rgba(16,185,129,0.08)] text-[var(--platform-success)]"
+          )}
+        >
+          {toast}
+        </div>
+      )}
+
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[var(--platform-border)] bg-[var(--platform-surface)] px-4 py-3 text-sm">
+          <span>
+            <span className="font-medium">{selectedIds.size}</span> selected
+          </span>
+          <button
+            type="button"
+            className="platform-btn-secondary inline-flex items-center gap-2 text-xs text-red-700"
+            disabled={deleting}
+            onClick={() => setBulkDeleteConfirm(true)}
+          >
+            <Trash2 className="size-3.5" />
+            Move to trash
+          </button>
+          <button
+            type="button"
+            className="platform-btn-ghost text-xs"
+            disabled={deleting}
+            onClick={() => setSelectedIds(new Set())}
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
+
       <div className="platform-card overflow-hidden rounded-xl">
         <div className="max-h-[min(70vh,48rem)] overflow-auto">
           <table className="platform-table w-full text-left text-sm">
             <thead>
               <tr className="text-xs text-[var(--platform-text-secondary)]">
+                <th className="w-10 px-3 py-3 font-medium">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={toggleSelectAllVisible}
+                    disabled={filtered.length === 0 || deleting}
+                    className="size-4 rounded border-[var(--platform-border)]"
+                    aria-label="Select all visible leads"
+                  />
+                </th>
                 <th className="px-4 py-3 font-medium">Date</th>
                 <th className="px-4 py-3 font-medium">Contact</th>
                 <th className="px-4 py-3 font-medium">Vehicle</th>
@@ -294,7 +446,7 @@ export default function LeadsPage() {
               {filtered.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={10}
                     className="px-4 py-12 text-center text-[var(--platform-text-secondary)]"
                   >
                     {leads.length === 0 ? (
@@ -344,6 +496,20 @@ export default function LeadsPage() {
                         }
                       }}
                     >
+                      <td
+                        className="px-3 py-3"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(key)}
+                          onChange={() => toggleSelected(key)}
+                          disabled={deleting}
+                          className="size-4 rounded border-[var(--platform-border)]"
+                          aria-label={`Select ${lead.name}`}
+                        />
+                      </td>
                       <td className="px-4 py-3 whitespace-nowrap text-[var(--platform-text-secondary)]">
                         <PlatformDateTime value={lead.createdAt} className="text-xs" />
                       </td>
@@ -547,16 +713,32 @@ export default function LeadsPage() {
         onOpenChange={(open) => {
           if (!open) setDeleteTarget(null);
         }}
-        title="Delete lead?"
+        title="Move lead to trash?"
         description={
           deleteTarget
-            ? `Permanently remove ${deleteTarget.name}'s ${leadTypeLabel(deleteTarget.type).toLowerCase()} inquiry? This cannot be undone.`
+            ? `${deleteTarget.name}'s ${leadTypeLabel(deleteTarget.type).toLowerCase()} inquiry will be removed from Leads, but kept in Trash where it can be restored.`
             : ""
         }
-        confirmLabel="Delete"
+        confirmLabel="Move to trash"
         destructive
+        confirmPhrase={DELETE_CONFIRM_PHRASE}
         onConfirm={async () => {
-          if (deleteTarget) await deleteLead(deleteTarget);
+          if (deleteTarget) await deleteLeads([deleteTarget]);
+        }}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteConfirm}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setBulkDeleteConfirm(false);
+        }}
+        title="Move selected leads to trash?"
+        description={`Move ${selectedIds.size} lead${selectedIds.size === 1 ? "" : "s"} to trash? They will be removed from Leads but kept in Trash where they can be restored.`}
+        confirmLabel="Move to trash"
+        destructive
+        confirmPhrase={DELETE_CONFIRM_PHRASE}
+        onConfirm={async () => {
+          await deleteLeads(selectedLeads);
         }}
       />
     </div>

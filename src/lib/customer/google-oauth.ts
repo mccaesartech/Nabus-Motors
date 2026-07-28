@@ -1,12 +1,13 @@
 import { sanitizeAuthRedirect } from "@/lib/customer/auth-redirect";
 import { setSessionPreference } from "@/lib/customer/session-preference";
+import { getPublicSiteUrl } from "@/lib/site-url";
 import { supabase } from "@/lib/supabase/client";
 
 export function buildOAuthCallbackUrl(redirectPath: string): string {
   const origin =
     typeof window !== "undefined"
       ? window.location.origin
-      : "https://truegoshen.vercel.app";
+      : getPublicSiteUrl();
   const safeRedirect = sanitizeAuthRedirect(redirectPath);
   const callback = new URL("/auth/callback", origin);
   callback.searchParams.set("redirect", safeRedirect);

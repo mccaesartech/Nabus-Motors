@@ -8,7 +8,12 @@ import {
   useMemo,
   useState,
 } from "react";
-import { DEFAULT_DISPLAY_CURRENCY, formatUsdPrice } from "@/lib/currency";
+import {
+  DEFAULT_DISPLAY_CURRENCY,
+  formatUsdPrice,
+  formatVehiclePrice,
+  type VehiclePriceFields,
+} from "@/lib/currency";
 import { setExchangeRates } from "@/lib/currency/rates";
 import {
   COUNTRY_CODES,
@@ -23,15 +28,18 @@ import {
 export const PLATFORM_COUNTRY_STORAGE_KEY = "true-goshen-platform-country";
 export const PLATFORM_CURRENCY_STORAGE_KEY = "true-goshen-platform-currency";
 
-const DEFAULT_CURRENCY = DEFAULT_DISPLAY_CURRENCY;
-
 interface PlatformCurrencyContextValue {
   currency: string;
   setCurrency: (currency: string) => void;
   country: CountryCode;
   setCountry: (country: CountryCode) => void;
   countries: readonly CountryConfig[];
+  /** Format a USD-canonical amount in the platform display currency. */
   formatPrice: (usdAmount: number) => string;
+  /** Format a vehicle using listed_price when currencies match (no FX drift). */
+  formatVehicleListPrice: (fields: VehiclePriceFields) => string;
+  /** Site setting default — also used as default listing currency for new vehicles. */
+  settingsDefaultCurrency: string;
   ratesLoaded: boolean;
 }
 
@@ -55,7 +63,7 @@ function readStoredPlatformCountry(): CountryCode | null {
   return null;
 }
 
-function resolveInitialPlatformPreferences(): {
+function resolveInitialPlatformPreferences(settingsDefault: string): {
   country: CountryCode;
   currency: string;
 } {
@@ -67,14 +75,16 @@ function resolveInitialPlatformPreferences(): {
     };
   }
 
+  const currency = (settingsDefault || DEFAULT_DISPLAY_CURRENCY).toUpperCase();
   return {
-    country: DEFAULT_COUNTRY,
-    currency: DEFAULT_CURRENCY,
+    country: countryForCurrency(currency),
+    currency,
   };
 }
 
 function persistPlatformPreferences(country: CountryCode, currency: string) {
   try {
+    // Platform-only keys — never write public frontend currency storage.
     localStorage.setItem(PLATFORM_COUNTRY_STORAGE_KEY, country);
     localStorage.setItem(PLATFORM_CURRENCY_STORAGE_KEY, currency);
   } catch {
@@ -84,20 +94,28 @@ function persistPlatformPreferences(country: CountryCode, currency: string) {
 
 export function PlatformCurrencyProvider({
   children,
+  settingsDefaultCurrency = DEFAULT_DISPLAY_CURRENCY,
 }: {
   children: React.ReactNode;
+  /** From site_settings.default_currency_display — does not affect public visitors. */
+  settingsDefaultCurrency?: string;
 }) {
-  const [country, setCountryState] = useState<CountryCode>(DEFAULT_COUNTRY);
-  const [currency, setCurrencyState] = useState<string>(DEFAULT_CURRENCY);
+  const settingsDefault = (
+    settingsDefaultCurrency || DEFAULT_DISPLAY_CURRENCY
+  ).toUpperCase();
+  const [country, setCountryState] = useState<CountryCode>(() =>
+    countryForCurrency(settingsDefault)
+  );
+  const [currency, setCurrencyState] = useState<string>(settingsDefault);
   const [hydrated, setHydrated] = useState(false);
   const [ratesLoaded, setRatesLoaded] = useState(false);
 
   useEffect(() => {
-    const initial = resolveInitialPlatformPreferences();
+    const initial = resolveInitialPlatformPreferences(settingsDefault);
     setCountryState(initial.country);
     setCurrencyState(initial.currency);
     setHydrated(true);
-  }, []);
+  }, [settingsDefault]);
 
   useEffect(() => {
     let cancelled = false;
@@ -132,11 +150,18 @@ export function PlatformCurrencyProvider({
     persistPlatformPreferences(nextCountry, next);
   }, []);
 
-  const displayCountry = hydrated ? country : DEFAULT_COUNTRY;
-  const displayCurrency = hydrated ? currency : DEFAULT_CURRENCY;
+  const displayCountry = hydrated
+    ? country
+    : countryForCurrency(settingsDefault);
+  const displayCurrency = hydrated ? currency : settingsDefault;
 
   const formatPrice = useCallback(
     (usdAmount: number) => formatUsdPrice(usdAmount, displayCurrency),
+    [displayCurrency, ratesLoaded]
+  );
+
+  const formatVehicleListPrice = useCallback(
+    (fields: VehiclePriceFields) => formatVehiclePrice(fields, displayCurrency),
     [displayCurrency, ratesLoaded]
   );
 
@@ -148,15 +173,19 @@ export function PlatformCurrencyProvider({
       setCountry,
       countries: COUNTRIES,
       formatPrice,
+      formatVehicleListPrice,
+      settingsDefaultCurrency: settingsDefault,
       ratesLoaded,
     }),
     [
       displayCountry,
       displayCurrency,
       formatPrice,
+      formatVehicleListPrice,
       ratesLoaded,
       setCountry,
       setCurrency,
+      settingsDefault,
     ]
   );
 

@@ -85,7 +85,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const enhanced = await enhanceUploadImage(buffer, mime);
+  // Client-side prepare sets this so we skip expensive sharpen/contrast.
+  const preprocessed = formData.get("preprocessed") === "1";
+  const enhanced = await enhanceUploadImage(buffer, mime, preprocessed ? "light" : "full");
   let uploadBuffer: Buffer = Buffer.from(enhanced.buffer);
   let uploadMime = enhanced.mime;
   let uploadExt = enhanced.ext;
@@ -102,6 +104,8 @@ export async function POST(req: NextRequest) {
 
   const { error } = await supabase.storage.from(BUCKET).upload(path, uploadBuffer, {
     contentType: uploadMime,
+    // Paths are unique UUIDs — long CDN cache speeds repeat public views.
+    cacheControl: "31536000",
     upsert: false,
   });
 

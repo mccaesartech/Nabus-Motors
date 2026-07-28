@@ -4,11 +4,14 @@ export const TRASH_ENTITY_TYPES = [
   "order",
   "vehicle",
   "customer",
+  "platform_user",
   "lead_contact",
   "lead_finance",
   "lead_appraisal",
   "lead_vehicle",
   "preorder",
+  "support_ticket",
+  "admin_notification",
 ] as const;
 
 export type TrashEntityType = (typeof TRASH_ENTITY_TYPES)[number];
@@ -19,11 +22,14 @@ export const TRASH_ENTITY_LABELS: Record<TrashEntityType, string> = {
   order: "Cart order",
   vehicle: "Vehicle",
   customer: "Customer",
+  platform_user: "Team user",
   lead_contact: "Contact inquiry",
   lead_finance: "Finance application",
   lead_appraisal: "Appraisal request",
   lead_vehicle: "Vehicle inquiry",
   preorder: "Pre-order",
+  support_ticket: "Support ticket",
+  admin_notification: "Notification",
 };
 
 export const INQUIRY_TRASH_TYPES: Record<string, TrashEntityType> = {

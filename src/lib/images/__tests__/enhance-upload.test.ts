@@ -34,20 +34,29 @@ function resetChain() {
 }
 
 vi.mock("sharp", () => ({
-  default: vi.fn(() => chain),
+  default: Object.assign(vi.fn(() => chain), {
+    kernel: { lanczos3: "lanczos3" },
+  }),
 }));
 
 describe("UPLOAD_ENHANCE options", () => {
   it("keeps sharpening and contrast in a moderate range", async () => {
     const { UPLOAD_ENHANCE } = await import("@/lib/images/enhance-upload");
 
-    expect(UPLOAD_ENHANCE.maxDimension).toBe(4096);
+    expect(UPLOAD_ENHANCE.maxDimension).toBe(2560);
+    expect(UPLOAD_ENHANCE.useMozjpeg).toBe(false);
     expect(UPLOAD_ENHANCE.sharpen.sigma).toBeGreaterThan(0);
     expect(UPLOAD_ENHANCE.sharpen.sigma).toBeLessThanOrEqual(1.5);
     expect(UPLOAD_ENHANCE.contrast.multiplier).toBeGreaterThan(1);
     expect(UPLOAD_ENHANCE.contrast.multiplier).toBeLessThanOrEqual(1.2);
     expect(UPLOAD_ENHANCE.jpegQuality).toBeGreaterThanOrEqual(80);
     expect(UPLOAD_ENHANCE.jpegQuality).toBeLessThanOrEqual(95);
+  });
+
+  it("targets ~4K longest side for listing AI enhance", async () => {
+    const { LISTING_ENHANCE_4K } = await import("@/lib/images/enhance-upload");
+    expect(LISTING_ENHANCE_4K.targetLongestSide).toBe(3840);
+    expect(LISTING_ENHANCE_4K.jpegQuality).toBeGreaterThanOrEqual(85);
   });
 });
 
@@ -117,6 +126,20 @@ describe("enhanceUploadImage", () => {
     expect(result.buffer.toString()).toBe("enhanced-bytes");
   });
 
+  it("skips sharpen and contrast in light mode", async () => {
+    resetChain();
+    const { enhanceUploadImage } = await import("@/lib/images/enhance-upload");
+
+    const result = await enhanceUploadImage(Buffer.from("fake-jpeg"), "image/jpeg", "light");
+
+    expect(chain.rotate).toHaveBeenCalled();
+    expect(chain.sharpen).not.toHaveBeenCalled();
+    expect(chain.linear).not.toHaveBeenCalled();
+    expect(chain.modulate).not.toHaveBeenCalled();
+    expect(chain.jpeg).toHaveBeenCalled();
+    expect(result.enhanced).toBe(true);
+  });
+
   it("downscales when either dimension exceeds the cap", async () => {
     resetChain();
     metadata.mockResolvedValue({ width: 6000, height: 4000, hasAlpha: false });
@@ -161,5 +184,39 @@ describe("enhanceUploadImage", () => {
       ext: "jpg",
       enhanced: false,
     });
+  });
+});
+
+describe("enhanceListingImageTo4k", () => {
+  afterEach(() => {
+    resetChain();
+    vi.clearAllMocks();
+  });
+
+  it("upsizes toward 3840 and marks upscaled", async () => {
+    resetChain();
+    metadata
+      .mockResolvedValueOnce({ width: 1280, height: 720, hasAlpha: false })
+      .mockResolvedValueOnce({ width: 3840, height: 2160, hasAlpha: false });
+    toBuffer.mockResolvedValue(Buffer.from("4k-bytes"));
+    const { enhanceListingImageTo4k, LISTING_ENHANCE_4K } = await import(
+      "@/lib/images/enhance-upload"
+    );
+
+    const result = await enhanceListingImageTo4k(Buffer.from("src"), "image/jpeg");
+
+    expect(chain.resize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        width: LISTING_ENHANCE_4K.targetLongestSide,
+        height: LISTING_ENHANCE_4K.targetLongestSide,
+        fit: "inside",
+        withoutEnlargement: false,
+      })
+    );
+    expect(chain.sharpen).toHaveBeenCalled();
+    expect(result.enhanced).toBe(true);
+    expect(result.upscaled).toBe(true);
+    expect(result.width).toBe(3840);
+    expect(result.mime).toBe("image/jpeg");
   });
 });

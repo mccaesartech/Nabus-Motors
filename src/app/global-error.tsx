@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 import {
   PUBLIC_UNEXPECTED_ERROR_MESSAGE,
   publicErrorReference,
@@ -12,6 +14,10 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
+
   const errorReference = publicErrorReference(error);
 
   return (

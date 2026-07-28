@@ -16,6 +16,7 @@ import {
   hasChosenSessionPreference,
   markSessionPreferencePromptPending,
 } from "@/lib/customer/session-preference";
+import { validateEmailLocal } from "@/lib/email/validate-email";
 import { supabase } from "@/lib/supabase/client";
 
 function RegisterForm() {
@@ -68,6 +69,12 @@ function RegisterForm() {
       return;
     }
 
+    const localEmail = validateEmailLocal(email);
+    if (!localEmail.ok) {
+      setError(localEmail.message);
+      return;
+    }
+
     setLoading(true);
 
     if (!supabase) {
@@ -76,8 +83,32 @@ function RegisterForm() {
       return;
     }
 
+    try {
+      const validateRes = await fetch("/api/customer/validate-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: localEmail.normalized }),
+      });
+      const validateBody = (await validateRes.json().catch(() => null)) as {
+        ok?: boolean;
+        message?: string;
+      } | null;
+      if (!validateRes.ok || !validateBody?.ok) {
+        setError(
+          validateBody?.message ||
+            "This email domain looks invalid."
+        );
+        setLoading(false);
+        return;
+      }
+    } catch {
+      setError("Could not verify email. Please try again.");
+      setLoading(false);
+      return;
+    }
+
     const { data, error: signUpError } = await supabase.auth.signUp({
-      email: email.trim(),
+      email: localEmail.normalized!,
       password,
       options: {
         data: {

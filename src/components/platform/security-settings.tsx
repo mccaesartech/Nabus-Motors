@@ -374,13 +374,7 @@ export function SecuritySettings() {
           Passkeys are not available for the bootstrap owner account. Team members can register passkeys
           after accepting their invite.
         </p>
-      ) : (
-        <p className="text-sm text-[var(--platform-text-secondary)]">
-          Passkeys are disabled. Set{" "}
-          <code className="rounded bg-[var(--platform-surface)] px-1">NEXT_PUBLIC_WEBAUTHN_ENABLED=true</code>{" "}
-          to enable.
-        </p>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -5,12 +5,21 @@ import {
   type ImageAdjustPreset,
   isImageAdjustPreset,
 } from "@/lib/ai/image-adjustments";
+import { enhanceListingImageTo4k } from "@/lib/images/enhance-upload";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 
 const BUCKET = "vehicle-images";
 const MAX_BYTES = 8 * 1024 * 1024;
 
 async function applyPreset(buffer: Buffer, preset: ImageAdjustPreset): Promise<Buffer> {
+  if (preset === "enhance") {
+    const result = await enhanceListingImageTo4k(buffer, "image/jpeg");
+    if (!result.enhanced) {
+      throw new Error("Enhance pipeline returned original");
+    }
+    return Buffer.from(result.buffer);
+  }
+
   const base = sharp(buffer).rotate();
 
   switch (preset) {
@@ -89,7 +98,11 @@ export async function POST(req: NextRequest) {
 
   if (!preset || !isImageAdjustPreset(preset)) {
     return NextResponse.json(
-      { ok: false, message: "Invalid preset. Use warm, cool, brighten, darken, contrast, vibrant, or muted." },
+      {
+        ok: false,
+        message:
+          "Invalid preset. Use warm, cool, brighten, darken, contrast, vibrant, muted, or enhance.",
+      },
       { status: 400 }
     );
   }
@@ -134,9 +147,23 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Small inline preview so the chat UI can show After immediately without
+  // waiting on CDN/storage propagation of a freshly uploaded object.
+  let previewDataUrl: string | undefined;
+  try {
+    const preview = await sharp(edited)
+      .resize(160, 160, { fit: "cover" })
+      .jpeg({ quality: 72 })
+      .toBuffer();
+    previewDataUrl = `data:image/jpeg;base64,${preview.toString("base64")}`;
+  } catch {
+    previewDataUrl = undefined;
+  }
+
   const path = `listings/edited/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.jpg`;
   const { error } = await supabase.storage.from(BUCKET).upload(path, edited, {
     contentType: "image/jpeg",
+    cacheControl: "31536000",
     upsert: false,
   });
 
@@ -149,6 +176,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     url: urlData.publicUrl,
+    previewDataUrl,
     sourceUrl,
     preset,
   });

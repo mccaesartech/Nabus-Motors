@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search } from "lucide-react";
+import { Search, Trash2 } from "lucide-react";
+import {
+  ConfirmDialog,
+  DELETE_CONFIRM_PHRASE,
+} from "@/components/platform/confirm-dialog";
 import { PageHeader } from "@/components/platform/page-header";
 import { PlatformDateTime } from "@/components/platform/platform-datetime";
 import { StatusBadge } from "@/components/platform/status-badge";
@@ -37,6 +41,11 @@ function reasonLabel(reason: string | null) {
   return reason;
 }
 
+function canSoftDeleteAccount(row: AccountLifecycleListItem) {
+  if (row.deleted_at) return false;
+  return row.account_status === "active" || row.account_status === "suspended";
+}
+
 export default function AccountLifecyclePage() {
   const router = useRouter();
   const [tab, setTab] = useState<TabId>("pending_deletion");
@@ -53,6 +62,10 @@ export default function AccountLifecyclePage() {
     }>
   >([]);
   const [loading, setLoading] = useState(true);
+  const [canDelete, setCanDelete] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<AccountLifecycleListItem | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteSuccess, setDeleteSuccess] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -77,11 +90,40 @@ export default function AccountLifecyclePage() {
   }, []);
 
   useEffect(() => {
+    void fetch("/api/admin/session")
+      .then((res) => res.json())
+      .then((json) => setCanDelete(Boolean(json.ok && json.canDeleteCustomers)))
+      .catch(() => setCanDelete(false));
+  }, []);
+
+  useEffect(() => {
     const timer = setTimeout(() => void load(), 250);
     return () => clearTimeout(timer);
   }, [load]);
 
   const selected = accounts.find((a) => a.id === selectedId) ?? null;
+
+  async function deleteAccount(account: AccountLifecycleListItem) {
+    setDeleteError(null);
+    setDeleteSuccess(null);
+    const res = await fetch(`/api/admin/customers/${encodeURIComponent(account.id)}`, {
+      method: "DELETE",
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const message = (json as { message?: string }).message ?? "Could not delete account.";
+      setDeleteError(message);
+      throw new Error(message);
+    }
+    setDeleteTarget(null);
+    setSelectedId(null);
+    setAudit([]);
+    setDeleteSuccess(
+      (json as { message?: string }).message ??
+        `${displayName(account)} moved to trash and will appear under Archived.`
+    );
+    await load();
+  }
 
   return (
     <div className="space-y-6">
@@ -89,6 +131,23 @@ export default function AccountLifecyclePage() {
         title="Account Lifecycle"
         description="Monitor customer account status, pending deletions, and retention windows."
       />
+
+      {deleteSuccess ? (
+        <div
+          role="status"
+          className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-[var(--platform-text-secondary)]"
+        >
+          {deleteSuccess}
+        </div>
+      ) : null}
+      {deleteError ? (
+        <div
+          role="alert"
+          className="rounded-lg border border-[var(--platform-error)]/40 bg-[rgba(239,68,68,0.08)] px-4 py-3 text-sm text-[var(--platform-error)]"
+        >
+          {deleteError}
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap gap-2 border-b border-border pb-3">
         {TABS.map((item) => (
@@ -99,6 +158,7 @@ export default function AccountLifecyclePage() {
               setTab(item.id);
               setSelectedId(null);
               setAudit([]);
+              setDeleteError(null);
             }}
             className={cn(
               "rounded-md px-3 py-2 text-sm font-medium transition-colors",
@@ -207,6 +267,21 @@ export default function AccountLifecyclePage() {
                 ) : null}
               </dl>
 
+              {canDelete && canSoftDeleteAccount(selected) ? (
+                <button
+                  type="button"
+                  className="platform-btn-ghost inline-flex w-full items-center justify-center gap-2 text-[var(--platform-error)]"
+                  onClick={() => {
+                    setDeleteError(null);
+                    setDeleteSuccess(null);
+                    setDeleteTarget(selected);
+                  }}
+                >
+                  <Trash2 className="size-4" />
+                  Delete account
+                </button>
+              ) : null}
+
               <div>
                 <p className="mb-2 text-sm font-medium">Audit log</p>
                 {audit.length === 0 ? (
@@ -228,6 +303,28 @@ export default function AccountLifecyclePage() {
           )}
         </aside>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title={
+          deleteTarget ? `Delete ${displayName(deleteTarget)}?` : "Delete account?"
+        }
+        description={
+          deleteTarget
+            ? `Soft-delete this account and move it to trash.\n\n${displayName(deleteTarget)} (${deleteTarget.email ?? "no email"}) will leave Active / Suspended and appear under Archived. Existing orders and messages are kept.`
+            : ""
+        }
+        confirmLabel="Delete account"
+        busyLabel="Deleting…"
+        destructive
+        confirmPhrase={DELETE_CONFIRM_PHRASE}
+        onConfirm={async () => {
+          if (deleteTarget) await deleteAccount(deleteTarget);
+        }}
+      />
     </div>
   );
 }

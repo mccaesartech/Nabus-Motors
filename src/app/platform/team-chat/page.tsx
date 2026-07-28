@@ -513,23 +513,13 @@ export default function TeamChatPage() {
             <AlertCircle className="mt-0.5 size-5 shrink-0 text-amber-600" />
             <div className="space-y-3">
               <p className="text-sm font-medium text-[var(--platform-text)]">
-                {setupRequired ? "Team chat setup required" : "Could not load team messages"}
+                {setupRequired ? "Group channels temporarily unavailable" : "Could not load team messages"}
               </p>
               <p className="text-sm text-[var(--platform-text-secondary)]">
-                {setupMessage ?? loadError}
+                {setupRequired
+                  ? "Direct messages still work. Group and All Staff channels will appear once setup is complete."
+                  : (setupMessage ?? loadError)}
               </p>
-              {setupRequired && (
-                <ol className="list-decimal space-y-1 pl-5 text-sm text-[var(--platform-text-secondary)]">
-                  <li>Open Supabase Dashboard → SQL Editor</li>
-                  <li>
-                    Run{" "}
-                    <code className="rounded bg-[var(--platform-bg)] px-1.5 py-0.5 text-xs">
-                      supabase/migrations/017_platform_team_channels.sql
-                    </code>
-                  </li>
-                  <li>Refresh this page</li>
-                </ol>
-              )}
               <button
                 type="button"
                 className="platform-btn-primary inline-flex items-center gap-2"
@@ -573,13 +563,14 @@ export default function TeamChatPage() {
       />
 
       {setupRequired && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+        <div className="flex items-start gap-3 rounded-xl border border-[var(--platform-border)] bg-[var(--platform-surface)] px-4 py-3 text-sm text-[var(--platform-text-secondary)]">
           <AlertCircle className="mt-0.5 size-4 shrink-0" />
           <div>
-            <p className="font-medium">Team chat setup required</p>
-            <p className="mt-1 text-amber-900/80 dark:text-amber-100/80">
-              {setupMessage ??
-                "Run migration 017 in Supabase to enable All Staff and group channels. Direct messages still work."}
+            <p className="font-medium text-[var(--platform-text)]">Group channels temporarily unavailable</p>
+            <p className="mt-1">
+              {setupMessage && !/migration/i.test(setupMessage)
+                ? setupMessage
+                : "Direct messages still work. Group and All Staff channels will appear once setup is complete."}
             </p>
           </div>
         </div>
@@ -658,9 +649,9 @@ export default function TeamChatPage() {
                   ) : setupRequired ? (
                     <span
                       className="text-[10px] text-[var(--platform-text-secondary)]"
-                      title="Run migration 017 in Supabase to enable groups"
+                      title="Group channels temporarily unavailable"
                     >
-                      Setup required
+                      Setup pending
                     </span>
                   ) : null}
                 </div>
@@ -669,7 +660,7 @@ export default function TeamChatPage() {
                 {filteredGroups.length === 0 ? (
                   <li className="px-4 py-6 text-center text-xs text-[var(--platform-text-secondary)]">
                     {setupRequired
-                      ? "Groups unavailable until migration 017 is applied in Supabase."
+                      ? "Group channels are temporarily unavailable. Direct messages still work."
                       : canCreateGroups
                         ? "No groups yet. Click + New Group above to message selected staff."
                         : "No groups yet. Ask your manager to create a group."}

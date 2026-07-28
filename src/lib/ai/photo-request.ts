@@ -1,7 +1,11 @@
+import { isFillFromPhotosRequest } from "@/lib/ai/vehicle-ai-vision";
+
 /** Detect when the user wants stock/placeholder photos (Pexels), not text edits. */
 export function isPhotoRequest(message: string): boolean {
   const text = message.trim();
   if (!text) return false;
+  // Vision fill / color detection must not be routed to the Pexels stock pool.
+  if (isFillFromPhotosRequest(text)) return false;
 
   const patterns = [
     /\bstock\s*(photo|photos|image|images|picture|pictures)\b/i,
@@ -9,11 +13,9 @@ export function isPhotoRequest(message: string): boolean {
     /\bfind\s*(stock\s*)?(photo|photos|image|images|picture|pictures)\b/i,
     /\badd\s*(\d+\s*)?(stock\s*)?(photo|photos|image|images|picture|pictures)\b/i,
     /\bgenerate\s*(photo|photos|image|images|picture|pictures)\b/i,
-    /\b(create|get|need|want)\s*(some\s*)?(photo|photos|image|images|picture|pictures)\b/i,
+    /\b(create|get|need|want)\s*(some\s*)?(stock\s+|placeholder\s+|pexels\s+)?(photo|photos|image|images|picture|pictures)\b/i,
     /\bplaceholder\s*(photo|photos|image|images|picture|pictures)\b/i,
     /\bpexels\b/i,
-    /\bgallery\s*(photo|photos|image|images|picture|pictures)\b/i,
-    /\b(car|vehicle)\s*(photo|photos|image|images|picture|pictures)\b/i,
   ];
 
   return patterns.some((p) => p.test(text));

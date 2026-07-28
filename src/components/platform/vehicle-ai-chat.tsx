@@ -14,9 +14,11 @@ import {
 } from "@/lib/ai/gallery-commands";
 import {
   colorAdjustReply,
+  ENHANCE_PHOTOS_4K_ACTION,
   IMAGE_ADJUST_LABELS,
   type ImageAdjustPreset,
   isColorAdjustRequest,
+  isImageEnhanceRequest,
   parseColorAdjustPreset,
 } from "@/lib/ai/image-adjustments";
 import { isPhotoRequest } from "@/lib/ai/photo-request";
@@ -25,21 +27,29 @@ import type {
   VehicleAiChatClientMessage,
   VehiclePhotoSource,
 } from "@/lib/ai/vehicle-ai-chat-types";
+import {
+  countGalleryPhotos,
+  isSparseVehicleListing,
+  selectVehicleAiQuickActions,
+  type VehicleAiQuickAction,
+} from "@/lib/ai/vehicle-ai-vision";
 import type { VehicleGalleryData, VehicleImageCategory } from "@/lib/types";
 import { VEHICLE_GALLERY_ORDER } from "@/lib/types";
+import { PLACEHOLDER_IMAGE } from "@/lib/data/vehicle-images";
 import { SafeVehicleImage } from "@/components/shared/safe-vehicle-image";
-
-const QUICK_ACTIONS = [
-  "Find stock photos (free)",
-  "Edit description",
-  "Warm up colors",
-  "Increase contrast",
-  "Improve the listing description",
-  "Make the title sound more premium",
-] as const;
+import { mapWithConcurrency } from "@/lib/images/prepare-client-upload";
+import { uploadVehicleImageFile } from "@/lib/images/upload-vehicle-image-client";
+import { cn } from "@/lib/utils";
 
 const STOCK_PHOTOS_ACTION = "Find stock photos (free)";
 const EDIT_DESCRIPTION_ACTION = "Edit description";
+const FILL_FROM_PHOTOS_ACTION = "Fill listing from photos";
+const DETECT_COLOR_ACTION = "Detect exterior color from photos";
+const CORRECT_FIELDS_ACTION = "Correct fields from photos";
+const INSPECTION_ACTION = "Write inspection summary";
+const WARRANTY_ACTION = "Draft warranty notes";
+const IMPROVE_DESCRIPTION_ACTION = "Improve the listing description";
+const PREMIUM_TITLE_ACTION = "Make the title sound more premium";
 
 const COLOR_ADJUST_CHIPS: Array<{ label: string; preset: ImageAdjustPreset }> = [
   { label: IMAGE_ADJUST_LABELS.warm, preset: "warm" },
@@ -67,6 +77,12 @@ const FIELD_LABELS: Record<string, string> = {
   description: "Description",
   featured: "Featured",
   status: "Status",
+  inspection_summary: "Inspection summary",
+  warranty_notes: "Warranty notes",
+  drivetrain: "Drivetrain",
+  horsepower: "Horsepower",
+  range: "Range",
+  seating_capacity: "Seating",
   appendToDescription: "Add to description",
   removeFromGallery: "Remove photos",
   replaceGallery: "Reorder gallery",
@@ -89,6 +105,70 @@ type VehicleAiChatProps = {
 
 function newMessageId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+/** Native img for before/after thumbs — avoids Next/Image opacity gate + CDN races. */
+function ChatCompareThumb({
+  src,
+  alt,
+  accent = false,
+  fallbackSrc,
+}: {
+  src: string;
+  alt: string;
+  accent?: boolean;
+  /** Optional secondary URL if primary fails (e.g. data URL → storage URL). */
+  fallbackSrc?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const [activeSrc, setActiveSrc] = useState(src);
+  const triedFallback = useRef(false);
+  const triedCacheBust = useRef(false);
+
+  useEffect(() => {
+    setFailed(false);
+    setActiveSrc(src);
+    triedFallback.current = false;
+    triedCacheBust.current = false;
+  }, [src, fallbackSrc]);
+
+  const displaySrc = failed ? PLACEHOLDER_IMAGE : activeSrc;
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- chat compare thumbs need immediate, ungated display
+    <img
+      src={displaySrc}
+      alt={alt}
+      width={72}
+      height={72}
+      decoding="async"
+      className={cn(
+        "size-16 rounded border object-cover bg-[var(--platform-bg-secondary)]",
+        accent
+          ? "border-[var(--platform-ai-accent)]"
+          : "border-[var(--platform-ai-border)]"
+      )}
+      onError={() => {
+        if (failed) return;
+        if (!triedFallback.current && fallbackSrc && activeSrc !== fallbackSrc) {
+          triedFallback.current = true;
+          setActiveSrc(fallbackSrc);
+          return;
+        }
+        if (
+          !triedCacheBust.current &&
+          activeSrc.startsWith("http") &&
+          !activeSrc.includes("_cb=")
+        ) {
+          triedCacheBust.current = true;
+          const joiner = activeSrc.includes("?") ? "&" : "?";
+          setActiveSrc(`${activeSrc}${joiner}_cb=${Date.now()}`);
+          return;
+        }
+        setFailed(true);
+      }}
+    />
+  );
 }
 
 function MessageCopyButton({ content }: { content: string }) {
@@ -338,18 +418,11 @@ export function VehicleAiChat({
   };
 
   async function uploadImageFile(file: File): Promise<string | null> {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    const res = await fetch("/api/admin/vehicles/upload-image", {
-      method: "POST",
-      body: formData,
-    });
-    const json = await res.json();
-    if (!res.ok || !json.ok) {
-      throw new Error(json.message ?? "Upload failed");
+    const result = await uploadVehicleImageFile(file);
+    if (!result.ok) {
+      throw new Error(result.message);
     }
-    return json.url as string;
+    return result.url;
   }
 
   function addImageToGallery(url: string, category: VehicleImageCategory = "exterior") {
@@ -369,9 +442,9 @@ export function VehicleAiChat({
     setUploadingImage(true);
 
     try {
-      for (const file of list) {
+      await mapWithConcurrency(list, 3, async (file) => {
         const url = await uploadImageFile(file);
-        if (!url) continue;
+        if (!url) return;
 
         addImageToGallery(url, "exterior");
 
@@ -385,11 +458,11 @@ export function VehicleAiChat({
           id: newMessageId(),
           role: "assistant",
           content:
-            "Image added to gallery (exterior). Try “Warm up colors” or paste another photo. Color filters work without a Gemini key.",
+            "Image added to gallery (exterior). Next: tap “Fill listing from photos” for a full vision pass (make, model, year, trim, description, paint) — or “Detect exterior color from photos”. Color filters below work without Gemini.",
           pastedImageUrl: url,
         };
         setMessages((prev) => [...prev, userMsg, assistantMsg]);
-      }
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Image upload failed");
     } finally {
@@ -426,7 +499,11 @@ export function VehicleAiChat({
   async function handleColorAdjust(preset: ImageAdjustPreset, userText: string) {
     const targetUrl = pickDefaultEditImageUrl(gallery, lastPastedImageUrlRef.current);
     if (!targetUrl) {
-      setError("Paste or upload a photo first, then try a color adjustment.");
+      setError(
+        preset === "enhance"
+          ? "Paste or upload a photo first, then try Enhance photos (4K)."
+          : "Paste or upload a photo first, then try a color adjustment."
+      );
       return;
     }
 
@@ -449,24 +526,40 @@ export function VehicleAiChat({
       });
       const json = await res.json();
       if (!res.ok || !json.ok) {
-        throw new Error(json.message ?? "Could not adjust image");
+        throw new Error(
+          json.message ?? (preset === "enhance" ? "Could not enhance image" : "Could not adjust image")
+        );
       }
 
       const newUrl = json.url as string;
-      const nextGallery = replaceGalleryUrl(gallery, targetUrl, newUrl);
-      onApplyGallery(nextGallery);
-      lastPastedImageUrlRef.current = newUrl;
+      const afterPreview =
+        typeof json.previewDataUrl === "string" && json.previewDataUrl.startsWith("data:")
+          ? (json.previewDataUrl as string)
+          : undefined;
+      // Propose only — do not mutate gallery until admin Approves.
+      const proposedGallery = replaceGalleryUrl(gallery, targetUrl, newUrl);
 
       const assistantMsg: VehicleAiChatClientMessage = {
         id: newMessageId(),
         role: "assistant",
         content: colorAdjustReply(preset),
-        applied: true,
-        imageEditPreview: { before: targetUrl, after: newUrl, preset },
+        proposedChanges: { replaceGallery: proposedGallery },
+        imageEditPreview: {
+          before: targetUrl,
+          after: newUrl,
+          afterPreview,
+          preset,
+        },
       };
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Color adjustment failed");
+      setError(
+        err instanceof Error
+          ? err.message
+          : preset === "enhance"
+            ? "Photo enhance failed"
+            : "Color adjustment failed"
+      );
     } finally {
       setLoading(false);
       textareaRef.current?.focus();
@@ -570,6 +663,12 @@ export function VehicleAiChat({
       return;
     }
 
+    // Quality / 4K enhance must short-circuit before Gemini listing-fill (and before color filters).
+    if (trimmed === ENHANCE_PHOTOS_4K_ACTION || isImageEnhanceRequest(trimmed)) {
+      await handleColorAdjust("enhance", trimmed);
+      return;
+    }
+
     const colorPreset = parseColorAdjustPreset(trimmed);
     if (colorPreset || (trimmed !== EDIT_DESCRIPTION_ACTION && isColorAdjustRequest(trimmed))) {
       await handleColorAdjust(colorPreset ?? "vibrant", trimmed);
@@ -580,8 +679,50 @@ export function VehicleAiChat({
       return;
     }
 
-    if (trimmed === EDIT_DESCRIPTION_ACTION) {
-      await sendGeminiMessage("Rewrite the listing description to be more compelling and premium. Keep it accurate to the vehicle specs.");
+    if (trimmed === EDIT_DESCRIPTION_ACTION || trimmed === IMPROVE_DESCRIPTION_ACTION) {
+      await sendGeminiMessage(
+        "Rewrite the listing description to be more compelling and premium for Ghana / West Africa buyers. Keep it accurate to the vehicle specs already on the form and visible in photos. Propose the full description field — staff will Apply."
+      );
+      return;
+    }
+
+    if (trimmed === PREMIUM_TITLE_ACTION) {
+      await sendGeminiMessage(
+        "Improve the listing copy so the vehicle sounds premium and trustworthy. Rewrite the description (and trim wording if helpful) without inventing specs, mileage, or price. Staff will Apply."
+      );
+      return;
+    }
+
+    if (trimmed === FILL_FROM_PHOTOS_ACTION) {
+      await sendGeminiMessage(
+        "Fill listing from photos. Analyze the listing photos as if the form were blank. Infer make, model, year, body type, trim cues, fuel type when clear, and draft a professional description plus a short inspection_summary when condition cues are visible. Exterior paint is detected separately from the photos — do not invent color from memory. Propose a complete changes object for every field you can confidently fill. State confidence. Staff must Apply."
+      );
+      return;
+    }
+
+    if (trimmed === CORRECT_FIELDS_ACTION) {
+      await sendGeminiMessage(
+        "Correct fields from photos. Compare current form labels against the listing photos. Override wrong make/model/year/body_type/trim/fuel_type. Keep correct fields unchanged. Explain each correction with confidence. Exterior paint is detected separately — do not invent color from form labels. Staff must Apply."
+      );
+      return;
+    }
+
+    if (trimmed === DETECT_COLOR_ACTION) {
+      await sendGeminiMessage("Detect exterior color from photos");
+      return;
+    }
+
+    if (trimmed === INSPECTION_ACTION) {
+      await sendGeminiMessage(
+        "Write a professional inspection_summary from the listing photos and known specs. Cover exterior, interior, and any clearly visible mechanical cues. Be honest about uncertainty. Do not invent damage. Staff must Apply."
+      );
+      return;
+    }
+
+    if (trimmed === WARRANTY_ACTION) {
+      await sendGeminiMessage(
+        "Draft professional warranty_notes suitable for True Goshen Auto. Keep claims editable and avoid inventing specific legal durations unless already provided — use clear placeholders where needed. Staff must Apply."
+      );
       return;
     }
 
@@ -636,6 +777,11 @@ export function VehicleAiChat({
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
+      if (json.visionFetchFailed) {
+        setError(
+          "Listing photos could not be loaded for vision analysis. Color was not taken from the form label — retry or re-upload photos."
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "AI request failed");
     } finally {
@@ -652,8 +798,44 @@ export function VehicleAiChat({
     );
     onApplyFields(nextForm);
     onApplyGallery(nextGallery);
+
+    const preview = messages.find((m) => m.id === messageId)?.imageEditPreview;
+    if (preview?.after) {
+      lastPastedImageUrlRef.current = preview.after;
+    }
+
     setMessages((prev) =>
       prev.map((m) => (m.id === messageId ? { ...m, applied: true } : m))
+    );
+  }
+
+  function applyImageEdit(messageId: string) {
+    const msg = messages.find((m) => m.id === messageId);
+    const preview = msg?.imageEditPreview;
+    if (!preview) return;
+
+    // Re-apply before→after on the current gallery so later edits aren't wiped.
+    const nextGallery = replaceGalleryUrl(gallery, preview.before, preview.after);
+    onApplyGallery(nextGallery);
+    lastPastedImageUrlRef.current = preview.after;
+    setMessages((prev) =>
+      prev.map((m) => (m.id === messageId ? { ...m, applied: true } : m))
+    );
+  }
+
+  function dismissProposal(messageId: string) {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId
+          ? {
+              ...m,
+              applied: false,
+              dismissed: true,
+              proposedChanges: undefined,
+              proposedImages: undefined,
+            }
+          : m
+      )
     );
   }
 
@@ -768,16 +950,35 @@ export function VehicleAiChat({
     (m) =>
       m.role === "assistant" &&
       !m.applied &&
-      (m.proposedChanges || hasSuggestedImages(m.proposedImages))
+      !m.dismissed &&
+      (m.proposedChanges ||
+        hasSuggestedImages(m.proposedImages) ||
+        Boolean(m.imageEditPreview))
   );
+
+  const galleryPhotoCount = countGalleryPhotos(gallery);
+  const quickActions: VehicleAiQuickAction[] = selectVehicleAiQuickActions({
+    sparse: isSparseVehicleListing(form),
+    hasGalleryPhotos: galleryPhotoCount > 0,
+    hasDescription: Boolean(form.description?.trim() && form.description.trim().length > 40),
+    hasInspection: Boolean(form.inspection_summary?.trim()),
+    hasWarranty: Boolean(form.warranty_notes?.trim()),
+  });
 
   function applyAllPending() {
     let nextForm = form;
     let nextGallery = gallery;
 
     for (const msg of messages) {
-      if (msg.role !== "assistant" || msg.applied) continue;
-      if (msg.proposedChanges) {
+      if (msg.role !== "assistant" || msg.applied || msg.dismissed) continue;
+      if (msg.imageEditPreview) {
+        nextGallery = replaceGalleryUrl(
+          nextGallery,
+          msg.imageEditPreview.before,
+          msg.imageEditPreview.after
+        );
+        lastPastedImageUrlRef.current = msg.imageEditPreview.after;
+      } else if (msg.proposedChanges) {
         const result = applyVehicleAiChanges(nextForm, nextGallery, msg.proposedChanges);
         nextForm = result.form;
         nextGallery = result.gallery;
@@ -792,7 +993,10 @@ export function VehicleAiChat({
     setMessages((prev) =>
       prev.map((m) =>
         m.role === "assistant" &&
-          (m.proposedChanges || hasSuggestedImages(m.proposedImages))
+          !m.dismissed &&
+          (m.proposedChanges ||
+            hasSuggestedImages(m.proposedImages) ||
+            Boolean(m.imageEditPreview))
           ? { ...m, applied: true }
           : m
       )
@@ -824,11 +1028,12 @@ export function VehicleAiChat({
         <div>
           <h3 className="text-sm font-semibold text-[var(--platform-ai-text)]">AI Editor</h3>
           <p className="text-xs text-[var(--platform-ai-text-secondary)]">
-            Chat to edit this listing
+            Expert vision + structured listing edits
           </p>
           <p className="mt-1 text-[10px] leading-snug text-[var(--platform-ai-text-secondary)]">
-            Free: stock photos, paste/drop images, color filters. Text edits need{" "}
-            <code className="text-[10px]">GEMINI_API_KEY</code>.
+            Vision fill, color detection, inspection & warranty copy need{" "}
+            <code className="text-[10px]">GEMINI_API_KEY</code>. Free without key: stock photos,
+            paste/drop, color filters. Suggestions always require Apply.
           </p>
         </div>
       </header>
@@ -844,8 +1049,9 @@ export function VehicleAiChat({
         {messages.length === 0 && !loading && (
           <div className="platform-ai-chat-empty">
             <p className="text-xs text-[var(--platform-ai-text-secondary)]">
-              Paste (Ctrl+V) or drag photos here. Then try color chips below — no Gemini key
-              required for filters.
+              {galleryPhotoCount > 0
+                ? "Photos are ready. Use “Fill listing from photos” for a full vision pass (identity, description, inspection cues, paint) — then Apply what looks right."
+                : "Paste (Ctrl+V) or drag photos here, then use “Fill listing from photos” to detect make, model, year, and color — even if the form is empty. Color filters work without a Gemini key."}
             </p>
           </div>
         )}
@@ -878,50 +1084,87 @@ export function VehicleAiChat({
                 <div className="mt-2 flex gap-2">
                   <div className="flex-1">
                     <p className="mb-1 text-[10px] text-[var(--platform-ai-text-secondary)]">Before</p>
-                    <SafeVehicleImage
-                      src={msg.imageEditPreview.before}
-                      alt="Before"
-                      fill={false}
-                      width={72}
-                      height={72}
-                      className="size-16 rounded border border-[var(--platform-ai-border)] object-cover"
-                    />
+                    <ChatCompareThumb src={msg.imageEditPreview.before} alt="Before" />
                   </div>
                   <div className="flex-1">
                     <p className="mb-1 text-[10px] text-[var(--platform-ai-text-secondary)]">
-                      After (filter)
+                      {msg.imageEditPreview.preset === "enhance"
+                        ? "After (enhanced)"
+                        : "After (filter)"}
                     </p>
-                    <SafeVehicleImage
-                      src={msg.imageEditPreview.after}
+                    <ChatCompareThumb
+                      src={
+                        msg.imageEditPreview.afterPreview ?? msg.imageEditPreview.after
+                      }
+                      fallbackSrc={
+                        msg.imageEditPreview.afterPreview
+                          ? msg.imageEditPreview.after
+                          : undefined
+                      }
                       alt="After"
-                      fill={false}
-                      width={72}
-                      height={72}
-                      className="size-16 rounded border border-[var(--platform-ai-accent)] object-cover"
+                      accent
                     />
                   </div>
                 </div>
               )}
 
-              {msg.role === "assistant" && msg.proposedChanges && !msg.applied && (
+              {msg.role === "assistant" &&
+                msg.imageEditPreview &&
+                !msg.applied &&
+                !msg.dismissed && (
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => applyImageEdit(msg.id)}
+                      className="platform-ai-apply-btn flex-1"
+                    >
+                      {msg.imageEditPreview.preset === "enhance"
+                        ? "Approve enhance"
+                        : "Approve filter"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => dismissProposal(msg.id)}
+                      className="platform-ai-undo-btn flex-1 justify-center"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                )}
+
+              {msg.role === "assistant" &&
+                msg.proposedChanges &&
+                !msg.imageEditPreview &&
+                !msg.applied &&
+                !msg.dismissed && (
                 <>
                   <ChangePreview
                     changes={msg.proposedChanges}
                     currentGallery={gallery}
                   />
-                  <button
-                    type="button"
-                    onClick={() => applyChanges(msg.proposedChanges!, msg.id)}
-                    className="platform-ai-apply-btn mt-2 w-full"
-                  >
-                    Apply changes
-                  </button>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => applyChanges(msg.proposedChanges!, msg.id)}
+                      className="platform-ai-apply-btn flex-1"
+                    >
+                      Apply changes
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => dismissProposal(msg.id)}
+                      className="platform-ai-undo-btn flex-1 justify-center"
+                    >
+                      Reject
+                    </button>
+                  </div>
                 </>
               )}
 
               {msg.role === "assistant" &&
                 hasSuggestedImages(msg.proposedImages) &&
-                !msg.applied && (
+                !msg.applied &&
+                !msg.dismissed && (
                 <StockPhotoPreview
                   photos={msg.proposedImages!}
                   gallery={gallery}
@@ -953,7 +1196,13 @@ export function VehicleAiChat({
                 </p>
               )}
 
-              {msg.applied && !msg.addedToGallery && (
+              {msg.dismissed && (
+                <p className="mt-2 text-xs text-[var(--platform-ai-text-secondary)]">
+                  Rejected — not applied to the listing.
+                </p>
+              )}
+
+              {msg.applied && !msg.addedToGallery && !msg.dismissed && (
                 <p className="mt-2 text-xs font-medium text-[var(--platform-ai-accent)]">
                   {msg.imageEditPreview ? "Filter applied to gallery photo" : "Applied to form"}
                 </p>
@@ -979,7 +1228,7 @@ export function VehicleAiChat({
           <p className="font-medium">Gemini API key not configured</p>
           <p className="mt-1">
             Text and description edits need <code>GEMINI_API_KEY</code> in Vercel.{" "}
-            Stock photos, paste/drop uploads, and color filters still work without it.{" "}
+            Stock photos, paste/drop uploads, color filters, and photo enhance (4K) still work without it.{" "}
             <a
               href="https://aistudio.google.com/apikey"
               target="_blank"
@@ -1004,7 +1253,7 @@ export function VehicleAiChat({
       )}
 
       <div className="platform-ai-chat-suggestions">
-        {QUICK_ACTIONS.map((action) => (
+        {quickActions.map((action) => (
           <button
             key={action}
             type="button"
@@ -1013,14 +1262,21 @@ export function VehicleAiChat({
             className={`platform-ai-chip${
               action === STOCK_PHOTOS_ACTION ? " platform-ai-chip--primary" : ""
             }${
-              (COLOR_ADJUST_CHIPS.some((c) => c.label === action) ? " platform-ai-chip--filter" : "")
+              action === FILL_FROM_PHOTOS_ACTION && galleryPhotoCount > 0
+                ? " platform-ai-chip--primary"
+                : ""
+            }${
+              action === ENHANCE_PHOTOS_4K_ACTION ||
+              COLOR_ADJUST_CHIPS.some((c) => c.label === action)
+                ? " platform-ai-chip--filter"
+                : ""
             }`}
           >
             {action}
           </button>
         ))}
         {COLOR_ADJUST_CHIPS.filter(
-          (c) => !QUICK_ACTIONS.includes(c.label as (typeof QUICK_ACTIONS)[number])
+          (c) => !quickActions.includes(c.label as VehicleAiQuickAction)
         ).map((chip) => (
           <button
             key={chip.preset}
@@ -1043,7 +1299,7 @@ export function VehicleAiChat({
           onKeyDown={handleKeyDown}
           rows={1}
           disabled={loading || uploadingImage}
-          placeholder="Ask to edit, paste an image, or drop a photo…"
+          placeholder="Fill from photos, correct fields, inspection, warranty…"
           className="platform-ai-chat-input"
           aria-label="Message AI editor"
         />

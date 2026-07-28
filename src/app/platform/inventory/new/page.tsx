@@ -13,14 +13,16 @@ import {
   redirectToAdminLogin,
 } from "@/lib/admin/client";
 import { usePlatformSession } from "@/components/platform/platform-shell";
+import { rolePublishesImmediately } from "@/lib/admin/vehicle-publish-gates";
 
 export default function NewVehiclePage() {
   const router = useRouter();
   const session = usePlatformSession();
   const isManager = session?.role === "manager";
+  const requiresPublishConfirmation = rolePublishesImmediately(session?.role);
   const [saving, setSaving] = useState(false);
 
-  async function save(data: VehicleInput) {
+  async function save(data: VehicleInput & { publishConfirmed?: boolean }) {
     setSaving(true);
     const res = await fetch("/api/admin/vehicles", {
       method: "POST",
@@ -46,8 +48,8 @@ export default function NewVehiclePage() {
         title="Add vehicle"
         description={
           isManager
-            ? "Submit a new listing for owner or super-admin approval. It will not appear on the public site until approved."
-            : "List a new unit in inventory. Changes sync to the public website within a minute."
+            ? "Submit a new listing for owner or super-admin approval. Photos must match the vehicle. It will not appear on the public site until approved."
+            : "Review and confirm the full listing details and matching photos before publishing to the public website."
         }
         breadcrumb="Inventory"
         backFallbackHref={platformPath("inventory")}
@@ -57,6 +59,7 @@ export default function NewVehiclePage() {
         onSave={save}
         onCancel={() => router.push(platformPath("inventory"))}
         saving={saving}
+        requiresPublishConfirmation={requiresPublishConfirmation}
       />
     </div>
   );

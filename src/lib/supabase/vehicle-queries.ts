@@ -16,12 +16,13 @@ import { filterVehicles, sortVehicles } from "@/lib/vehicles";
 import { fetchAllVehicles } from "@/lib/supabase/vehicles";
 import { vehicles as mockVehicles } from "@/lib/data/vehicles";
 import type { TrustBadgeKey } from "@/lib/vehicles/trust-badges";
+import { applyKeywordFilterToQuery } from "@/lib/vehicles/keyword-search";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type VehicleQuery = any;
 
 const PUBLIC_LISTING_SELECT =
-  "id, slug, make, model, year, trim, price, mileage, fuel_type, transmission, condition, body_type, location, featured, images, primary_image_url, additional_images, status, trust_badges, country_of_origin, financing_available, shipment_available, customs_clearing_available, available_locally, local_availability_at, created_at";
+  "id, slug, make, model, year, trim, price, price_currency, listed_price, mileage, fuel_type, transmission, condition, body_type, location, featured, images, primary_image_url, additional_images, status, trust_badges, country_of_origin, financing_available, shipment_available, customs_clearing_available, available_locally, local_availability_at, created_at";
 
 function applySort(query: VehicleQuery, sort: SortOption): VehicleQuery {
   switch (sort) {
@@ -87,8 +88,9 @@ export function applyVehicleFiltersToQuery(
 ): VehicleQuery {
   let q = query;
 
-  if (filters.make) q = q.eq("make", filters.make);
-  if (filters.model) q = q.eq("model", filters.model);
+  // Case-insensitive exact match so catalog casing mismatches still find stock.
+  if (filters.make) q = q.ilike("make", filters.make);
+  if (filters.model) q = q.ilike("model", filters.model);
   if (filters.yearMin) q = q.gte("year", filters.yearMin);
   if (filters.yearMax) q = q.lte("year", filters.yearMax);
   if (filters.priceMin) q = q.gte("price", filters.priceMin);
@@ -104,6 +106,7 @@ export function applyVehicleFiltersToQuery(
   if (filters.financingAvailable) q = q.eq("financing_available", true);
   if (filters.customsClearingAvailable) q = q.eq("customs_clearing_available", true);
 
+  q = applyKeywordFilterToQuery(q, filters.q);
   q = applyFulfillmentFilter(q, filters);
   q = applyTrustBadgeFilters(q, filters.trustBadges);
 

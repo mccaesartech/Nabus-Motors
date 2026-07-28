@@ -387,6 +387,8 @@ export async function deleteAdminCustomer(
       .from("profiles")
       .update({
         deleted_at: now,
+        // Keep Account Lifecycle in sync — deleted_at alone left status='active'.
+        account_status: "deleted",
         first_name: "Deleted",
         last_name: "customer",
         phone: null,

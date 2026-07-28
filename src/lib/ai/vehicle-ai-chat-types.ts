@@ -28,6 +28,12 @@ export type VehicleAiChatChanges = Partial<
     | "description"
     | "featured"
     | "status"
+    | "inspection_summary"
+    | "warranty_notes"
+    | "drivetrain"
+    | "horsepower"
+    | "range"
+    | "seating_capacity"
   >
 > & {
   gallery?: Partial<VehicleGalleryData>;
@@ -53,6 +59,8 @@ export type VehicleAiChatResponse = {
   /** Present when photos came from the free Pexels pool (no Gemini). */
   photoSource?: VehiclePhotoSource;
   geminiSkipped?: boolean;
+  /** Overall suggestion confidence when the model provided it. */
+  confidence?: "high" | "medium" | "low";
 };
 
 export type VehicleAiChatClientMessage = VehicleAiChatMessage & {
@@ -65,6 +73,14 @@ export type VehicleAiChatClientMessage = VehicleAiChatMessage & {
   addedToGallery?: { urls: string[]; undone?: boolean };
   /** Pasted or uploaded image shown in chat. */
   pastedImageUrl?: string;
-  /** Before/after preview for color filter edits. */
-  imageEditPreview?: { before: string; after: string; preset: string };
+  /** Before/after preview for color filter or 4K enhance edits (pending until Approve). */
+  imageEditPreview?: {
+    before: string;
+    after: string;
+    /** Inline data URL for reliable After thumbnails (avoids CDN race). */
+    afterPreview?: string;
+    preset: string;
+  };
+  /** Admin dismissed a pending proposal without applying. */
+  dismissed?: boolean;
 };

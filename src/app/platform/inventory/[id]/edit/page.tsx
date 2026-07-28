@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { listingAmountForForm } from "@/lib/currency";
 import { PageHeader } from "@/components/platform/page-header";
 import { CategoryBadges } from "@/components/admin/category-badges";
 import { PlatformVehicleForm } from "@/components/platform/platform-vehicle-form";
@@ -24,11 +25,13 @@ import {
   isRejectedEditPending,
   mergeVehicleWithPending,
 } from "@/lib/admin/vehicle-pending-changes";
+import { rolePublishesImmediately } from "@/lib/admin/vehicle-publish-gates";
 
 export default function EditVehiclePage() {
   const router = useRouter();
   const session = usePlatformSession();
   const isManager = session?.role === "manager";
+  const requiresPublishConfirmation = rolePublishesImmediately(session?.role);
   const params = useParams();
   const id = String(params.id ?? "");
   const [vehicle, setVehicle] = useState<DbVehicle | null>(null);
@@ -67,7 +70,7 @@ export default function EditVehiclePage() {
     load();
   }, [load]);
 
-  async function save(data: VehicleInput) {
+  async function save(data: VehicleInput & { publishConfirmed?: boolean }) {
     setSaving(true);
     const res = await fetch("/api/admin/vehicles", {
       method: "PATCH",
@@ -124,7 +127,9 @@ export default function EditVehiclePage() {
                 ? "This listing has proposed edits awaiting approval. Saving again will update the pending submission."
                 : vehicle.approval_status === "rejected"
                   ? "This submission was rejected. Update and save to resubmit for approval."
-                  : "Update listing details, pricing, and availability."
+                  : requiresPublishConfirmation
+                    ? "Update listing details, then confirm photos and full details before publishing changes."
+                    : "Update listing details, pricing, and availability."
         }
         breadcrumb="Inventory"
         backFallbackHref={platformPath("inventory")}
@@ -166,7 +171,12 @@ export default function EditVehiclePage() {
           model: formVehicle.model,
           year: formVehicle.year,
           trim: formVehicle.trim ?? undefined,
-          price: formVehicle.price,
+          price: listingAmountForForm({
+            price: formVehicle.price,
+            priceCurrency: formVehicle.price_currency,
+            listedPrice: formVehicle.listed_price,
+          }),
+          price_currency: formVehicle.price_currency ?? "USD",
           mileage: formVehicle.mileage,
           fuel_type: formVehicle.fuel_type,
           transmission: formVehicle.transmission,
@@ -201,6 +211,7 @@ export default function EditVehiclePage() {
         onSave={save}
         onCancel={() => router.push(platformPath("inventory"))}
         saving={saving}
+        requiresPublishConfirmation={requiresPublishConfirmation}
       />
     </div>
   );

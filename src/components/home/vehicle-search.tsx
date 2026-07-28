@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Search } from "lucide-react";
 import { Container } from "@/components/shared/container";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -15,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { makes, modelsByMake, locations } from "@/lib/data/catalog-meta";
 import { buildFilterSearchParams } from "@/lib/vehicles";
+import { MAX_PUBLIC_SEARCH_LENGTH } from "@/lib/vehicles/keyword-search";
 import { ROUTES } from "@/lib/routes";
 import { setLastInventorySearch } from "@/lib/journey-history";
 import { recordSearchPreferences } from "@/lib/vehicle-preferences";
@@ -28,6 +30,7 @@ const years = Array.from({ length: 15 }, (_, i) => currentYear - i);
 export function VehicleSearch() {
   const router = useRouter();
   const { currency } = useCurrency();
+  const [q, setQ] = useState("");
   const [make, setMake] = useState("");
   const [model, setModel] = useState("");
   const [year, setYear] = useState("");
@@ -41,6 +44,7 @@ export function VehicleSearch() {
 
   function handleSearch() {
     const filters = {
+      q: q.trim().slice(0, MAX_PUBLIC_SEARCH_LENGTH) || undefined,
       make: make || undefined,
       model: model || undefined,
       yearMin: year ? Number(year) : undefined,
@@ -66,7 +70,34 @@ export function VehicleSearch() {
             Find Your Vehicle
           </h2>
 
-          <div className="mt-6 grid w-full grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4 xl:gap-6">
+          <div className="mt-6 space-y-2">
+            <Label htmlFor="search-q" className="text-xs font-medium">
+              Search
+            </Label>
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden
+              />
+              <Input
+                id="search-q"
+                type="search"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleSearch();
+                  }
+                }}
+                maxLength={MAX_PUBLIC_SEARCH_LENGTH}
+                placeholder="e.g. 2024 Toyota RAV4, BYD, white SUV…"
+                className="h-9 pl-8"
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 grid w-full grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4 xl:gap-6">
             <div className="space-y-2">
               <Label htmlFor="search-make" className="text-xs font-medium">
                 Make

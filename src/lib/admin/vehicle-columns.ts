@@ -54,6 +54,8 @@ export const OPTIONAL_VEHICLE_COLUMNS = [
   "walkaround_video_url",
   "available_locally",
   "local_availability_at",
+  "price_currency",
+  "listed_price",
 ] as const;
 
 const OPTIONAL_COLUMN_SET = new Set<string>(OPTIONAL_VEHICLE_COLUMNS);
@@ -155,6 +157,8 @@ const OPTIONAL_MIGRATION_HINTS: Record<string, string> = {
   walkaround_video_url: "065_vehicle_walkaround_video.sql",
   available_locally: "067_vehicle_interest_local_availability.sql",
   local_availability_at: "067_vehicle_interest_local_availability.sql",
+  price_currency: "081_vehicle_price_currency.sql",
+  listed_price: "081_vehicle_price_currency.sql",
 };
 
 export function optionalVehicleColumnWarning(message: string): string {

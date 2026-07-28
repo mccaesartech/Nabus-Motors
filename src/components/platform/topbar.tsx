@@ -191,6 +191,7 @@ export function PlatformTopbar({
         <Link
           href="/"
           target="_blank"
+          rel="noopener noreferrer"
           className="platform-btn-ghost hidden sm:inline-flex"
         >
           <ExternalLink className="size-4" />

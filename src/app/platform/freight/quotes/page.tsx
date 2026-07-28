@@ -4,6 +4,10 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ExternalLink, Trash2 } from "lucide-react";
+import {
+  ConfirmDialog,
+  DELETE_CONFIRM_PHRASE,
+} from "@/components/platform/confirm-dialog";
 import { PageHeader } from "@/components/platform/page-header";
 import { CustomerVisibleNoteField } from "@/components/platform/customer-visible-note-field";
 import { adminLoginPath } from "@/lib/admin/paths";
@@ -38,6 +42,7 @@ export default function FreightQuotesPage() {
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [resendToast, setResendToast] = useState<string | null>(null);
   const [resendToastVariant, setResendToastVariant] = useState<"success" | "warning" | "neutral">("success");
+  const [deleteTarget, setDeleteTarget] = useState<FreightQuote | null>(null);
 
   useMarkNotificationsOnVisit({
     link: platformPath("freight/quotes"),
@@ -160,9 +165,9 @@ export default function FreightQuotesPage() {
     }
   }
 
-  async function deleteQuote(id: string) {
-    if (!confirm("Delete this quote request?")) return;
-    await fetch(`/api/admin/freight/quotes?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+  async function deleteQuote(quote: FreightQuote) {
+    await fetch(`/api/admin/freight/quotes?id=${encodeURIComponent(quote.id)}`, { method: "DELETE" });
+    setDeleteTarget(null);
     load();
   }
 
@@ -206,9 +211,8 @@ export default function FreightQuotesPage() {
         >
           {tableMissing ? (
             <>
-              The <code className="text-xs">freight_quote_requests</code> table is missing. Run
-              migrations 028, 036, and 037 in Supabase SQL Editor so inbound quotes can be saved and listed
-              here.
+              Freight quote requests are temporarily unavailable. Inbound quotes will show here once
+              setup is complete.
             </>
           ) : (
             loadError
@@ -313,7 +317,7 @@ export default function FreightQuotesPage() {
                           <button
                             type="button"
                             className="platform-btn-ghost text-xs text-[var(--platform-error)]"
-                            onClick={() => void deleteQuote(quote.id)}
+                            onClick={() => setDeleteTarget(quote)}
                           >
                             <Trash2 className="size-3.5" />
                           </button>
@@ -360,6 +364,25 @@ export default function FreightQuotesPage() {
           </table>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="Delete quote request?"
+        description={
+          deleteTarget
+            ? `Permanently delete the freight quote from ${deleteTarget.name}? This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        destructive
+        confirmPhrase={DELETE_CONFIRM_PHRASE}
+        onConfirm={async () => {
+          if (deleteTarget) await deleteQuote(deleteTarget);
+        }}
+      />
     </div>
   );
 }

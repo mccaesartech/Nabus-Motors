@@ -93,9 +93,9 @@ function buildAttentionItems(
   if (stats.lowStock && permissions.inventory) {
     items.push({
       id: "low-stock",
-      label: "Low inventory stock",
-      count: 1,
-      href: platformPath("inventory"),
+      label: "Low stock — add or import vehicles",
+      count: Math.max(stats.availableVehicles, 1),
+      href: `${platformPath("inventory")}?stock=low`,
       icon: Package,
       severity: "danger",
     });

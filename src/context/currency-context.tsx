@@ -11,6 +11,8 @@ import {
 import {
   DEFAULT_DISPLAY_CURRENCY,
   formatUsdPrice,
+  formatVehiclePrice,
+  type VehiclePriceFields,
 } from "@/lib/currency";
 import { setExchangeRates } from "@/lib/currency/rates";
 import {
@@ -37,6 +39,7 @@ interface CurrencyContextValue {
   setCountry: (country: CountryCode) => void;
   countries: readonly CountryConfig[];
   formatPrice: (usdAmount: number) => string;
+  formatVehicleListPrice: (fields: VehiclePriceFields) => string;
   ratesLoaded: boolean;
 }
 
@@ -160,6 +163,11 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     [displayCurrency, ratesLoaded]
   );
 
+  const formatVehicleListPrice = useCallback(
+    (fields: VehiclePriceFields) => formatVehiclePrice(fields, displayCurrency),
+    [displayCurrency, ratesLoaded]
+  );
+
   const value = useMemo(
     () => ({
       currency: displayCurrency,
@@ -168,12 +176,14 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
       setCountry,
       countries: COUNTRIES,
       formatPrice,
+      formatVehicleListPrice,
       ratesLoaded,
     }),
     [
       displayCountry,
       displayCurrency,
       formatPrice,
+      formatVehicleListPrice,
       ratesLoaded,
       setCountry,
       setCurrency,

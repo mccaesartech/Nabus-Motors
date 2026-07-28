@@ -121,6 +121,7 @@ export function applyFulfillmentExclusivity(
 /** Count active non-default filters for chip display and recommendations. */
 export function countActiveFilters(filters: VehicleFilters): number {
   let count = 0;
+  if (filters.q) count++;
   if (filters.make) count++;
   if (filters.model) count++;
   if (filters.yearMin || filters.yearMax) count++;

@@ -4,6 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
+import {
+  ConfirmDialog,
+  DELETE_CONFIRM_PHRASE,
+} from "@/components/platform/confirm-dialog";
 import { PageHeader } from "@/components/platform/page-header";
 import { StatusBadge } from "@/components/platform/status-badge";
 import { CustomerVisibleNoteField } from "@/components/platform/customer-visible-note-field";
@@ -81,6 +85,8 @@ export function ShipmentManager({
   const [showCustomEventForm, setShowCustomEventForm] = useState(false);
   const [notesDraft, setNotesDraft] = useState("");
   const [canUseAi, setCanUseAi] = useState(false);
+  const [deleteShipmentTarget, setDeleteShipmentTarget] = useState<ShipmentTrackingRow | null>(null);
+  const [deleteEventTarget, setDeleteEventTarget] = useState<ShipmentTimelineEventRow | null>(null);
 
   function resetEventForm() {
     setEventForm({
@@ -303,14 +309,15 @@ export function ShipmentManager({
   async function deleteEvent(event: ShipmentTimelineEventRow) {
     if (!selectedId) return;
     await updateShipment({ delete_event_id: event.id });
+    setDeleteEventTarget(null);
   }
 
   async function deleteShipment(id: string) {
-    if (!confirm("Delete this shipment and all timeline events?")) return;
     await fetch(`/api/admin/freight/shipments?id=${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
     if (selectedId === id) setSelectedId(null);
+    setDeleteShipmentTarget(null);
     await loadList();
   }
 
@@ -483,7 +490,7 @@ export function ShipmentManager({
                           <button
                             type="button"
                             className="platform-btn-ghost text-xs text-[var(--platform-error)]"
-                            onClick={() => void deleteShipment(row.id)}
+                            onClick={() => setDeleteShipmentTarget(row)}
                           >
                             <Trash2 className="size-3.5" />
                           </button>
@@ -714,7 +721,7 @@ export function ShipmentManager({
                         <button
                           type="button"
                           className="platform-btn-ghost text-[var(--platform-error)]"
-                          onClick={() => void deleteEvent(event)}
+                          onClick={() => setDeleteEventTarget(event)}
                         >
                           <Trash2 className="size-3.5" />
                         </button>
@@ -727,6 +734,44 @@ export function ShipmentManager({
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(deleteShipmentTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteShipmentTarget(null);
+        }}
+        title="Delete shipment?"
+        description={
+          deleteShipmentTarget
+            ? `Permanently delete shipment ${deleteShipmentTarget.tracking_number} and all timeline events? This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        destructive
+        confirmPhrase={DELETE_CONFIRM_PHRASE}
+        onConfirm={async () => {
+          if (deleteShipmentTarget) await deleteShipment(deleteShipmentTarget.id);
+        }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteEventTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteEventTarget(null);
+        }}
+        title="Delete timeline event?"
+        description={
+          deleteEventTarget
+            ? `Permanently delete the “${deleteEventTarget.title}” timeline event? This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        destructive
+        confirmPhrase={DELETE_CONFIRM_PHRASE}
+        onConfirm={async () => {
+          if (deleteEventTarget) await deleteEvent(deleteEventTarget);
+        }}
+      />
     </div>
   );
 }

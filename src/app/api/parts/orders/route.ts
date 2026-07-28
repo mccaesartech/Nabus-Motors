@@ -12,6 +12,8 @@ import {
   notifyVehicleSaleToLeadsTeam,
   vehicleOrderLeadsLink,
 } from "@/lib/platform/vehicle-sale-notifications";
+import { maybeNotifyVehicleStockAction, refreshFleetLowStockAlert } from "@/lib/platform/vehicle-stock-notifications";
+import { countAvailableSiblings } from "@/lib/vehicles/stock-automation";
 import { notifyCustomerOrderSubmitted } from "@/lib/customer/notifications-server";
 import { notifyCustomer } from "@/lib/notifications/customer-notify";
 import type { CartPartLine, CartVehicleLine } from "@/lib/parts/cart-types";
@@ -313,6 +315,38 @@ export async function POST(req: NextRequest) {
         link: vehicleOrderLeadsLink(order.id),
         totalUsd,
       });
+
+      for (const item of vehicleOrderItems) {
+        if (!item.vehicle_id) continue;
+        const vehicle = vehiclesMap.get(item.vehicle_id);
+        if (!vehicle?.make || !vehicle.model || vehicle.year == null) continue;
+        try {
+          const availableSiblings = await countAvailableSiblings(supabase, {
+            id: vehicle.id,
+            make: vehicle.make,
+            model: vehicle.model,
+            year: Number(vehicle.year),
+          });
+          await maybeNotifyVehicleStockAction(supabase, {
+            id: vehicle.id,
+            slug: vehicle.slug,
+            year: Number(vehicle.year),
+            make: vehicle.make,
+            model: vehicle.model,
+            availableSiblings,
+            source: "purchase",
+            sourceDetail: "cart_order",
+          });
+        } catch (err) {
+          console.error("[parts/orders] stock action notify failed:", err);
+        }
+      }
+
+      try {
+        await refreshFleetLowStockAlert(supabase);
+      } catch (err) {
+        console.error("[parts/orders] fleet low stock notify failed:", err);
+      }
     }
 
     const orderUserId = checkoutCustomer.userId ?? user?.id ?? null;

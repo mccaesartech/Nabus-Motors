@@ -10,7 +10,10 @@ import { PageHeader } from "@/components/platform/page-header";
 import { PlatformPrintButton, PrintableRecord } from "@/components/platform/printable-record";
 import { buildAdminPreorderDocumentHtml } from "@/lib/platform/printable-documents";
 import { useMarkNotificationsOnVisit } from "@/hooks/use-mark-notifications-read";
-import { ConfirmDialog } from "@/components/platform/confirm-dialog";
+import {
+  ConfirmDialog,
+  DELETE_CONFIRM_PHRASE,
+} from "@/components/platform/confirm-dialog";
 import { PaymentStatusBadge, StatusBadge } from "@/components/platform/status-badge";
 import { SafeVehicleImage } from "@/components/shared/safe-vehicle-image";
 import { adminLoginPath } from "@/lib/admin/paths";
@@ -618,6 +621,7 @@ export default function PreorderDetailPage() {
         description={`Permanently remove ${inquiry.name}'s pre-order for ${vehicleTitle}? This cannot be undone.`}
         confirmLabel="Delete"
         destructive
+        confirmPhrase={DELETE_CONFIRM_PHRASE}
         onConfirm={handleDelete}
       />
 

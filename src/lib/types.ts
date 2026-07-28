@@ -67,7 +67,12 @@ export interface Vehicle {
   model: string;
   year: number;
   trim?: string;
+  /** Canonical list price in USD. */
   price: number;
+  /** ISO currency the seller entered for listedPrice. */
+  priceCurrency?: string;
+  /** Exact amount entered in priceCurrency (when known). */
+  listedPrice?: number | null;
   mileage: number;
   fuelType: FuelType;
   transmission: Transmission;
@@ -102,6 +107,8 @@ export interface Vehicle {
 export type FulfillmentMode = "all" | "in_ghana" | "import_ship" | "pre_order_only";
 
 export interface VehicleFilters {
+  /** Free-text keyword search (make/model/year/color/VIN/slug, etc.). */
+  q?: string;
   make?: string;
   model?: string;
   yearMin?: number;

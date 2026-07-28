@@ -6,7 +6,10 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import { ExternalLink, KeyRound, MessageSquare, Package, Ship, ShoppingBag, Copy, Check, Trash2 } from "lucide-react";
 import { ContactEmailAction, ContactPhoneAction, ContactWhatsAppAction } from "@/components/platform/contact-actions";
 import { CustomerDataTrustNote } from "@/components/forms/customer-data-trust-note";
-import { ConfirmDialog } from "@/components/platform/confirm-dialog";
+import {
+  ConfirmDialog,
+  DELETE_CONFIRM_PHRASE,
+} from "@/components/platform/confirm-dialog";
 import { PageHeader } from "@/components/platform/page-header";
 import {
   CustomerInvoicePrintButton,
@@ -551,6 +554,7 @@ export default function CustomerProfilePage() {
         description={`This cannot be undone.\n\nTheir profile will be removed from the customer list. Existing orders, pre-orders, and messages will be kept for your records.`}
         confirmLabel="Delete customer"
         destructive
+        confirmPhrase={DELETE_CONFIRM_PHRASE}
         onConfirm={handleDelete}
       />
     </div>

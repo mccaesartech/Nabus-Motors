@@ -3,12 +3,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Check, Download, Plus, Search, X } from "lucide-react";
+import { Check, Download, Plus, Search, X, AlertTriangle } from "lucide-react";
 import { PageHeader } from "@/components/platform/page-header";
-import { ConfirmDialog } from "@/components/platform/confirm-dialog";
+import {
+  ConfirmDialog,
+  DELETE_CONFIRM_PHRASE,
+} from "@/components/platform/confirm-dialog";
 import { ApprovalStatusBadge } from "@/components/platform/status-badge";
 import { VehicleStatusControl } from "@/components/platform/vehicle-status-control";
-import { VEHICLE_STATUS_LABELS } from "@/lib/admin/vehicle-fields";
+import { VEHICLE_STATUS_LABELS, type VehicleInput } from "@/lib/admin/vehicle-fields";
 import { cn } from "@/lib/utils";
 import {
   ActiveFiltersSummary,
@@ -46,9 +49,26 @@ import {
   isRejectedEditPending,
   mergeVehicleWithPending,
 } from "@/lib/admin/vehicle-pending-changes";
+import { buildVehiclePublishSummary } from "@/lib/admin/vehicle-publish-gates";
+import { VehiclePublishConfirmDialog } from "@/components/platform/vehicle-publish-confirm-dialog";
+import type { VehiclePublishSummary } from "@/lib/admin/vehicle-publish-gates";
+import {
+  availableCountForVehicle,
+  buildAvailableStockCounts,
+  listLowStockGroups,
+  modelStockLevel,
+  shouldHighlightVehicleStock,
+} from "@/lib/vehicles/low-stock";
 
 type ApprovalFilter = "all" | "pending_approval" | "approved" | "rejected";
 type ListingTab = "all" | "available" | "pre_order";
+
+type InventoryStockMeta = {
+  availableCount: number;
+  lowStockThreshold: number;
+  notifyLowStockEnabled: boolean;
+  fleetLowStock: boolean;
+};
 
 export default function InventoryPage() {
   const router = useRouter();
@@ -56,20 +76,30 @@ export default function InventoryPage() {
   const canEdit = session?.permissions.inventory_edit ?? false;
   const canApprove = session?.permissions.inventory_approve ?? false;
   const isManager = session?.role === "manager";
-  const { formatPrice } = usePlatformCurrency();
+  const { formatVehicleListPrice } = usePlatformCurrency();
   const searchParams = useSearchParams();
   const [vehicles, setVehicles] = useState<DbVehicle[]>([]);
+  const [stockMeta, setStockMeta] = useState<InventoryStockMeta | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
+  const [stockFilter, setStockFilter] = useState<"all" | "low">(
+    () => (searchParams.get("stock") === "low" ? "low" : "all")
+  );
   const [filters, setFilters] = useState<InventoryFilters>(EMPTY_INVENTORY_FILTERS);
   const [toast, setToast] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [bulkTrashConfirm, setBulkTrashConfirm] = useState(false);
+  const [bulkActing, setBulkActing] = useState(false);
   const [rejectTarget, setRejectTarget] = useState<{
     id: string;
     name: string;
     isEdit: boolean;
   } | null>(null);
   const [rejectNote, setRejectNote] = useState("");
+  const [approveTarget, setApproveTarget] = useState<{
+    id: string;
+    summary: VehiclePublishSummary;
+  } | null>(null);
   const [approvalFilter, setApprovalFilter] = useState<ApprovalFilter>(() => {
     const param = searchParams.get("approval");
     if (param === "pending") return "pending_approval";
@@ -101,6 +131,16 @@ export default function InventoryPage() {
     }
     const json = await res.json();
     setVehicles(json.vehicles ?? []);
+    if (json.stock) {
+      setStockMeta({
+        availableCount: Number(json.stock.availableCount) || 0,
+        lowStockThreshold: Number(json.stock.lowStockThreshold) || 5,
+        notifyLowStockEnabled: Boolean(json.stock.notifyLowStockEnabled),
+        fleetLowStock: Boolean(json.stock.fleetLowStock),
+      });
+    } else {
+      setStockMeta(null);
+    }
     setLoading(false);
   }, [router]);
 
@@ -111,6 +151,7 @@ export default function InventoryPage() {
   useEffect(() => {
     const q = searchParams.get("q");
     if (q !== null) setSearch(q);
+    setStockFilter(searchParams.get("stock") === "low" ? "low" : "all");
     const param = searchParams.get("approval");
     if (param === "pending") setApprovalFilter("pending_approval");
     else if (
@@ -122,6 +163,26 @@ export default function InventoryPage() {
     }
   }, [searchParams]);
 
+  const setStockFilterAndUrl = useCallback(
+    (next: "all" | "low") => {
+      setStockFilter(next);
+      const params = new URLSearchParams(searchParams.toString());
+      if (next === "low") params.set("stock", "low");
+      else params.delete("stock");
+      const qs = params.toString();
+      router.replace(qs ? `${platformPath("inventory")}?${qs}` : platformPath("inventory"));
+    },
+    [router, searchParams]
+  );
+  const availableStockCounts = useMemo(
+    () => buildAvailableStockCounts(vehicles),
+    [vehicles]
+  );
+
+  const lowStockGroups = useMemo(
+    () => listLowStockGroups(vehicles, availableStockCounts),
+    [vehicles, availableStockCounts]
+  );
   const pendingCount = useMemo(
     () => vehicles.filter((v) => v.approval_status === "pending_approval").length,
     [vehicles]
@@ -151,12 +212,15 @@ export default function InventoryPage() {
     if (approvalFilter !== "all") {
       list = list.filter((v) => (v.approval_status ?? "approved") === approvalFilter);
     }
+    if (stockFilter === "low") {
+      list = list.filter((v) => shouldHighlightVehicleStock(v, availableStockCounts));
+    }
     return [...list].sort((a, b) => {
       const makeCmp = a.make.localeCompare(b.make, undefined, { sensitivity: "base" });
       if (makeCmp !== 0) return makeCmp;
       return b.year - a.year;
     });
-  }, [vehicles, filters, search, approvalFilter, listingTab]);
+  }, [vehicles, filters, search, approvalFilter, listingTab, stockFilter, availableStockCounts]);
 
   const chips = useMemo(() => buildFilterChips(vehicles, filters), [vehicles, filters]);
 
@@ -287,15 +351,72 @@ export default function InventoryPage() {
     });
   }
 
-  async function deleteVehicle(id: string, name: string) {
+  async function deleteVehicle(id: string, _name: string) {
+    setActingOnId(id);
+    setDeleteTarget(null);
+    setToast("Moving vehicle to trash…");
+    setVehicles((prev) => prev.filter((v) => v.id !== id));
+    setSelectedIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+
     const res = await fetch(`/api/admin/vehicles?id=${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
-    const json = await res.json();
+    const json = await parseAdminResponse(res);
+    setActingOnId(null);
     if (res.ok && json.ok) {
       setToast("Vehicle moved to trash. Restore it from Platform → Trash if needed.");
-      setDeleteTarget(null);
-      load();
+      void load();
+    } else {
+      setToast(adminErrorMessage(json, "Could not move vehicle to trash."));
+      void load();
+    }
+  }
+
+  async function applyBulkTrash() {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    setBulkActing(true);
+    setBulkTrashConfirm(false);
+    setToast(
+      `Moving ${ids.length} vehicle${ids.length === 1 ? "" : "s"} to trash…`
+    );
+    const idSet = new Set(ids);
+    setVehicles((prev) => prev.filter((v) => !idSet.has(v.id)));
+    setSelectedIds(new Set());
+
+    const res = await fetch("/api/admin/vehicles", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    const json = await parseAdminResponse(res);
+    setBulkActing(false);
+    await load();
+
+    const deletedCount = Array.isArray(json.deletedIds)
+      ? json.deletedIds.length
+      : res.ok && json.ok
+        ? ids.length
+        : 0;
+    const failedCount = Array.isArray(json.failed)
+      ? json.failed.length
+      : Math.max(0, ids.length - deletedCount);
+
+    if (res.ok && json.ok && failedCount === 0) {
+      setToast(
+        `Moved ${ids.length} vehicle${ids.length === 1 ? "" : "s"} to trash. Restore from Platform → Trash if needed.`
+      );
+    } else if (deletedCount > 0) {
+      setToast(
+        `Moved ${deletedCount} of ${ids.length} vehicles to trash. Some deletions failed.`
+      );
+    } else {
+      setToast(adminErrorMessage(json, "Could not move vehicles to trash."));
     }
   }
 
@@ -309,7 +430,12 @@ export default function InventoryPage() {
     const res = await fetch("/api/admin/vehicles/approval", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, action, note: note?.trim() || undefined }),
+      body: JSON.stringify({
+        id,
+        action,
+        note: note?.trim() || undefined,
+        ...(action === "approve" ? { publishConfirmed: true } : {}),
+      }),
     });
     const json = await parseAdminResponse(res);
     setActingOnId(null);
@@ -319,6 +445,7 @@ export default function InventoryPage() {
     }
     setRejectTarget(null);
     setRejectNote("");
+    setApproveTarget(null);
     setToast(
       action === "approve"
         ? "Vehicle approved and published."
@@ -373,6 +500,88 @@ export default function InventoryPage() {
       {toast && (
         <div className="rounded-lg border border-[var(--platform-success)]/30 bg-[rgba(16,185,129,0.08)] px-4 py-3 text-sm text-[var(--platform-success)]">
           {toast}
+        </div>
+      )}
+
+      {(stockMeta?.fleetLowStock || lowStockGroups.length > 0) && (
+        <div
+          className={cn(
+            "flex flex-wrap items-start justify-between gap-3 rounded-xl border px-4 py-3",
+            stockMeta?.fleetLowStock
+              ? "border-red-300/70 bg-red-50"
+              : "border-amber-300/70 bg-amber-50"
+          )}
+          role="status"
+        >
+          <div className="flex min-w-0 flex-1 gap-3">
+            <AlertTriangle
+              className={cn(
+                "mt-0.5 size-5 shrink-0",
+                stockMeta?.fleetLowStock ? "text-red-600" : "text-amber-600"
+              )}
+              aria-hidden
+            />
+            <div className="min-w-0 space-y-1">
+              <p
+                className={cn(
+                  "text-sm font-semibold",
+                  stockMeta?.fleetLowStock ? "text-red-800" : "text-amber-900"
+                )}
+              >
+                {stockMeta?.fleetLowStock ? "Low Stock warning" : "Model low stock"}
+              </p>
+              <p
+                className={cn(
+                  "text-sm",
+                  stockMeta?.fleetLowStock ? "text-red-700" : "text-amber-800"
+                )}
+              >
+                {stockMeta?.fleetLowStock
+                  ? `Only ${stockMeta.availableCount} available vehicle${
+                      stockMeta.availableCount === 1 ? "" : "s"
+                    } (threshold ${stockMeta.lowStockThreshold}).`
+                  : null}
+                {lowStockGroups.length > 0
+                  ? `${stockMeta?.fleetLowStock ? " " : ""}${lowStockGroups.length} make/model/year group${
+                      lowStockGroups.length === 1 ? "" : "s"
+                    } at ≤1 available unit.`
+                  : null}{" "}
+                Consider adding inventory, importing more units, or setting Pre-order / Available in
+                Ghana.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setStockFilterAndUrl("low")}
+              className="platform-btn-ghost text-xs"
+            >
+              Show low stock
+            </button>
+            {canEdit && (
+              <Link href={platformPath("inventory/new")} className="platform-btn-primary text-xs">
+                <Plus className="size-3.5" />
+                Add / import vehicle
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+
+      {stockFilter === "low" && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200/80 bg-amber-50/80 px-3 py-2 text-sm text-amber-900">
+          <span>
+            Filtering to low-stock models ({filtered.length} listing
+            {filtered.length === 1 ? "" : "s"})
+          </span>
+          <button
+            type="button"
+            onClick={() => setStockFilterAndUrl("all")}
+            className="text-xs font-medium text-amber-800 underline-offset-2 hover:underline"
+          >
+            Clear stock filter
+          </button>
         </div>
       )}
 
@@ -647,6 +856,7 @@ export default function InventoryPage() {
               }}
               className="platform-select min-h-9 min-w-[10rem] text-sm"
               aria-label="Bulk status change"
+              disabled={bulkActing}
             >
               <option value="">Change status…</option>
               {(["available", "pre_order", "reserved", "sold"] as const).map((value) => (
@@ -657,11 +867,20 @@ export default function InventoryPage() {
             </select>
             <button
               type="button"
+              disabled={bulkActing}
+              onClick={() => setBulkTrashConfirm(true)}
+              className="platform-btn-ghost text-xs text-[var(--platform-error)] disabled:opacity-50"
+            >
+              Move to trash
+            </button>
+            <button
+              type="button"
+              disabled={bulkActing}
               onClick={() => {
                 setSelectedIds(new Set());
                 setBulkStatus("");
               }}
-              className="text-xs text-[var(--platform-text-secondary)] hover:text-[var(--platform-text)]"
+              className="text-xs text-[var(--platform-text-secondary)] hover:text-[var(--platform-text)] disabled:opacity-50"
             >
               Clear selection
             </button>
@@ -736,6 +955,9 @@ export default function InventoryPage() {
                     ? mergeVehicleWithPending(v, v.pending_changes)
                     : v;
                   const isLive = isPubliclyListed(approvalStatus, v.pending_changes);
+                  const modelAvailable = availableCountForVehicle(v, availableStockCounts);
+                  const stockLevel = modelStockLevel(modelAvailable);
+                  const showStockHighlight = shouldHighlightVehicleStock(v, availableStockCounts);
                   const thumb = primaryPhotoFor({
                     slug: v.slug,
                     id: v.id,
@@ -749,7 +971,13 @@ export default function InventoryPage() {
                     <tr
                       className={cn(
                         "border-t border-[var(--platform-border)]",
-                        actingOnId === v.id && "opacity-60"
+                        actingOnId === v.id && "opacity-60",
+                        showStockHighlight &&
+                          stockLevel === "out" &&
+                          "bg-red-50/90 ring-1 ring-inset ring-red-200/80",
+                        showStockHighlight &&
+                          stockLevel === "low" &&
+                          "bg-amber-50/90 ring-1 ring-inset ring-amber-200/80"
                       )}
                     >
                       {canEdit && (
@@ -780,6 +1008,19 @@ export default function InventoryPage() {
                         <p className="font-medium leading-snug">
                           {display.year} {display.make} {display.model}
                         </p>
+                        {showStockHighlight && (
+                          <p
+                            className={cn(
+                              "mt-0.5 inline-flex items-center gap-1 text-xs font-semibold",
+                              stockLevel === "out" ? "text-red-700" : "text-amber-700"
+                            )}
+                          >
+                            <AlertTriangle className="size-3" aria-hidden />
+                            {stockLevel === "out"
+                              ? "Out of available stock"
+                              : `Low Stock · ${modelAvailable} available`}
+                          </p>
+                        )}
                         {isEditPending && !isRejectedEdit && (
                           <p className="mt-0.5 text-xs text-[var(--platform-accent)]">
                             Proposed edits awaiting approval
@@ -809,10 +1050,14 @@ export default function InventoryPage() {
                       </td>
                       <td className="px-4 py-3 align-middle whitespace-nowrap">
                         <p className="font-medium tabular-nums">
-                          {formatPrice(display.price)}
+                          {formatVehicleListPrice({
+                            price: Number(display.price) || 0,
+                            priceCurrency: display.price_currency,
+                            listedPrice: display.listed_price,
+                          })}
                         </p>
                         <p className="text-xs text-[var(--platform-text-secondary)]">
-                          {formatAdminCurrencyPreviews(display.price)}
+                          {formatAdminCurrencyPreviews(Number(display.price) || 0)}
                         </p>
                       </td>
                       <td className="px-4 py-3 align-middle tabular-nums whitespace-nowrap">
@@ -865,7 +1110,40 @@ export default function InventoryPage() {
                               <button
                                 type="button"
                                 disabled={actingOnId === v.id}
-                                onClick={() => reviewVehicle(v.id, "approve")}
+                                onClick={() =>
+                                  setApproveTarget({
+                                    id: v.id,
+                                    summary: buildVehiclePublishSummary({
+                                      year: Number(display.year),
+                                      make: String(display.make),
+                                      model: String(display.model),
+                                      trim: display.trim ? String(display.trim) : undefined,
+                                      price:
+                                        display.listed_price != null
+                                          ? Number(display.listed_price) || 0
+                                          : Number(display.price) || 0,
+                                      price_currency:
+                                        display.price_currency ?? undefined,
+                                      mileage: Number(display.mileage) || 0,
+                                      color: display.color ? String(display.color) : undefined,
+                                      status: String(display.status ?? "available"),
+                                      location: String(display.location ?? ""),
+                                      body_type: display.body_type as VehicleInput["body_type"],
+                                      fuel_type: display.fuel_type as VehicleInput["fuel_type"],
+                                      transmission:
+                                        display.transmission as VehicleInput["transmission"],
+                                      condition: display.condition as VehicleInput["condition"],
+                                      primary_image_url:
+                                        display.primary_image_url ??
+                                        display.images?.[0] ??
+                                        undefined,
+                                      additional_images: display.additional_images ?? undefined,
+                                      images: display.images,
+                                      gallery: display.gallery,
+                                      featured: Boolean(display.featured),
+                                    }),
+                                  })
+                                }
                                 className="inline-flex items-center gap-1 text-[var(--platform-success)] hover:underline disabled:opacity-50"
                               >
                                 <Check className="size-3" />
@@ -1084,6 +1362,20 @@ export default function InventoryPage() {
         )}
       </ConfirmDialog>
 
+      {approveTarget ? (
+        <VehiclePublishConfirmDialog
+          open={Boolean(approveTarget)}
+          onOpenChange={(open) => {
+            if (!open) setApproveTarget(null);
+          }}
+          summary={approveTarget.summary}
+          mode="approve"
+          onConfirm={async () => {
+            await reviewVehicle(approveTarget.id, "approve");
+          }}
+        />
+      ) : null}
+
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => {
@@ -1097,9 +1389,23 @@ export default function InventoryPage() {
         }
         confirmLabel="Move to trash"
         destructive
+        confirmPhrase={DELETE_CONFIRM_PHRASE}
         onConfirm={async () => {
           if (deleteTarget) await deleteVehicle(deleteTarget.id, deleteTarget.name);
         }}
+      />
+
+      <ConfirmDialog
+        open={bulkTrashConfirm}
+        onOpenChange={(open) => {
+          if (!open && !bulkActing) setBulkTrashConfirm(false);
+        }}
+        title="Move selected vehicles to trash?"
+        description={`Move ${selectedIds.size} vehicle${selectedIds.size === 1 ? "" : "s"} to trash? They will be removed from inventory and the public site, but kept in Trash where they can be restored.`}
+        confirmLabel="Move to trash"
+        destructive
+        confirmPhrase={DELETE_CONFIRM_PHRASE}
+        onConfirm={applyBulkTrash}
       />
     </div>
   );

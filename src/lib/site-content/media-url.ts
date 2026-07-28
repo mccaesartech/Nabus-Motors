@@ -1,5 +1,19 @@
 import { categoryPhotoUrlFor, isValidImageUrl } from "@/lib/data/vehicle-images";
 
+/** True when the URL is a public Supabase Storage object (already CDN-served). */
+export function isSupabaseStoragePublicUrl(url: string): boolean {
+  const trimmed = url.trim();
+  if (!trimmed || !trimmed.includes("/storage/v1/object/public/")) return false;
+
+  if (trimmed.startsWith("/storage/v1/")) return true;
+
+  try {
+    return new URL(trimmed).hostname.toLowerCase().endsWith(".supabase.co");
+  } catch {
+    return false;
+  }
+}
+
 /** Turn relative Supabase storage paths into absolute public URLs. */
 export function normalizeMediaUrl(url: string): string {
   const trimmed = url.trim();

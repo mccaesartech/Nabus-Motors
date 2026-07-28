@@ -32,6 +32,14 @@ function buildChips(filters: VehicleFilters, currency: string): ChipDef[] {
   const chips: ChipDef[] = [];
   const fulfillment = resolveFulfillmentMode(filters);
 
+  if (filters.q) {
+    chips.push({
+      key: "q",
+      label: `Search: ${filters.q}`,
+      clear: { q: undefined },
+    });
+  }
+
   if (fulfillment !== "all") {
     const modeLabel =
       FULFILLMENT_MODES.find((m) => m.value === fulfillment)?.label ?? fulfillment;

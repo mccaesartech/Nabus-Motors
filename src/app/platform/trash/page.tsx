@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Printer, RotateCcw, Trash2 } from "lucide-react";
-import { ConfirmDialog } from "@/components/platform/confirm-dialog";
+import {
+  ConfirmDialog,
+  DELETE_CONFIRM_PHRASE,
+} from "@/components/platform/confirm-dialog";
 import { PageHeader } from "@/components/platform/page-header";
 import { PlatformDateTime } from "@/components/platform/platform-datetime";
 import { adminLoginPath } from "@/lib/admin/paths";
-import { isAdminAuthError } from "@/lib/admin/client";
+import { adminErrorMessage, isAdminAuthError, parseAdminResponse } from "@/lib/admin/client";
 import { usePlatformCurrency } from "@/context/platform-currency-context";
 import { usePlatformSession } from "@/components/platform/platform-shell";
 import {
@@ -36,7 +39,12 @@ export default function TrashPage() {
   const router = useRouter();
   const session = usePlatformSession();
   const { formatPrice } = usePlatformCurrency();
-  const isOwner = session?.role === "owner";
+  const canRestore =
+    session?.role === "owner" ||
+    session?.role === "super_admin" ||
+    session?.role === "manager";
+  const canPermanentDelete =
+    session?.role === "owner" || session?.role === "super_admin";
   const [items, setItems] = useState<PlatformTrashRow[]>([]);
   const [summary, setSummary] = useState<TrashSummary | null>(null);
   const [total, setTotal] = useState(0);
@@ -49,6 +57,10 @@ export default function TrashPage() {
   const [restoreTarget, setRestoreTarget] = useState<PlatformTrashRow | null>(null);
   const [restoreStatus, setRestoreStatus] = useState<string>("available");
   const [deleteTarget, setDeleteTarget] = useState<PlatformTrashRow | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bulkRestoreConfirm, setBulkRestoreConfirm] = useState(false);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [bulkActing, setBulkActing] = useState(false);
 
   const load = useCallback(async () => {
     const params = new URLSearchParams();
@@ -71,6 +83,7 @@ export default function TrashPage() {
     setItems(json.items ?? []);
     setTotal(json.total ?? 0);
     setSummary(json.summary ?? null);
+    setSelectedIds(new Set());
     setLoading(false);
   }, [router, entityType, deletedBy, dateFrom, dateTo]);
 
@@ -93,31 +106,159 @@ export default function TrashPage() {
     }
   }, [restoreTarget, defaultRestoreStatus]);
 
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllVisible() {
+    const visibleIds = items.map((item) => item.id);
+    const allSelected =
+      visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        visibleIds.forEach((id) => next.delete(id));
+      } else {
+        visibleIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  }
+
   async function restoreItem(id: string, vehicleStatus?: string) {
+    setToast("Restoring…");
+    setItems((prev) => prev.filter((item) => item.id !== id));
+    setRestoreTarget(null);
+    setSelectedIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+
     const res = await fetch(`/api/admin/trash/${encodeURIComponent(id)}/restore`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(vehicleStatus ? { vehicleStatus } : {}),
     });
-    const json = await res.json();
-    if (res.ok) {
+    const json = await parseAdminResponse(res);
+    if (res.ok && json.ok !== false) {
       setToast("Item restored.");
-      load();
+      void load();
     } else {
-      setToast(json.message ?? "Could not restore item.");
+      setToast(adminErrorMessage(json, "Could not restore item."));
+      void load();
     }
   }
 
   async function permanentlyDelete(id: string) {
+    setToast("Deleting…");
+    setItems((prev) => prev.filter((item) => item.id !== id));
+    setDeleteTarget(null);
+    setSelectedIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+
     const res = await fetch(`/api/admin/trash/${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
-    const json = await res.json();
-    if (res.ok) {
+    const json = await parseAdminResponse(res);
+    if (res.ok && json.ok !== false) {
       setToast("Item permanently deleted.");
-      load();
+      void load();
     } else {
-      setToast(json.message ?? "Could not delete item.");
+      setToast(adminErrorMessage(json, "Could not delete item."));
+      void load();
+    }
+  }
+
+  async function applyBulkRestore() {
+    const ids = [...selectedIds];
+    if (ids.length === 0 || !canRestore) return;
+    setBulkActing(true);
+    setBulkRestoreConfirm(false);
+    setToast(`Restoring ${ids.length} item${ids.length === 1 ? "" : "s"}…`);
+    const idSet = new Set(ids);
+    setItems((prev) => prev.filter((item) => !idSet.has(item.id)));
+    setSelectedIds(new Set());
+
+    const res = await fetch("/api/admin/trash", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    const json = await parseAdminResponse(res);
+    setBulkActing(false);
+    await load();
+
+    const restoredCount = Array.isArray(json.restoredIds)
+      ? json.restoredIds.length
+      : res.ok && json.ok !== false
+        ? ids.length
+        : 0;
+    const failedCount = Array.isArray(json.failed)
+      ? json.failed.length
+      : Math.max(0, ids.length - restoredCount);
+
+    if (res.ok && json.ok !== false && failedCount === 0) {
+      setToast(`Restored ${ids.length} item${ids.length === 1 ? "" : "s"}.`);
+    } else if (restoredCount > 0) {
+      setToast(
+        `Restored ${restoredCount} of ${ids.length} items. Some restores failed.`
+      );
+    } else {
+      setToast(adminErrorMessage(json, "Could not restore items."));
+    }
+  }
+
+  async function applyBulkPermanentDelete() {
+    const ids = [...selectedIds];
+    if (ids.length === 0 || !canPermanentDelete) return;
+    setBulkActing(true);
+    setBulkDeleteConfirm(false);
+    setToast(
+      `Permanently deleting ${ids.length} item${ids.length === 1 ? "" : "s"}…`
+    );
+    const idSet = new Set(ids);
+    setItems((prev) => prev.filter((item) => !idSet.has(item.id)));
+    setSelectedIds(new Set());
+
+    const res = await fetch("/api/admin/trash", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    const json = await parseAdminResponse(res);
+    setBulkActing(false);
+    await load();
+
+    const deletedCount = Array.isArray(json.deletedIds)
+      ? json.deletedIds.length
+      : res.ok && json.ok !== false
+        ? ids.length
+        : 0;
+    const failedCount = Array.isArray(json.failed)
+      ? json.failed.length
+      : Math.max(0, ids.length - deletedCount);
+
+    if (res.ok && json.ok !== false && failedCount === 0) {
+      setToast(
+        `Permanently deleted ${ids.length} item${ids.length === 1 ? "" : "s"}.`
+      );
+    } else if (deletedCount > 0) {
+      setToast(
+        `Permanently deleted ${deletedCount} of ${ids.length} items. Some deletions failed.`
+      );
+    } else {
+      setToast(adminErrorMessage(json, "Could not delete items."));
     }
   }
 
@@ -135,11 +276,18 @@ export default function TrashPage() {
     count: summary?.byType[type] ?? 0,
   })).filter((row) => row.count > 0);
 
+  const allVisibleSelected =
+    items.length > 0 && items.every((item) => selectedIds.has(item.id));
+
   return (
     <div className="space-y-6 print:space-y-4">
       <PageHeader
         title="Trash"
-        description="Deleted records are kept here so mistakes can be undone. Restore items or permanently remove them (owner only)."
+        description={
+          canPermanentDelete
+            ? "Deleted records are kept here so mistakes can be undone. Restore items or permanently remove them."
+            : "Deleted records are kept here so mistakes can be undone. Restore items as needed. Permanent delete requires owner or super admin."
+        }
         breadcrumb="Platform / Trash"
       />
 
@@ -274,10 +422,57 @@ export default function TrashPage() {
       </div>
 
       <div className="platform-card overflow-hidden rounded-xl">
+        {canRestore && selectedIds.size > 0 && (
+          <div className="flex flex-wrap items-center gap-3 border-b border-[var(--platform-border)] bg-[var(--platform-bg-secondary)] px-4 py-3 print:hidden">
+            <p className="text-sm text-[var(--platform-text)]">
+              <span className="font-medium">{selectedIds.size}</span> selected
+            </p>
+            <button
+              type="button"
+              disabled={bulkActing}
+              onClick={() => setBulkRestoreConfirm(true)}
+              className="platform-btn-ghost text-xs disabled:opacity-50"
+            >
+              <RotateCcw className="size-3.5" />
+              Restore
+            </button>
+            {canPermanentDelete && (
+              <button
+                type="button"
+                disabled={bulkActing}
+                onClick={() => setBulkDeleteConfirm(true)}
+                className="platform-btn-ghost text-xs text-[var(--platform-danger)] disabled:opacity-50"
+              >
+                <Trash2 className="size-3.5" />
+                Delete forever
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={bulkActing}
+              onClick={() => setSelectedIds(new Set())}
+              className="text-xs text-[var(--platform-text-secondary)] hover:text-[var(--platform-text)] disabled:opacity-50"
+            >
+              Clear selection
+            </button>
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="platform-table w-full text-left text-sm">
             <thead>
               <tr className="text-xs text-[var(--platform-text-secondary)]">
+                {canRestore && (
+                  <th className="px-3 py-3 font-medium print:hidden">
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={toggleSelectAllVisible}
+                      disabled={items.length === 0 || bulkActing}
+                      className="size-4 rounded border-[var(--platform-border)]"
+                      aria-label="Select all visible trash items"
+                    />
+                  </th>
+                )}
                 <th className="px-4 py-3 font-medium">Type</th>
                 <th className="px-4 py-3 font-medium">Name</th>
                 <th className="px-4 py-3 font-medium">Activity record</th>
@@ -288,7 +483,7 @@ export default function TrashPage() {
               {items.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={4}
+                    colSpan={canRestore ? 5 : 4}
                     className="px-4 py-10 text-center text-[var(--platform-text-secondary)]"
                   >
                     Trash is empty.
@@ -297,6 +492,18 @@ export default function TrashPage() {
               ) : (
                 items.map((item) => (
                   <tr key={item.id} className="border-t border-[var(--platform-border)]">
+                    {canRestore && (
+                      <td className="px-3 py-3 align-middle print:hidden">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(item.id)}
+                          onChange={() => toggleSelected(item.id)}
+                          disabled={bulkActing}
+                          className="size-4 rounded border-[var(--platform-border)]"
+                          aria-label={`Select ${item.entity_label}`}
+                        />
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-[var(--platform-text-secondary)]">
                       {TRASH_ENTITY_LABELS[item.entity_type] ?? item.entity_type}
                     </td>
@@ -323,18 +530,22 @@ export default function TrashPage() {
                     </td>
                     <td className="px-4 py-3 print:hidden">
                       <div className="flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          className="platform-btn-ghost text-xs"
-                          onClick={() => setRestoreTarget(item)}
-                        >
-                          <RotateCcw className="size-3.5" />
-                          Restore
-                        </button>
-                        {isOwner && (
+                        {canRestore && (
+                          <button
+                            type="button"
+                            className="platform-btn-ghost text-xs"
+                            disabled={bulkActing}
+                            onClick={() => setRestoreTarget(item)}
+                          >
+                            <RotateCcw className="size-3.5" />
+                            Restore
+                          </button>
+                        )}
+                        {canPermanentDelete && (
                           <button
                             type="button"
                             className="platform-btn-ghost text-xs text-[var(--platform-danger)]"
+                            disabled={bulkActing}
                             onClick={() => setDeleteTarget(item)}
                           >
                             <Trash2 className="size-3.5" />
@@ -394,9 +605,34 @@ export default function TrashPage() {
         description={`"${deleteTarget?.entity_label ?? "This item"}" will be permanently removed from the database. This cannot be undone.`}
         confirmLabel="Delete permanently"
         destructive
+        confirmPhrase={DELETE_CONFIRM_PHRASE}
         onConfirm={async () => {
           if (deleteTarget) await permanentlyDelete(deleteTarget.id);
         }}
+      />
+
+      <ConfirmDialog
+        open={bulkRestoreConfirm}
+        onOpenChange={(open) => {
+          if (!open && !bulkActing) setBulkRestoreConfirm(false);
+        }}
+        title="Restore selected items?"
+        description={`Restore ${selectedIds.size} item${selectedIds.size === 1 ? "" : "s"} from trash? Soft-deleted records will return to their previous state (vehicles keep their prior inventory status).`}
+        confirmLabel="Restore"
+        onConfirm={applyBulkRestore}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteConfirm}
+        onOpenChange={(open) => {
+          if (!open && !bulkActing) setBulkDeleteConfirm(false);
+        }}
+        title="Permanently delete selected items?"
+        description={`Permanently delete ${selectedIds.size} item${selectedIds.size === 1 ? "" : "s"} from the database? This cannot be undone.`}
+        confirmLabel="Delete permanently"
+        destructive
+        confirmPhrase={DELETE_CONFIRM_PHRASE}
+        onConfirm={applyBulkPermanentDelete}
       />
     </div>
   );

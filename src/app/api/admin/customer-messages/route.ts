@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePermission } from "@/lib/admin/auth";
+import { canManageTrash, requirePermission } from "@/lib/admin/auth";
 import {
   buildConversationSummaries,
   claimSupportTicket,
@@ -24,6 +24,7 @@ import {
 } from "@/lib/platform/customer-chat-notifications";
 import { notifyCustomerStaffMessage } from "@/lib/customer/notifications-server";
 import { formatCustomerNotificationFeedback } from "@/lib/notifications/notification-status";
+import { normalizeBatchIds, softDeleteEntities } from "@/lib/platform/trash";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 
 export async function GET(req: NextRequest) {
@@ -66,6 +67,7 @@ export async function GET(req: NextRequest) {
     ok: true,
     conversations,
     canOversight,
+    canDelete: canManageTrash(auth.auth),
     ...(customers ? { customers } : {}),
     ...(platformUsers ? { platformUsers } : {}),
   });
@@ -277,6 +279,120 @@ export async function POST(req: NextRequest) {
     notification: notificationResult,
     notificationMessage: feedback.message,
     notificationVariant: feedback.variant,
+  });
+}
+
+export async function DELETE(req: NextRequest) {
+  const auth = await requirePermission("messages");
+  if (!auth.ok) {
+    return NextResponse.json({ ok: false, message: auth.message }, { status: auth.status });
+  }
+
+  if (!canManageTrash(auth.auth)) {
+    return NextResponse.json(
+      { ok: false, message: "Only owners, super admins, and managers can delete support tickets." },
+      { status: 403 }
+    );
+  }
+
+  const supabase = createAdminSupabase();
+  if (!supabase) {
+    return NextResponse.json({ ok: false, message: "Not configured" }, { status: 503 });
+  }
+
+  const queryId = req.nextUrl.searchParams.get("id");
+  let ids: string[] = [];
+  if (queryId?.trim()) {
+    ids = [queryId.trim()];
+  } else {
+    const body = (await req.json().catch(() => ({}))) as { ids?: unknown; id?: unknown };
+    if (typeof body.id === "string" && body.id.trim()) {
+      ids = [body.id.trim()];
+    } else {
+      ids = normalizeBatchIds(body.ids);
+    }
+  }
+
+  if (ids.length === 0) {
+    return NextResponse.json({ ok: false, message: "Missing id" }, { status: 400 });
+  }
+
+  const batch = await softDeleteEntities(supabase, auth.auth, "support_ticket", ids);
+
+  if (batch.deletedIds.length > 0) {
+    const messageIds =
+      (
+        await supabase
+          .from("customer_conversation_messages")
+          .select("id")
+          .in("conversation_id", batch.deletedIds)
+      ).data?.map((row) => String(row.id)) ?? [];
+
+    await Promise.all([
+      supabase
+        .from("admin_notifications")
+        .delete()
+        .eq("source_table", "customer_conversations")
+        .in("source_id", batch.deletedIds),
+      messageIds.length > 0
+        ? supabase
+            .from("admin_notifications")
+            .delete()
+            .eq("source_table", "customer_conversation_messages")
+            .in("source_id", messageIds)
+        : Promise.resolve(),
+    ]);
+
+    await logPlatformActivity(
+      auth.auth,
+      "ticket_deleted",
+      batch.deletedIds.length === 1
+        ? batch.deletedIds[0]
+        : `${batch.deletedIds.length} support tickets`
+    );
+  }
+
+  if (batch.deletedIds.length === 0) {
+    const first = batch.failed[0];
+    const message = first?.message ?? "Could not move tickets to trash.";
+    const status =
+      /deleted_at/i.test(message) || /schema cache/i.test(message)
+        ? 503
+        : first?.message === "Record not found."
+          ? 404
+          : 500;
+    if (status === 503) {
+      const { reportSchemaIssue } = await import("@/lib/observability/schema-issue");
+      reportSchemaIssue({
+        table: "customer_conversations",
+        column: "deleted_at",
+        migration: "079_support_ticket_soft_delete.sql",
+        source: "api.admin.customer-messages.DELETE",
+        message,
+      });
+    }
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          status === 503
+            ? "Support ticket trash is temporarily unavailable. Please try again later."
+            : message,
+        failed: batch.failed,
+        deletedIds: [],
+      },
+      { status }
+    );
+  }
+
+  return NextResponse.json({
+    ok: true,
+    deletedIds: batch.deletedIds,
+    failed: batch.failed,
+    message:
+      batch.deletedIds.length === 1
+        ? "Ticket moved to trash."
+        : `${batch.deletedIds.length} tickets moved to trash.`,
   });
 }
 

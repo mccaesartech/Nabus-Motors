@@ -1,3 +1,16 @@
+/** Hostnames valid for Supabase project URL (default or Custom Domain for Auth). */
+function isAllowedSupabaseProjectHost(hostname: string): boolean {
+  if (hostname.endsWith(".supabase.co")) return true;
+  if (hostname.endsWith(".supabase.com") || hostname === "supabase.co") {
+    return false;
+  }
+  if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]") {
+    return false;
+  }
+  // Custom Domain (Pro+): e.g. auth.truegoshen.com — see docs/GOOGLE_AUTH.md
+  return hostname.includes(".");
+}
+
 /** Trim and validate Supabase env vars (common copy/paste mistakes). */
 export function getSupabaseUrl(): string | null {
   const raw = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL)?.trim();
@@ -12,10 +25,11 @@ export function getSupabaseUrl(): string | null {
     return null;
   }
 
-  // Must be https://xxxx.supabase.co (no trailing path)
+  // https://xxxx.supabase.co or https://auth.yourdomain.com (no trailing path)
   try {
     const parsed = new URL(raw);
-    if (!parsed.hostname.endsWith(".supabase.co")) return null;
+    if (parsed.pathname !== "/" && parsed.pathname !== "") return null;
+    if (!isAllowedSupabaseProjectHost(parsed.hostname)) return null;
     return `${parsed.protocol}//${parsed.hostname}`;
   } catch {
     return null;

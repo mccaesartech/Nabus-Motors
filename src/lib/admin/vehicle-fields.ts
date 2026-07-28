@@ -27,7 +27,13 @@ export type VehicleInput = {
   model: string;
   year: number;
   trim?: string;
+  /**
+   * List price amount in `price_currency` (what the admin types).
+   * Persisted as `listed_price`; converted to USD for `vehicles.price`.
+   */
   price: number;
+  /** ISO currency for the entered list price (e.g. GHS, USD). */
+  price_currency?: string;
   mileage: number;
   fuel_type: FuelType | string;
   transmission: Transmission | string;
@@ -135,13 +141,14 @@ export function buildVehicleSlug(input: Pick<VehicleInput, "year" | "make" | "mo
   return parts.join("-");
 }
 
-export function emptyVehicleForm(): VehicleInput {
+export function emptyVehicleForm(defaultPriceCurrency = "GHS"): VehicleInput {
   return {
     make: "",
     model: "",
     year: new Date().getFullYear(),
     trim: "",
     price: 0,
+    price_currency: defaultPriceCurrency,
     mileage: 0,
     fuel_type: "Petrol",
     transmission: "Automatic",

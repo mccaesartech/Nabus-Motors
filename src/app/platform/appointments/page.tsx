@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
+import {
+  ConfirmDialog,
+  DELETE_CONFIRM_PHRASE,
+} from "@/components/platform/confirm-dialog";
 import { PageHeader } from "@/components/platform/page-header";
 import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
@@ -42,6 +46,7 @@ export default function AppointmentsPage() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [toastVariant, setToastVariant] = useState<NotificationFeedbackVariant>("success");
+  const [deleteTarget, setDeleteTarget] = useState<Appointment | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/appointments");
@@ -74,9 +79,9 @@ export default function AppointmentsPage() {
     load();
   }
 
-  async function removeAppointment(id: string) {
-    if (!confirm("Delete this appointment?")) return;
-    await fetch(`/api/admin/appointments?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+  async function removeAppointment(appt: Appointment) {
+    await fetch(`/api/admin/appointments?id=${encodeURIComponent(appt.id)}`, { method: "DELETE" });
+    setDeleteTarget(null);
     load();
   }
 
@@ -175,7 +180,7 @@ export default function AppointmentsPage() {
                       <button
                         type="button"
                         className="platform-btn-ghost text-[var(--platform-error)]"
-                        onClick={() => void removeAppointment(appt.id)}
+                        onClick={() => setDeleteTarget(appt)}
                       >
                         <Trash2 className="size-4" />
                       </button>
@@ -187,6 +192,25 @@ export default function AppointmentsPage() {
           </tbody>
         </table>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="Delete appointment?"
+        description={
+          deleteTarget
+            ? `Permanently delete the appointment for ${deleteTarget.name}? This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        destructive
+        confirmPhrase={DELETE_CONFIRM_PHRASE}
+        onConfirm={async () => {
+          if (deleteTarget) await removeAppointment(deleteTarget);
+        }}
+      />
     </div>
   );
 }

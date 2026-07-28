@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
-import Link from "next/link";
-import { platformPath } from "@/lib/platform/paths";
 
 type DbHealth = {
   connected: boolean;
@@ -11,6 +9,10 @@ type DbHealth = {
   tables?: Record<string, boolean>;
 };
 
+/**
+ * Only surface hard connectivity / core-table failures.
+ * Optional-table and migration gaps are logged server-side (Sentry), not shown to owners.
+ */
 export function PlatformDbBanner() {
   const [db, setDb] = useState<DbHealth | null>(null);
 
@@ -25,22 +27,13 @@ export function PlatformDbBanner() {
 
   if (!db) return null;
 
-  const freightTableMissing = db.tables?.freight_quote_requests === false;
   const coreDown =
     db.connected === false ||
     db.tables?.vehicles === false ||
     db.tables?.site_content === false ||
     db.tables?.site_settings === false;
-  const optionalOnlyWarning =
-    Boolean(db.error) &&
-    !coreDown &&
-    typeof db.error === "string" &&
-    db.error.startsWith("Optional tables unavailable");
 
-  // Soften: optional-table warnings stay quiet in the shell; only block on core/freight.
-  const showBanner = freightTableMissing || (Boolean(db.error) && !optionalOnlyWarning);
-
-  if (!showBanner) return null;
+  if (!coreDown) return null;
 
   return (
     <div
@@ -51,27 +44,12 @@ export function PlatformDbBanner() {
         <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" aria-hidden />
         <div className="space-y-1">
           <p className="font-medium text-amber-900 dark:text-amber-100">
-            Database setup needs attention
+            Database connection needs attention
           </p>
-          {freightTableMissing && (
-            <p className="text-[var(--platform-text-secondary)]">
-              Freight quote requests are not being saved — the{" "}
-              <code className="text-xs">freight_quote_requests</code> table is missing. Confirm
-              freight migrations are applied in Supabase, then refresh.
-            </p>
-          )}
-          {db.error && !freightTableMissing && (
-            <p className="text-[var(--platform-text-secondary)]">{db.error}</p>
-          )}
-          {freightTableMissing && (
-            <p className="text-[var(--platform-text-secondary)]">
-              Existing quotes may be in{" "}
-              <Link href={platformPath("freight/quotes")} className="text-[var(--platform-accent)] hover:underline">
-                Platform → Freight → Quote Requests
-              </Link>{" "}
-              once the freight tables are available.
-            </p>
-          )}
+          <p className="text-[var(--platform-text-secondary)]">
+            Core inventory or site content could not be reached. Refresh in a moment. If this
+            persists, contact your developer — details are logged for ops.
+          </p>
         </div>
       </div>
     </div>

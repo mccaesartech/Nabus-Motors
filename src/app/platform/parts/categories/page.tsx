@@ -4,6 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, Trash2 } from "lucide-react";
+import {
+  ConfirmDialog,
+  DELETE_CONFIRM_PHRASE,
+} from "@/components/platform/confirm-dialog";
 import { PageHeader } from "@/components/platform/page-header";
 import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
@@ -24,6 +28,7 @@ export default function PartsCategoriesPage() {
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<PartCategory | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/parts/categories");
@@ -63,9 +68,9 @@ export default function PartsCategoriesPage() {
     load();
   }
 
-  async function removeCategory(id: string) {
-    if (!confirm("Delete this category?")) return;
-    await fetch(`/api/admin/parts/categories?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+  async function removeCategory(cat: PartCategory) {
+    await fetch(`/api/admin/parts/categories?id=${encodeURIComponent(cat.id)}`, { method: "DELETE" });
+    setDeleteTarget(null);
     load();
   }
 
@@ -139,7 +144,7 @@ export default function PartsCategoriesPage() {
                   <button
                     type="button"
                     className="platform-btn-ghost text-[var(--platform-error)]"
-                    onClick={() => void removeCategory(cat.id)}
+                    onClick={() => setDeleteTarget(cat)}
                   >
                     <Trash2 className="size-4" />
                   </button>
@@ -149,6 +154,25 @@ export default function PartsCategoriesPage() {
           </tbody>
         </table>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="Delete category?"
+        description={
+          deleteTarget
+            ? `Permanently delete the “${deleteTarget.name}” category? This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        destructive
+        confirmPhrase={DELETE_CONFIRM_PHRASE}
+        onConfirm={async () => {
+          if (deleteTarget) await removeCategory(deleteTarget);
+        }}
+      />
     </div>
   );
 }

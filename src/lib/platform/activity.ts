@@ -22,6 +22,7 @@ export type ActivityAction =
   | "ticket_claimed"
   | "ticket_closed"
   | "ticket_reassigned"
+  | "ticket_deleted"
   | "team_message_sent"
   | "team_group_created"
   | "team_group_updated"

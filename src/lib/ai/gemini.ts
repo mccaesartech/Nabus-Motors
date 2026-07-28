@@ -5,8 +5,24 @@ import type { VehicleAiAction, VehicleAiSuggestions } from "@/lib/ai/vehicle-ai-
 /** Default model — widely available on AI Studio free and paid tiers. */
 export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 
+/**
+ * Preferred model for inventory vehicle AI (vision fill, listing chat, paint).
+ * Stronger reasoning than Flash; Flash remains the automatic fallback.
+ */
+export const DEFAULT_GEMINI_INVENTORY_MODEL = "gemini-2.5-pro";
+
 /** Fallback order when the primary model is unavailable or has zero free-tier quota. */
 export const GEMINI_MODEL_FALLBACKS = [
+  "gemini-2.5-flash",
+  "gemini-1.5-flash",
+] as const;
+
+/**
+ * Inventory AI candidates: Pro first for thorough vision + structured edits,
+ * then Flash variants if Pro is unavailable / rate-limited.
+ */
+export const GEMINI_INVENTORY_MODEL_FALLBACKS = [
+  "gemini-2.5-pro",
   "gemini-2.5-flash",
   "gemini-1.5-flash",
 ] as const;
@@ -65,8 +81,30 @@ export function getGeminiModelCandidates(): string[] {
   return candidates;
 }
 
+/**
+ * Inventory vehicle AI models: prefer Pro (or explicit GEMINI_MODEL), then Flash.
+ * Explicit GEMINI_MODEL always wins as primary so ops can pin a model.
+ */
+export function getGeminiInventoryModelCandidates(): string[] {
+  const configured = process.env.GEMINI_MODEL?.trim();
+  const primary = normalizeGeminiModel(
+    configured || DEFAULT_GEMINI_INVENTORY_MODEL
+  );
+  const candidates: string[] = [primary];
+  for (const fallback of GEMINI_INVENTORY_MODEL_FALLBACKS) {
+    if (!candidates.includes(fallback)) {
+      candidates.push(fallback);
+    }
+  }
+  return candidates;
+}
+
 export function getGeminiModel(): string {
   return getGeminiModelCandidates()[0];
+}
+
+export function getGeminiInventoryModel(): string {
+  return getGeminiInventoryModelCandidates()[0];
 }
 
 /**
@@ -211,11 +249,23 @@ export function geminiErrorToHttp(err: unknown): {
   return { message, status: 500 };
 }
 
-type ContentPart = { text: string };
+export type GeminiContentPart =
+  | { text: string }
+  | { inlineData: { data: string; mimeType: string } };
+
+export type GenerateGeminiTextOptions = {
+  maxRetries?: number;
+  /** Prefer inventory Pro→Flash chain (vision fill / listing chat). */
+  inventoryModel?: boolean;
+  /** Lower = more deterministic structured JSON (default 0.4 for inventory). */
+  temperature?: number;
+  /** Ask Gemini to return application/json (more reliable parsing). */
+  jsonMode?: boolean;
+};
 
 export async function generateGeminiText(
-  parts: ContentPart[],
-  options?: { maxRetries?: number }
+  parts: GeminiContentPart[],
+  options?: GenerateGeminiTextOptions
 ): Promise<string> {
   const apiKey = getGeminiApiKey();
   if (!apiKey) {
@@ -223,14 +273,24 @@ export async function generateGeminiText(
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const modelCandidates = getGeminiModelCandidates();
+  const modelCandidates = options?.inventoryModel
+    ? getGeminiInventoryModelCandidates()
+    : getGeminiModelCandidates();
   const maxRetries = options?.maxRetries ?? 3;
+  const temperature = options?.temperature;
+  const jsonMode = Boolean(options?.jsonMode);
 
   let lastError: unknown;
 
   for (let modelIndex = 0; modelIndex < modelCandidates.length; modelIndex++) {
     const modelName = modelCandidates[modelIndex];
-    const model = genAI.getGenerativeModel({ model: modelName });
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      generationConfig: {
+        ...(typeof temperature === "number" ? { temperature } : {}),
+        ...(jsonMode ? { responseMimeType: "application/json" as const } : {}),
+      },
+    });
     const hasNextModel = modelIndex < modelCandidates.length - 1;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -294,34 +354,38 @@ export async function generateVehicleSuggestions(
 
   const actionPrompt =
     action === "improve_description"
-      ? "Rewrite only the listing description to be more compelling. Do not change other fields unless the owner request asks for it."
+      ? "Rewrite only the listing description to be more compelling for Ghana / West Africa buyers. Do not change other fields unless the owner request asks for it."
       : action === "fill_fields"
-        ? "Review all listing text fields (description, trim, color, engine_size) and suggest improvements where empty or weak. Fill gaps using only plausible values from the specs provided."
+        ? "Treat the listing like a blank or unreliable form. Prefer filling empty fields and correcting weak/wrong labels (especially color) from any evidence in the owner request. Do not merely echo existing labels. Suggest make/model/year/color/trim/engine_size when the request or context supports them. Prefer complete structured fieldUpdates over vague notes."
         : "";
 
-  const systemPrompt = `You are an expert automotive listing copywriter for True Goshen Auto, a premium vehicle dealership in Ghana and West Africa.
+  const systemPrompt = `You are a senior automotive inventory copywriter and listing analyst for True Goshen Auto, a premium vehicle dealership in Ghana and West Africa.
 Given the current vehicle listing data and the owner's request, return ONLY valid JSON (no markdown fences) with this shape:
 {
   "description": "improved listing description or omit if unchanged",
   "title": "suggested listing title e.g. 2024 BYD Atto 3 Premium or omit",
-  "fieldUpdates": { "description": "...", "trim": "...", "color": "..." },
-  "notes": "brief note about what you changed"
+  "fieldUpdates": { "description": "...", "trim": "...", "color": "...", "make": "...", "model": "...", "year": 2024, "engine_size": "..." },
+  "notes": "brief note about what you changed and confidence"
 }
 Rules:
-- Keep descriptions professional, persuasive, and accurate to the specs provided.
-- Do not invent specs (mileage, price, VIN) that are not in the input.
+- Keep descriptions professional, persuasive, and accurate to known facts.
+- Form "color" is provisional — if the owner says the paint differs or asks you to detect/set color, put the corrected color in fieldUpdates.color.
+- Do not invent mileage, price, or VIN that are not in the input or owner request.
 - fieldUpdates may only include: description, trim, color, engine_size, make, model, year.
 - Omit keys you are not changing.
-- You write listing text only. You cannot create or return image URLs or photos.
+- You write listing text only. You cannot create or return image URLs or photos. For photo-based detection, staff should use the inventory AI chat with uploaded images.
 ${actionPrompt ? `\nTask focus: ${actionPrompt}` : ""}`;
 
   const raw = (
-    await generateGeminiText([
-      { text: systemPrompt },
-      {
-        text: `Current vehicle:\n${vehicleContext}\n\nOwner request:\n${userPrompt}`,
-      },
-    ])
+    await generateGeminiText(
+      [
+        { text: systemPrompt },
+        {
+          text: `Current vehicle:\n${vehicleContext}\n\nOwner request:\n${userPrompt}`,
+        },
+      ],
+      { inventoryModel: true, jsonMode: true, temperature: 0.35 }
+    )
   ).trim();
 
   const jsonText = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");

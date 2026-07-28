@@ -414,9 +414,18 @@ export default function SettingsPage() {
                 <option value="USD">USD — US Dollar</option>
                 <option value="EUR">EUR — Euro</option>
                 <option value="GBP">GBP — British Pound</option>
+                <option value="NGN">NGN — Nigerian Naira</option>
+                <option value="ZAR">ZAR — South African Rand</option>
               </select>
+              <p className="mt-1.5 text-xs text-[var(--platform-text-secondary)]">
+                Controls platform/admin money display only. Public visitors choose their own
+                currency in the site UI — this setting never overrides them.
+              </p>
             </Field>
-            <Field label="Low-stock threshold (vehicles)">
+            <Field
+              label="Low-stock threshold (vehicles)"
+              hint="Fleet-wide: alerts when total Available vehicles fall below this number. Separate urgent alerts also fire when a specific make/model/year is down to 0–1 units left (prompting Ghana availability or Pre-order)."
+            >
               <input
                 type="number"
                 min={0}
@@ -511,7 +520,7 @@ export default function SettingsPage() {
             />
             <Field
               label="Shipment update frequency"
-              hint="How often customers receive WhatsApp/email on shipment changes. Every update includes notes and custom messages; milestones only sends status changes and one-click milestone chips."
+              hint="How often customers receive SMS/email on shipment changes. Every update includes notes and custom messages; milestones only sends status changes and one-click milestone chips."
             >
               <select
                 className="platform-input w-full"

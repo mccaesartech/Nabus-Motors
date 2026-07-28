@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import type { AccountStatus } from "@/lib/customer/account-lifecycle";
+import { effectiveAccountStatus } from "@/lib/platform/account-lifecycle-status";
 
 export type AccountLifecycleListItem = {
   id: string;
@@ -33,6 +34,16 @@ const TAB_STATUSES: Record<AccountLifecycleTab, AccountStatus[]> = {
   archived: ["archived", "deleted"],
 };
 
+const PROFILE_LIFECYCLE_SELECT =
+  "id, account_status, registration_id, email, first_name, last_name, phone, is_anonymized, deletion_requested_at, scheduled_deletion_at, retention_expires_at, deleted_at, anonymized_at, deletion_reason, created_at";
+
+function normalizeLifecycleRow(row: AccountLifecycleListItem): AccountLifecycleListItem {
+  return {
+    ...row,
+    account_status: effectiveAccountStatus(row.account_status, row.deleted_at),
+  };
+}
+
 export async function listAccountLifecycle(
   tab: AccountLifecycleTab,
   search?: string
@@ -43,12 +54,19 @@ export async function listAccountLifecycle(
   const statuses = TAB_STATUSES[tab];
   let query = supabase
     .from("profiles")
-    .select(
-      "id, account_status, registration_id, email, first_name, last_name, phone, is_anonymized, deletion_requested_at, scheduled_deletion_at, retention_expires_at, deleted_at, anonymized_at, deletion_reason, created_at"
-    )
-    .in("account_status", statuses)
+    .select(PROFILE_LIFECYCLE_SELECT)
     .order("updated_at", { ascending: false })
     .limit(200);
+
+  // Soft-deleted customers (deleted_at set) must never appear under Active /
+  // Suspended / Pending — even if account_status was left as 'active'.
+  if (tab === "archived") {
+    query = query.or(
+      `account_status.in.(${statuses.join(",")}),deleted_at.not.is.null`
+    );
+  } else {
+    query = query.in("account_status", statuses).is("deleted_at", null);
+  }
 
   const term = search?.trim();
   if (term) {
@@ -64,7 +82,7 @@ export async function listAccountLifecycle(
     return [];
   }
 
-  return (data as AccountLifecycleListItem[]) ?? [];
+  return ((data as AccountLifecycleListItem[]) ?? []).map(normalizeLifecycleRow);
 }
 
 export async function getAccountLifecycleDetail(
@@ -75,9 +93,7 @@ export async function getAccountLifecycleDetail(
 
   const { data, error } = await supabase
     .from("profiles")
-    .select(
-      "id, account_status, registration_id, email, first_name, last_name, phone, is_anonymized, deletion_requested_at, scheduled_deletion_at, retention_expires_at, deleted_at, anonymized_at, deletion_reason, created_at"
-    )
+    .select(PROFILE_LIFECYCLE_SELECT)
     .eq("id", userId)
     .maybeSingle();
 
@@ -86,7 +102,8 @@ export async function getAccountLifecycleDetail(
     return null;
   }
 
-  return (data as AccountLifecycleListItem | null) ?? null;
+  if (!data) return null;
+  return normalizeLifecycleRow(data as AccountLifecycleListItem);
 }
 
 export async function getAccountLifecycleAudit(

@@ -10,6 +10,7 @@ import {
   VALID_TRANSMISSIONS,
 } from "@/lib/vehicles/filter-config";
 import { resolveFulfillmentMode } from "@/lib/vehicles/fulfillment";
+import { sanitizePublicSearchQuery } from "@/lib/vehicles/keyword-search";
 
 const VALID_FULFILLMENT_MODES = new Set<FulfillmentMode>([
   "all",
@@ -84,6 +85,7 @@ export function parseFiltersFromSearchParams(
   const status = getParam(params, "status");
 
   const filters: VehicleFilters = {
+    q: sanitizePublicSearchQuery(getParam(params, "q")),
     make: getParam(params, "make")?.slice(0, 80),
     model: getParam(params, "model")?.slice(0, 80),
     yearMin: parsePositiveInt(getParam(params, "yearMin")),

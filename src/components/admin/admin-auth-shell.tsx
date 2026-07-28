@@ -1,7 +1,11 @@
+"use client";
+
+import { useEffect } from "react";
 import Link from "next/link";
 import { Container } from "@/components/shared/container";
 import { Logo } from "@/components/shared/logo";
 import { BackNav } from "@/components/shared/back-nav";
+import { clearPlatformHistoryGuard } from "@/lib/platform/history-guard";
 import { ROUTES } from "@/lib/routes";
 
 type AdminAuthShellProps = {
@@ -9,6 +13,11 @@ type AdminAuthShellProps = {
 };
 
 export function AdminAuthShell({ children }: AdminAuthShellProps) {
+  useEffect(() => {
+    // Login / invite are intentional exits from the workspace Back stack.
+    clearPlatformHistoryGuard();
+  }, []);
+
   return (
     <div className="flex min-h-dvh flex-col bg-[var(--platform-bg)]">
       <header className="sticky top-0 z-10 shrink-0 border-b border-[var(--platform-border)] bg-[var(--platform-bg)]/95 backdrop-blur-sm">

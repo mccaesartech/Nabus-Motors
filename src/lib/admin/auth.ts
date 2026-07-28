@@ -14,6 +14,10 @@ import {
   type PlatformPermission,
   type PlatformRole,
 } from "@/lib/platform/permissions";
+import {
+  isMissingColumnError,
+  reportSchemaIssue,
+} from "@/lib/observability/schema-issue";
 
 export type PlatformAuthContext = {
   type: "owner" | "user";
@@ -44,15 +48,44 @@ async function loadActivePlatformUser(userId: string) {
   const supabase = createAdminSupabase();
   if (!supabase) return null;
 
-  const { data, error } = await supabase
+  const primary = await supabase
     .from("platform_users")
-    .select("id, name, email, role, status, password_hash")
+    .select("id, name, email, role, status, password_hash, deleted_at")
     .eq("id", userId)
+    .is("deleted_at", null)
     .maybeSingle();
 
-  if (error || !data) return null;
+  let data = primary.data as {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    status: string;
+    password_hash: string | null;
+    deleted_at?: string | null;
+  } | null;
+  if (primary.error && isMissingColumnError(primary.error.message, "deleted_at")) {
+    reportSchemaIssue({
+      table: "platform_users",
+      column: "deleted_at",
+      migration: "078_platform_user_soft_delete.sql",
+      source: "admin.auth.loadActivePlatformUser",
+      message: primary.error.message,
+    });
+    const fallback = await supabase
+      .from("platform_users")
+      .select("id, name, email, role, status, password_hash")
+      .eq("id", userId)
+      .maybeSingle();
+    if (fallback.error || !fallback.data) return null;
+    data = { ...fallback.data, deleted_at: null };
+  } else if (primary.error || !data) {
+    return null;
+  }
+
   if (data.status !== "active" || !data.password_hash) return null;
-  return data;
+  const passwordHash: string = data.password_hash;
+  return { ...data, password_hash: passwordHash };
 }
 
 export async function verifyPlatformSessionCookie(
@@ -112,13 +145,41 @@ export async function authenticatePlatformUser(
   if (!supabase) return { status: "invalid" };
 
   const normalizedEmail = email.trim().toLowerCase();
-  const { data, error } = await supabase
+  const primary = await supabase
     .from("platform_users")
-    .select("id, name, email, role, status, password_hash")
+    .select("id, name, email, role, status, password_hash, deleted_at")
     .eq("email", normalizedEmail)
+    .is("deleted_at", null)
     .maybeSingle();
 
-  if (error || !data) return { status: "invalid" };
+  let data = primary.data as {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    status: string;
+    password_hash: string | null;
+    deleted_at?: string | null;
+  } | null;
+  if (primary.error && isMissingColumnError(primary.error.message, "deleted_at")) {
+    reportSchemaIssue({
+      table: "platform_users",
+      column: "deleted_at",
+      migration: "078_platform_user_soft_delete.sql",
+      source: "admin.auth.authenticatePlatformUser",
+      message: primary.error.message,
+    });
+    const fallback = await supabase
+      .from("platform_users")
+      .select("id, name, email, role, status, password_hash")
+      .eq("email", normalizedEmail)
+      .maybeSingle();
+    if (fallback.error || !fallback.data) return { status: "invalid" };
+    data = { ...fallback.data, deleted_at: null };
+  } else if (primary.error || !data) {
+    return { status: "invalid" };
+  }
+
   if (data.status === "disabled") return { status: "invalid" };
 
   // No password on file (invited but never activated): the first password the
@@ -237,9 +298,13 @@ export function canManageTrash(auth: PlatformAuthContext): boolean {
   );
 }
 
-/** Only the bootstrap owner or platform owner role can permanently delete from trash. */
+/** Owner or super admin can permanently delete from trash. */
 export function canPermanentlyDeleteTrash(auth: PlatformAuthContext): boolean {
-  return auth.type === "owner" || auth.role === "owner";
+  return (
+    auth.type === "owner" ||
+    auth.role === "owner" ||
+    auth.role === "super_admin"
+  );
 }
 
 export async function getPlatformAuth(): Promise<PlatformAuthContext | null> {

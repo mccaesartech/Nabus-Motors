@@ -6,19 +6,129 @@ import { generateToken, hashPassword, hashToken } from "@/lib/platform/password"
 import { buildPlatformInviteUrl } from "@/lib/platform/invite-url";
 import { logPlatformActivity } from "@/lib/platform/activity";
 import { sendPlatformInviteEmail, getPlatformEmailConfig } from "@/lib/email/platform-invite";
+import { validateEmailForSignup } from "@/lib/email/validate-email-server";
 import type { PlatformUserInviteInfo } from "@/lib/platform/modules";
 import {
   computePlatformInviteExpiresAt,
   isPlatformInviteExpired,
 } from "@/lib/platform/invite-ttl";
+import {
+  notifyTeamInviteWhatsApp,
+  notifyTeamPasswordSetWhatsApp,
+  notifyTeamRoleChangedWhatsApp,
+  formatTeamNotifyLabel,
+  type TeamNotifyResult,
+} from "@/lib/notifications/platform-team-whatsapp";
+import { getArkeselConfig, shouldPreferArkeselSms } from "@/lib/notifications/arkesel-config";
+import {
+  notDeletedFilter,
+  recordTrashEntry,
+  softDeleteEntity,
+} from "@/lib/platform/trash";
+import { assertPlatformUserDeletable } from "@/lib/platform/platform-user-delete";
+import {
+  isMissingColumnError,
+  reportSchemaIssue,
+} from "@/lib/observability/schema-issue";
 
 export const dynamic = "force-dynamic";
 
+function isMissingDeletedAtError(message: string | undefined): boolean {
+  return isMissingColumnError(message, "deleted_at");
+}
+
+function reportPlatformUsersDeletedAtIssue(message: string, source: string) {
+  reportSchemaIssue({
+    table: "platform_users",
+    column: "deleted_at",
+    migration: "078_platform_user_soft_delete.sql",
+    source,
+    message,
+  });
+}
+
+/** Owner-safe error messages — schema/ops details go to Sentry, not the UI. */
 function withSchemaMigrationHint(message: string): string {
+  if (isMissingDeletedAtError(message)) {
+    reportPlatformUsersDeletedAtIssue(message, "platform-users-api");
+    return "Could not complete that action. Please try again.";
+  }
   if (/sender_anonymized|token_plain|schema cache/i.test(message)) {
-    return "Database update required: run 026_platform_production_schema_fixes.sql in the Supabase SQL editor, then retry.";
+    reportSchemaIssue({
+      table: "platform_user_invites",
+      migration: "026_platform_production_schema_fixes.sql",
+      source: "platform-users-api",
+      message,
+    });
+    return "Could not complete that action. Please try again.";
   }
   return message;
+}
+
+function notifyPayload(result: TeamNotifyResult) {
+  return {
+    notify: {
+      channel: result.channel,
+      status: result.status,
+      label: formatTeamNotifyLabel(result),
+      detail: result.detail,
+    },
+  };
+}
+
+async function listTrashedPlatformUserIds(
+  supabase: NonNullable<ReturnType<typeof createAdminSupabase>>
+): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from("platform_trash")
+    .select("entity_id")
+    .eq("entity_type", "platform_user")
+    .is("restored_at", null)
+    .is("permanently_deleted_at", null);
+
+  if (error) {
+    console.error("[platform_user trash] list failed:", error.message);
+    return new Set();
+  }
+
+  return new Set((data ?? []).map((row) => String(row.entity_id)));
+}
+
+async function listActivePlatformUsers(
+  supabase: NonNullable<ReturnType<typeof createAdminSupabase>>
+) {
+  const filtered = await notDeletedFilter(supabase.from("platform_users").select("*")).order(
+    "created_at",
+    { ascending: false }
+  );
+
+  if (!filtered.error) {
+    return {
+      users: filtered.data ?? [],
+      error: null as { message: string } | null,
+    };
+  }
+
+  if (isMissingDeletedAtError(filtered.error.message)) {
+    reportPlatformUsersDeletedAtIssue(
+      filtered.error.message,
+      "platform-users.listActivePlatformUsers"
+    );
+    const [fallback, trashedIds] = await Promise.all([
+      supabase.from("platform_users").select("*").order("created_at", { ascending: false }),
+      listTrashedPlatformUserIds(supabase),
+    ]);
+    const users = (fallback.data ?? []).filter((row) => !trashedIds.has(String(row.id)));
+    return {
+      users,
+      error: fallback.error,
+    };
+  }
+
+  return {
+    users: filtered.data ?? [],
+    error: filtered.error,
+  };
 }
 
 async function refreshInviteForUser(
@@ -123,6 +233,15 @@ export async function GET(req: NextRequest) {
   const emailConfig = getPlatformEmailConfig();
   const inviteLinkFor = req.nextUrl.searchParams.get("inviteLinkFor");
   const isOwner = canViewInviteLinks(auth.auth);
+  const [arkeselConfig, preferSms] = await Promise.all([
+    getArkeselConfig(),
+    shouldPreferArkeselSms(),
+  ]);
+  const smsConfig = {
+    ready: arkeselConfig.smsReady,
+    preferred: preferSms,
+    configured: arkeselConfig.configured,
+  };
 
   const supabase = createAdminSupabase();
   if (!supabase) {
@@ -135,6 +254,7 @@ export async function GET(req: NextRequest) {
       roleLabels: ROLE_LABELS,
       emailConfigured: emailConfig.configured,
       emailConfig,
+      smsConfig,
       canViewInviteLinks: isOwner,
     });
   }
@@ -167,26 +287,33 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const [{ data: users, error: usersError }, { data: invites, error: invitesError }] =
-    await Promise.all([
-      supabase.from("platform_users").select("*").order("created_at", { ascending: false }),
-      isOwner
-        ? supabase
-            .from("platform_user_invites")
-            .select("id, user_id, expires_at, accepted_at, created_at, token_plain")
-            .order("created_at", { ascending: false })
-        : Promise.resolve({ data: [], error: null }),
-    ]);
+  const [usersResult, invitesResult] = await Promise.all([
+    listActivePlatformUsers(supabase),
+    isOwner
+      ? supabase
+          .from("platform_user_invites")
+          .select("id, user_id, expires_at, accepted_at, created_at, token_plain")
+          .order("created_at", { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  const { users } = usersResult;
+  const usersError = usersResult.error;
+  const invites = invitesResult.data;
+  const invitesError = invitesResult.error;
 
   if (usersError) {
     console.error("platform_users fetch failed:", usersError.message);
   }
   if (invitesError) {
     console.error("platform_user_invites fetch failed:", invitesError.message);
+    reportSchemaIssue({
+      table: "platform_user_invites",
+      migration: "026_platform_production_schema_fixes.sql",
+      source: "platform-users.GET",
+      message: invitesError.message,
+    });
   }
-
-  const inviteLinksSchemaReady = !invitesError;
-  const inviteLinksSchemaError = invitesError?.message ?? null;
 
   const inviteByUser = new Map<string, InviteRecord>();
   if (isOwner) {
@@ -233,9 +360,9 @@ export async function GET(req: NextRequest) {
     roleLabels: ROLE_LABELS,
     emailConfigured: emailConfig.configured,
     emailConfig,
+    smsConfig,
     canViewInviteLinks: isOwner,
-    inviteLinksSchemaReady,
-    inviteLinksSchemaError,
+    ...(usersError ? { usersError: usersError.message } : {}),
   });
 }
 
@@ -247,17 +374,39 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
   const name = String(body.name ?? "").trim();
-  const email = String(body.email ?? "").trim().toLowerCase();
+  const emailRaw = String(body.email ?? "").trim().toLowerCase();
   const role = normalizeRole(String(body.role ?? "staff"));
+  const phone = body.phone ? String(body.phone).trim() : null;
   const password = typeof body.password === "string" ? body.password : "";
   const confirmPassword = typeof body.confirmPassword === "string" ? body.confirmPassword : "";
 
-  if (!name || !email) {
+  if (!name || !emailRaw) {
     return NextResponse.json({ ok: false, message: "Name and email required" }, { status: 400 });
   }
 
+  const emailCheck = await validateEmailForSignup(emailRaw);
+  if (!emailCheck.ok || !emailCheck.normalized) {
+    return NextResponse.json(
+      { ok: false, message: emailCheck.message },
+      { status: 400 }
+    );
+  }
+  const email = emailCheck.normalized;
+
   if (!INVITABLE_ROLES.includes(role)) {
     return NextResponse.json({ ok: false, message: "Invalid role for invitation" }, { status: 400 });
+  }
+
+  const preferSms = await shouldPreferArkeselSms();
+  if (preferSms && !phone) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          "Phone number is required when SMS invites are enabled. Add a Ghana mobile number so the invite SMS can be sent.",
+      },
+      { status: 400 }
+    );
   }
 
   if (password) {
@@ -288,6 +437,7 @@ export async function POST(req: NextRequest) {
         name,
         email,
         role,
+        phone,
         status: "active",
         invited_at: now,
         activated_at: now,
@@ -299,7 +449,12 @@ export async function POST(req: NextRequest) {
     if (userError) {
       const duplicate = userError.message.toLowerCase().includes("duplicate");
       return NextResponse.json(
-        { ok: false, message: duplicate ? "A user with this email already exists." : userError.message },
+        {
+          ok: false,
+          message: duplicate
+            ? "A user with this email already exists."
+            : withSchemaMigrationHint(userError.message),
+        },
         { status: duplicate ? 409 : 500 }
       );
     }
@@ -309,6 +464,11 @@ export async function POST(req: NextRequest) {
       role,
       created_with_password: true,
     });
+    const notify = await notifyTeamPasswordSetWhatsApp({
+      phone: user.phone ?? phone,
+      name: user.name ?? name,
+      userId: user.id,
+    });
 
     return NextResponse.json({
       ok: true,
@@ -316,6 +476,7 @@ export async function POST(req: NextRequest) {
       user: { ...user, password_hash: undefined, role, status: "active" },
       emailSent: false,
       emailConfigured: getPlatformEmailConfig().configured,
+      ...notifyPayload(notify),
     });
   }
 
@@ -325,6 +486,7 @@ export async function POST(req: NextRequest) {
       name,
       email,
       role,
+      phone,
       status: "pending",
       invited_at: now,
     })
@@ -334,7 +496,12 @@ export async function POST(req: NextRequest) {
   if (userError) {
     const duplicate = userError.message.toLowerCase().includes("duplicate");
     return NextResponse.json(
-      { ok: false, message: duplicate ? "A user with this email already exists." : userError.message },
+      {
+        ok: false,
+        message: duplicate
+          ? "A user with this email already exists."
+          : withSchemaMigrationHint(userError.message),
+      },
       { status: duplicate ? 409 : 500 }
     );
   }
@@ -371,6 +538,13 @@ export async function POST(req: NextRequest) {
     email_sent: emailResult.emailSent,
     ...(emailResult.emailSent ? {} : { email_error: emailResult.emailError }),
   });
+  const notify = await notifyTeamInviteWhatsApp({
+    phone: user.phone ?? phone,
+    name,
+    role,
+    inviteUrl: link,
+    userId: user.id,
+  });
 
   return NextResponse.json({
     ok: true,
@@ -378,11 +552,13 @@ export async function POST(req: NextRequest) {
       ...user,
       role,
       status: "pending",
+      notify: notifyPayload(notify).notify,
     },
     ...(canViewInviteLinks(auth.auth) ? ownerInvitePayload(link, expiresAt) : {}),
     emailSent: emailResult.emailSent,
     emailConfigured: getPlatformEmailConfig().configured,
     ...(emailResult.emailSent ? {} : { emailError: emailResult.emailError }),
+    ...notifyPayload(notify),
   });
 }
 
@@ -431,10 +607,13 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "Supabase not configured" }, { status: 503 });
   }
 
+  let lastNotify: TeamNotifyResult | null = null;
+  let updatedRole: string | undefined;
+
   if (password) {
     const { data: target } = await supabase
       .from("platform_users")
-      .select("id, email, role, status")
+      .select("id, email, name, role, status, phone")
       .eq("id", id)
       .maybeSingle();
 
@@ -463,10 +642,18 @@ export async function PATCH(req: NextRequest) {
       .eq("id", id);
 
     if (passwordError) {
-      return NextResponse.json({ ok: false, message: passwordError.message }, { status: 500 });
+      return NextResponse.json(
+        { ok: false, message: withSchemaMigrationHint(passwordError.message) },
+        { status: 500 }
+      );
     }
 
     await logPlatformActivity(auth.auth, "user_password_set", target.email, { user_id: id });
+    lastNotify = await notifyTeamPasswordSetWhatsApp({
+      phone: target.phone,
+      name: target.name,
+      userId: id,
+    });
   }
 
   const updates: Record<string, string> = {};
@@ -475,11 +662,34 @@ export async function PATCH(req: NextRequest) {
   if (status) updates.status = status;
 
   if (Object.keys(updates).length > 0) {
+    const { data: before } = role
+      ? await supabase
+          .from("platform_users")
+          .select("id, name, phone, role")
+          .eq("id", id)
+          .maybeSingle()
+      : { data: null };
+
     const { error } = await supabase.from("platform_users").update(updates).eq("id", id);
     if (error) {
-      return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+      return NextResponse.json(
+        { ok: false, message: withSchemaMigrationHint(error.message) },
+        { status: 500 }
+      );
     }
     await logPlatformActivity(auth.auth, "user_updated", id, updates);
+
+    if (role) {
+      updatedRole = role;
+      if (before && normalizeRole(before.role) !== role) {
+        lastNotify = await notifyTeamRoleChangedWhatsApp({
+          phone: before.phone,
+          name: name ?? before.name,
+          role,
+          userId: id,
+        });
+      }
+    }
   }
 
   if (resendInvite || getInviteLink) {
@@ -489,7 +699,7 @@ export async function PATCH(req: NextRequest) {
 
     const { data: user } = await supabase
       .from("platform_users")
-      .select("id, name, email, role, status")
+      .select("id, name, email, role, status, phone")
       .eq("id", id)
       .maybeSingle();
 
@@ -525,6 +735,14 @@ export async function PATCH(req: NextRequest) {
       email_sent: emailResult.emailSent,
       ...(emailResult.emailSent ? {} : { email_error: emailResult.emailError }),
     });
+    const notify = await notifyTeamInviteWhatsApp({
+      phone: user.phone,
+      name: user.name,
+      role: normalizeRole(user.role),
+      inviteUrl: link,
+      userId: user.id,
+      resent: true,
+    });
 
     return NextResponse.json({
       ok: true,
@@ -532,10 +750,15 @@ export async function PATCH(req: NextRequest) {
       emailSent: emailResult.emailSent,
       ...(emailResult.emailSent ? {} : { emailError: emailResult.emailError }),
       user: { id: user.id, email: user.email, name: user.name },
+      ...notifyPayload(notify),
     });
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({
+    ok: true,
+    ...(updatedRole ? { role: updatedRole } : {}),
+    ...(lastNotify ? notifyPayload(lastNotify) : {}),
+  });
 }
 
 export async function DELETE(req: NextRequest) {
@@ -554,44 +777,153 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "Supabase not configured" }, { status: 503 });
   }
 
-  const { data: user } = await supabase
-    .from("platform_users")
-    .select("email")
-    .eq("id", id)
-    .maybeSingle();
+  let user: {
+    id: string;
+    email: string | null;
+    name: string | null;
+    role: string;
+    deleted_at?: string | null;
+    status?: string | null;
+  } | null = null;
+  let softDeleteSchemaReady = true;
 
-  await supabase.from("platform_user_invites").delete().eq("user_id", id);
+  {
+    const primary = await supabase
+      .from("platform_users")
+      .select("id, email, name, role, status, deleted_at")
+      .eq("id", id)
+      .maybeSingle();
 
-  // Mark messages before delete so ON DELETE SET NULL does not violate sender checks.
-  const [{ error: platformMsgError }, { error: customerMsgError }] = await Promise.all([
-    supabase
-      .from("platform_messages")
-      .update({ sender_anonymized: true })
-      .eq("sender_user_id", id),
-    supabase
-      .from("customer_conversation_messages")
-      .update({ sender_anonymized: true })
-      .eq("sender_user_id", id),
-  ]);
+    if (primary.error && isMissingDeletedAtError(primary.error.message)) {
+      reportPlatformUsersDeletedAtIssue(
+        primary.error.message,
+        "platform-users.DELETE.select"
+      );
+      softDeleteSchemaReady = false;
+      const fallback = await supabase
+        .from("platform_users")
+        .select("id, email, name, role, status")
+        .eq("id", id)
+        .maybeSingle();
+      if (fallback.error) {
+        return NextResponse.json({ ok: false, message: fallback.error.message }, { status: 500 });
+      }
+      user = fallback.data;
+    } else if (primary.error) {
+      return NextResponse.json({ ok: false, message: primary.error.message }, { status: 500 });
+    } else {
+      user = primary.data;
+    }
+  }
 
-  if (platformMsgError) {
+  if (!user) {
+    return NextResponse.json({ ok: false, message: "User not found." }, { status: 404 });
+  }
+
+  // Without deleted_at, treat an open trash entry as already deleted.
+  if (!softDeleteSchemaReady) {
+    const trashedIds = await listTrashedPlatformUserIds(supabase);
+    if (trashedIds.has(id)) {
+      return NextResponse.json(
+        { ok: false, message: "User is already in trash." },
+        { status: 400 }
+      );
+    }
+  }
+
+  const guard = assertPlatformUserDeletable(
+    user,
+    auth.auth.type === "user" ? auth.auth.userId : null
+  );
+  if (!guard.ok) {
+    return NextResponse.json({ ok: false, message: guard.message }, { status: guard.status });
+  }
+
+  // Cancel open invites so a soft-deleted user cannot accept later.
+  await supabase.from("platform_user_invites").delete().eq("user_id", id).is("accepted_at", null);
+
+  const result = await softDeleteEntity(supabase, auth.auth, "platform_user", id);
+  if (!result.ok) {
+    // Migration 078 missing: disable login + trash (list hides via trash ids).
+    if (isMissingDeletedAtError(result.message)) {
+      reportPlatformUsersDeletedAtIssue(result.message, "platform-users.DELETE");
+
+      const { data: fullRow } = await supabase
+        .from("platform_users")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+      const snapshot: Record<string, unknown> = {
+        ...(user as Record<string, unknown>),
+        ...((fullRow as Record<string, unknown> | null) ?? {}),
+      };
+      delete snapshot.password_hash;
+
+      const name = String(snapshot.name ?? user.name ?? "").trim();
+      const email = String(snapshot.email ?? user.email ?? "").trim();
+      const label =
+        name && email ? `${name} (${email})` : name || email || "Team user";
+
+      const { error: disableError } = await supabase
+        .from("platform_users")
+        .update({ status: "disabled" })
+        .eq("id", id);
+
+      if (disableError) {
+        return NextResponse.json({ ok: false, message: disableError.message }, { status: 500 });
+      }
+
+      const trash = await recordTrashEntry(
+        supabase,
+        auth.auth,
+        "platform_user",
+        id,
+        label,
+        snapshot
+      );
+
+      await logPlatformActivity(auth.auth, "user_removed", user.email ?? id, {
+        user_id: id,
+        soft_delete: false,
+        status_disabled_fallback: true,
+        trashId: trash.ok ? trash.id : null,
+      });
+
+      if (!trash.ok) {
+        return NextResponse.json({
+          ok: true,
+          fallback: "disabled",
+          message:
+            "User disabled. They can no longer sign in. Restore may be limited until a database update finishes.",
+        });
+      }
+
+      return NextResponse.json({
+        ok: true,
+        trashId: trash.id,
+        fallback: "disabled",
+        message: "User moved to trash. Restore from Platform → Trash if needed.",
+      });
+    }
+
     return NextResponse.json(
-      { ok: false, message: withSchemaMigrationHint(platformMsgError.message) },
-      { status: 500 }
+      { ok: false, message: result.message },
+      { status: result.status ?? 500 }
     );
   }
-  if (customerMsgError) {
-    return NextResponse.json(
-      { ok: false, message: withSchemaMigrationHint(customerMsgError.message) },
-      { status: 500 }
-    );
-  }
 
-  const { error } = await supabase.from("platform_users").delete().eq("id", id);
-  if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
-  }
+  // Soft-delete + disable so Users/lifecycle never still show Active.
+  await supabase.from("platform_users").update({ status: "disabled" }).eq("id", id);
 
-  await logPlatformActivity(auth.auth, "user_removed", user?.email ?? id);
-  return NextResponse.json({ ok: true });
+  await logPlatformActivity(auth.auth, "user_removed", user.email ?? id, {
+    user_id: id,
+    trashId: result.trashId,
+    soft_delete: true,
+  });
+
+  return NextResponse.json({
+    ok: true,
+    trashId: result.trashId,
+    message: "User moved to trash. Restore from Platform → Trash if needed.",
+  });
 }

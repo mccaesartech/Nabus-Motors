@@ -7,17 +7,23 @@ import {
   resolveFulfillmentMode,
 } from "@/lib/vehicles/fulfillment";
 import { isLocallyAvailableForBanner } from "@/lib/vehicles/local-availability";
+import { vehicleMatchesKeyword } from "@/lib/vehicles/keyword-search";
 
 function vehicleOrigin(vehicle: Vehicle): CountryOfOrigin {
   if (vehicle.countryOfOrigin) return vehicle.countryOfOrigin;
   return inferVehicleOrigin(vehicle);
 }
 
+function caseInsensitiveEq(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
 export type FilterPredicate = (vehicle: Vehicle, filters: VehicleFilters) => boolean;
 
 export const FILTER_PREDICATES: Record<string, FilterPredicate> = {
-  make: (v, f) => !f.make || v.make === f.make,
-  model: (v, f) => !f.model || v.model === f.model,
+  q: (v, f) => vehicleMatchesKeyword(v, f.q),
+  make: (v, f) => !f.make || caseInsensitiveEq(v.make, f.make),
+  model: (v, f) => !f.model || caseInsensitiveEq(v.model, f.model),
   yearMin: (v, f) => !f.yearMin || v.year >= f.yearMin,
   yearMax: (v, f) => !f.yearMax || v.year <= f.yearMax,
   priceMin: (v, f) => !f.priceMin || v.price >= f.priceMin,
@@ -66,6 +72,7 @@ export const FILTER_PREDICATES: Record<string, FilterPredicate> = {
 };
 
 const PREDICATE_ORDER: (keyof typeof FILTER_PREDICATES)[] = [
+  "q",
   "make",
   "model",
   "yearMin",

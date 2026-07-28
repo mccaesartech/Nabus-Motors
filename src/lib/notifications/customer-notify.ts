@@ -14,6 +14,11 @@ import { sendWhatsAppMessage } from "@/lib/notifications/whatsapp-send";
 import { sendTermiiSms } from "@/lib/notifications/termii";
 import { getTermiiConfig, isTermiiProviderEnv } from "@/lib/notifications/termii-config";
 import { getWhatsAppConfig } from "@/lib/notifications/whatsapp-config";
+import { sendArkeselSms } from "@/lib/notifications/arkesel";
+import {
+  getArkeselConfig,
+  shouldPreferArkeselSms,
+} from "@/lib/notifications/arkesel-config";
 
 export type NotifyCustomerParams = {
   email?: string;
@@ -49,15 +54,37 @@ async function shouldTryTermiiSms(): Promise<boolean> {
   return termii.smsReady && whatsapp.provider === "termii";
 }
 
-async function tryTermiiSmsFallback(
+async function trySmsDelivery(
   phone: string,
   body: string,
   params: NotifyCustomerParams,
   result: NotifyCustomerResult
-): Promise<void> {
-  if (!(await shouldTryTermiiSms())) return;
+): Promise<boolean> {
+  const arkesel = await getArkeselConfig();
+  if (arkesel.smsReady) {
+    const sms = await sendArkeselSms(phone, body, arkesel);
+    if (sms.sent) {
+      result.channels.push("sms");
+      await logNotification({
+        sourceTable: params.sourceTable,
+        sourceId: params.sourceId,
+        template: params.template,
+        channel: "sms",
+        status: "sent",
+        recipient: phone,
+        detail: `arkesel message_id=${sms.messageId ?? "unknown"}`,
+      });
+      return true;
+    }
+    console.warn(
+      "[notifyCustomer] Arkesel SMS failed (non-blocking):",
+      sms.reason
+    );
+  }
+
+  if (!(await shouldTryTermiiSms())) return false;
   const termii = await getTermiiConfig();
-  if (!termii.smsReady) return;
+  if (!termii.smsReady) return false;
 
   const sms = await sendTermiiSms(phone, body);
   if (sms.sent) {
@@ -71,8 +98,11 @@ async function tryTermiiSmsFallback(
       recipient: phone,
       detail: `termii message_id=${sms.messageId ?? "unknown"}`,
     });
+    return true;
   }
+  return false;
 }
+
 function buildLogDetail(input: {
   reason?: string;
   waMeUrl?: string;
@@ -130,6 +160,7 @@ export async function notifyCustomer(
     customerName: params.customerName ?? params.data?.customerName,
   };
   const content = buildCustomerMessage(params.template, messageData);
+  const preferSms = phone ? await shouldPreferArkeselSms() : false;
 
   const result: NotifyCustomerResult = {
     whatsappSent: false,
@@ -145,25 +176,55 @@ export async function notifyCustomer(
   if (!phone) {
     result.whatsappStatus = "skipped";
     result.whatsappReason = "WhatsApp not sent (no phone on file)";
+  } else if (preferSms) {
+    // Arkesel SMS primary — leave WhatsApp dormant when SMS is the configured path.
+    result.whatsappStatus = "skipped";
+    result.whatsappReason = "SMS preferred (Arkesel)";
+    await trySmsDelivery(phone, content.whatsapp, params, result);
   } else if (!whatsappCapable) {
     result.whatsappStatus = "skipped";
     result.whatsappReason = "WhatsApp not sent (customer opted out)";
-    await tryTermiiSmsFallback(phone, content.whatsapp, params, result);
+    await trySmsDelivery(phone, content.whatsapp, params, result);
   } else {
-    const wa = await sendWhatsAppMessage(phone, content.whatsapp);
+    const resetUrl = params.data?.passwordResetUrl?.trim();
+    const usePasswordResetTemplate = params.template === "password_reset" && Boolean(resetUrl);
+    const wa = await sendWhatsAppMessage(phone, content.whatsapp, {
+      template: params.template,
+      sourceTable: params.sourceTable,
+      sourceId: params.sourceId,
+      persistLog: true,
+      idempotencyKey:
+        params.sourceTable && params.sourceId
+          ? `customer:${params.template}:${params.sourceTable}:${params.sourceId}`
+          : undefined,
+      ...(usePasswordResetTemplate
+        ? {
+            metaTemplateKind: "password_reset" as const,
+            metaTemplateBodyParameters: [
+              params.customerName ?? params.data?.customerName ?? "there",
+              resetUrl!,
+            ],
+            metaTemplateButtonUrl: resetUrl,
+            preferMetaTemplate: true,
+          }
+        : {}),
+    });
     if (wa.sent) {
       result.whatsappSent = true;
       result.whatsappStatus = "sent";
       result.channels.push("whatsapp");
-      await logNotification({
-        sourceTable: params.sourceTable,
-        sourceId: params.sourceId,
-        template: params.template,
-        channel: "whatsapp",
-        status: "sent",
-        recipient: phone,
-        detail: wa.provider,
-      });
+      // Delivery row is persisted by sendWhatsAppMessage when persistLog is true.
+      if (!wa.logId) {
+        await logNotification({
+          sourceTable: params.sourceTable,
+          sourceId: params.sourceId,
+          template: params.template,
+          channel: "whatsapp",
+          status: "sent",
+          recipient: phone,
+          detail: wa.provider,
+        });
+      }
     } else if (wa.waMeUrl) {
       result.whatsappDeferred = true;
       result.whatsappStatus = "deferred";
@@ -171,35 +232,41 @@ export async function notifyCustomer(
       console.info(
         "[notifyCustomer] WhatsApp deferred for manual follow-up; recipient and message omitted"
       );
-      await logNotification({
-        sourceTable: params.sourceTable,
-        sourceId: params.sourceId,
-        template: params.template,
-        channel: "whatsapp",
-        status: "deferred",
-        recipient: phone,
-        detail: buildLogDetail({
-          reason: "WhatsApp API not configured",
-          waMeUrl: wa.waMeUrl,
-          waMeText: content.whatsapp,
-        }),
-      });
+      if (!wa.logId) {
+        await logNotification({
+          sourceTable: params.sourceTable,
+          sourceId: params.sourceId,
+          template: params.template,
+          channel: "whatsapp",
+          status: "deferred",
+          recipient: phone,
+          detail: buildLogDetail({
+            reason: "WhatsApp API not configured",
+            waMeUrl: wa.waMeUrl,
+            waMeText: content.whatsapp,
+          }),
+        });
+      }
+      // Prefer SMS when WhatsApp is only deferred (API not configured).
+      await trySmsDelivery(phone, content.whatsapp, params, result);
     } else {
       result.whatsappStatus = "failed";
       result.whatsappReason = sanitizeNotificationReason(wa.reason);
-      await logNotification({
-        sourceTable: params.sourceTable,
-        sourceId: params.sourceId,
-        template: params.template,
-        channel: "whatsapp",
-        status: "failed",
-        recipient: phone,
-        detail: buildLogDetail({
-          reason: sanitizeNotificationReason(wa.reason),
-          technical: wa.reason,
-        }),
-      });
-      await tryTermiiSmsFallback(phone, content.whatsapp, params, result);
+      if (!wa.logId) {
+        await logNotification({
+          sourceTable: params.sourceTable,
+          sourceId: params.sourceId,
+          template: params.template,
+          channel: "whatsapp",
+          status: "failed",
+          recipient: phone,
+          detail: buildLogDetail({
+            reason: sanitizeNotificationReason(wa.reason),
+            technical: wa.reason,
+          }),
+        });
+      }
+      await trySmsDelivery(phone, content.whatsapp, params, result);
     }
   }
 

@@ -5,7 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ExternalLink, Mail, MessageSquare, Phone, Trash2, User } from "lucide-react";
 import { ContactWhatsAppAction } from "@/components/platform/contact-actions";
-import { ConfirmDialog } from "@/components/platform/confirm-dialog";
+import {
+  ConfirmDialog,
+  DELETE_CONFIRM_PHRASE,
+} from "@/components/platform/confirm-dialog";
 import { PageHeader } from "@/components/platform/page-header";
 import {
   PlatformPrintButton,
@@ -472,6 +475,7 @@ export function LeadInquiryDetail({ type, id }: LeadInquiryDetailProps) {
           description={`Permanently remove ${name}'s ${title.toLowerCase()}? This cannot be undone.`}
           confirmLabel="Delete"
           destructive
+          confirmPhrase={DELETE_CONFIRM_PHRASE}
           onConfirm={handleDelete}
         />
       </div>

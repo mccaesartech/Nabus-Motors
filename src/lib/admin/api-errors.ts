@@ -33,7 +33,7 @@ export function friendlyAdminDbError(message: string): string {
       lower.includes("does not exist") ||
       lower.includes("column"))
   ) {
-    return "Team chat setup required — run migration 017 in Supabase. Open Supabase Dashboard → SQL Editor, paste and run supabase/migrations/017_platform_team_channels.sql, then refresh this page.";
+    return "Group channels are temporarily unavailable. Direct messages still work.";
   }
 
   if (

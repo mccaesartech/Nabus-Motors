@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/admin/auth";
 import { galleryFromInput } from "@/lib/admin/vehicle-fields";
 import { geminiErrorToHttp, getGeminiApiKey, getGeminiKeyWarning } from "@/lib/ai/gemini";
+import { fetchUrlsAsGeminiInlineImages } from "@/lib/ai/gemini-vision-images";
 import { isPhotoRequest } from "@/lib/ai/photo-request";
 import {
   generateStockPhotoSuggestions,
@@ -11,6 +12,10 @@ import type {
   VehicleAiChatMessage,
   VehicleAiChatVehicleState,
 } from "@/lib/ai/vehicle-ai-chat-types";
+import {
+  collectVisionImageUrls,
+  isFillFromPhotosRequest,
+} from "@/lib/ai/vehicle-ai-vision";
 
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS = 20;
@@ -103,10 +108,22 @@ export async function POST(req: NextRequest) {
     images: Array.isArray(vehicle.images) ? vehicle.images.map(String) : [],
     gallery: galleryFromInput(vehicle.gallery, vehicle.images),
     slug: vehicle.slug ? String(vehicle.slug) : undefined,
+    inspection_summary: vehicle.inspection_summary
+      ? String(vehicle.inspection_summary)
+      : "",
+    warranty_notes: vehicle.warranty_notes ? String(vehicle.warranty_notes) : "",
+    drivetrain: vehicle.drivetrain ? String(vehicle.drivetrain) : "",
+    horsepower: vehicle.horsepower ? String(vehicle.horsepower) : "",
+    range: vehicle.range ? String(vehicle.range) : "",
+    seating_capacity:
+      vehicle.seating_capacity != null && Number.isFinite(Number(vehicle.seating_capacity))
+        ? Number(vehicle.seating_capacity)
+        : null,
   };
 
   const lastUserMessage = messages[messages.length - 1]?.content ?? "";
-  const photoOnly = isPhotoRequest(lastUserMessage);
+  const fillFromPhotos = isFillFromPhotosRequest(lastUserMessage);
+  const photoOnly = isPhotoRequest(lastUserMessage) && !fillFromPhotos;
 
   // Stock photos use the local Pexels URL pool — free, no Gemini key or quota.
   if (photoOnly) {
@@ -125,7 +142,7 @@ export async function POST(req: NextRequest) {
         ok: false,
         configured: false,
         message:
-          "Add GEMINI_API_KEY in Vercel for text/description edits (aistudio.google.com/apikey). Stock photos, paste/drop uploads, and color filters work without a key.",
+          "Add GEMINI_API_KEY in Vercel for photo analysis and text edits (aistudio.google.com/apikey). Stock photos, paste/drop uploads, and color filters work without a key.",
       },
       { status: 503 }
     );
@@ -134,11 +151,24 @@ export async function POST(req: NextRequest) {
   const keyWarning = getGeminiKeyWarning();
 
   try {
-    const result = await generateVehicleAiChatReply(messages, currentVehicle);
+    const visionUrls = collectVisionImageUrls(
+      currentVehicle.gallery,
+      currentVehicle.images
+    );
+    const visionImages = visionUrls.length
+      ? await fetchUrlsAsGeminiInlineImages(visionUrls)
+      : [];
+
+    const result = await generateVehicleAiChatReply(messages, currentVehicle, {
+      visionImages,
+    });
     return NextResponse.json({
       ok: true,
       configured: true,
       ...(keyWarning ? { keyWarning } : {}),
+      visionImagesAttached: visionImages.length,
+      visionUrlsAttempted: visionUrls.length,
+      visionFetchFailed: visionUrls.length > 0 && visionImages.length === 0,
       ...result,
     });
   } catch (err) {

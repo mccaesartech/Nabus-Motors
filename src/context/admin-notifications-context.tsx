@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -36,6 +37,12 @@ type AdminNotificationsContextValue = {
   markRead: (id: string) => Promise<void>;
   markReadMatching: (options: MarkReadMatchingOptions) => Promise<void>;
   markAllRead: () => Promise<void>;
+  /** Optimistically remove notifications from local state (while trash API runs). */
+  removeLocal: (ids: string[]) => void;
+  /** Re-insert notifications after a failed trash API call. */
+  restoreLocal: (items: AdminNotification[]) => void;
+  /** Clear pending-removal suppression after trash API succeeds. */
+  confirmRemoved: (ids: string[]) => void;
 };
 
 const AdminNotificationsContext = createContext<AdminNotificationsContextValue | null>(null);
@@ -66,6 +73,8 @@ export function AdminNotificationsProvider({
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [session, setSession] = useState<RealtimeSession | null>(realtimeSession);
+  /** IDs removed optimistically — keep them out of poll/realtime merges until confirm/restore. */
+  const pendingRemovedIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (realtimeSession) {
@@ -80,14 +89,18 @@ export function AdminNotificationsProvider({
     const incoming = (json.notifications ?? []) as AdminNotification[];
     setNotifications((previous) => {
       const merged = mergeLoadedAdminNotifications(previous, incoming);
-      setUnreadCount(countUnreadAdminNotifications(merged));
-      return merged;
+      const pending = pendingRemovedIdsRef.current;
+      const next =
+        pending.size > 0 ? merged.filter((n) => !pending.has(n.id)) : merged;
+      setUnreadCount(countUnreadAdminNotifications(next));
+      return next;
     });
   }, []);
 
   useNotificationRealtime({
     session,
     onNotification: (notification) => {
+      if (pendingRemovedIdsRef.current.has(notification.id)) return;
       setNotifications((prev) => {
         if (prev.some((n) => n.id === notification.id)) return prev;
         return [notification, ...prev].slice(0, 50);
@@ -177,6 +190,34 @@ export function AdminNotificationsProvider({
     }
   }, [load]);
 
+  const removeLocal = useCallback((ids: string[]) => {
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
+    for (const id of idSet) pendingRemovedIdsRef.current.add(id);
+    setNotifications((prev) => {
+      const next = prev.filter((n) => !idSet.has(n.id));
+      setUnreadCount(countUnreadAdminNotifications(next));
+      return next;
+    });
+  }, []);
+
+  const restoreLocal = useCallback((items: AdminNotification[]) => {
+    if (items.length === 0) return;
+    for (const item of items) pendingRemovedIdsRef.current.delete(item.id);
+    setNotifications((prev) => {
+      const existing = new Set(prev.map((n) => n.id));
+      const toAdd = items.filter((n) => !existing.has(n.id));
+      if (toAdd.length === 0) return prev;
+      const next = [...toAdd, ...prev].slice(0, 50);
+      setUnreadCount(countUnreadAdminNotifications(next));
+      return next;
+    });
+  }, []);
+
+  const confirmRemoved = useCallback((ids: string[]) => {
+    for (const id of ids) pendingRemovedIdsRef.current.delete(id);
+  }, []);
+
   const unreadByNavHref = useMemo(
     () => countUnreadByNavHref(notifications),
     [notifications]
@@ -191,8 +232,22 @@ export function AdminNotificationsProvider({
       markRead,
       markReadMatching,
       markAllRead,
+      removeLocal,
+      restoreLocal,
+      confirmRemoved,
     }),
-    [notifications, unreadCount, unreadByNavHref, load, markRead, markReadMatching, markAllRead]
+    [
+      notifications,
+      unreadCount,
+      unreadByNavHref,
+      load,
+      markRead,
+      markReadMatching,
+      markAllRead,
+      removeLocal,
+      restoreLocal,
+      confirmRemoved,
+    ]
   );
 
   return (

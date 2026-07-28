@@ -42,6 +42,7 @@ Verify these variable names independently in every environment:
 - Admin/cron: `ADMIN_PASSWORD`, `ADMIN_SECRET`, `CRON_SECRET`
 - Email/messaging: `RESEND_API_KEY`, `RESEND_FROM_EMAIL`,
   `WHATSAPP_PROVIDER` and the selected provider's credentials
+  (see `docs/WHATSAPP.md` for Meta webhook / template setup)
 - Optional integrations: `GEMINI_API_KEY`,
   `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`, VAPID variables
 
@@ -94,7 +95,10 @@ After promotion:
    page, and one synthetic non-production inquiry.
 4. Confirm the account-deletion cron shows a successful invocation without
    exposing records in logs.
-5. Confirm error and latency dashboards identify the new release.
+5. Confirm WhatsApp webhook verify works (`GET /api/whatsapp/webhook`) when
+   Meta credentials are configured, and that `/api/cron/whatsapp-retry`
+   accepts `CRON_SECRET`. See `docs/WHATSAPP.md`.
+6. Confirm error and latency dashboards identify the new release.
 
 ## Rollback
 
@@ -159,10 +163,11 @@ secondary escalation contacts.
 
 The repository emits sanitized structured `next_request_error` records with
 environment, release, runtime, route file, route type, method, and digest. It
-does not include request URLs, headers, error messages, or PII. If Sentry is
-adopted, configure server/client/edge initialization, release/environment tags,
-authenticated source-map upload, PII scrubbing, and an approved sampling rate;
-do not expose auth tokens or private source maps.
+does not include request URLs, headers, error messages, or PII. Sentry is wired
+via `@sentry/nextjs` (client/server/edge) and activates only when
+`SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` are set — see [SENTRY.md](./SENTRY.md).
+Optional authenticated source-map upload, PII scrubbing, and sampling rates are
+documented there; do not expose auth tokens or private source maps.
 
 ## Capacity and load verification
 

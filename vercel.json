@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/correct-vehicle-colors",
       "schedule": "15 4 * * *"
+    },
+    {
+      "path": "/api/cron/whatsapp-retry",
+      "schedule": "45 3 * * *"
     }
   ]
 }

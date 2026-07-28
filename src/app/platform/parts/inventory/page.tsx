@@ -4,6 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, Trash2 } from "lucide-react";
+import {
+  ConfirmDialog,
+  DELETE_CONFIRM_PHRASE,
+} from "@/components/platform/confirm-dialog";
 import { PageHeader } from "@/components/platform/page-header";
 import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
@@ -37,6 +41,7 @@ export default function PartsInventoryPage() {
     category_id: "",
     brand: "",
   });
+  const [deleteTarget, setDeleteTarget] = useState<PartRow | null>(null);
 
   const load = useCallback(async () => {
     const [partsRes, catsRes] = await Promise.all([
@@ -88,9 +93,9 @@ export default function PartsInventoryPage() {
     load();
   }
 
-  async function removePart(id: string) {
-    if (!confirm("Delete this part?")) return;
-    await fetch(`/api/admin/parts?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+  async function removePart(part: PartRow) {
+    await fetch(`/api/admin/parts?id=${encodeURIComponent(part.id)}`, { method: "DELETE" });
+    setDeleteTarget(null);
     load();
   }
 
@@ -207,7 +212,7 @@ export default function PartsInventoryPage() {
                   <button
                     type="button"
                     className="platform-btn-ghost text-[var(--platform-error)]"
-                    onClick={() => void removePart(part.id)}
+                    onClick={() => setDeleteTarget(part)}
                   >
                     <Trash2 className="size-4" />
                   </button>
@@ -217,6 +222,25 @@ export default function PartsInventoryPage() {
           </tbody>
         </table>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="Delete part?"
+        description={
+          deleteTarget
+            ? `Permanently delete “${deleteTarget.name}” from parts inventory? This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        destructive
+        confirmPhrase={DELETE_CONFIRM_PHRASE}
+        onConfirm={async () => {
+          if (deleteTarget) await removePart(deleteTarget);
+        }}
+      />
     </div>
   );
 }

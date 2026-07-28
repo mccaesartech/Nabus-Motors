@@ -86,7 +86,7 @@ export const DASHBOARD_KPI_DEFINITIONS: Record<DashboardKpiKey, DashboardKpiDefi
     key: "lowStock",
     label: "Low stock alert",
     description: "Inventory below threshold",
-    href: "/platform/inventory",
+    href: "/platform/inventory?stock=low",
     toneFromValue: (v) => (v > 0 ? "negative" : "positive"),
   },
   pendingFinance: {

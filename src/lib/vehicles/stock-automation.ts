@@ -1,8 +1,11 @@
-import type { createAdminSupabase } from "@/lib/supabase/admin";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PlatformAuthContext } from "@/lib/admin/auth";
 import { logPlatformActivity } from "@/lib/platform/activity";
-
-type AdminSupabase = NonNullable<ReturnType<typeof createAdminSupabase>>;
+import {
+  maybeNotifyVehicleStockAction,
+  refreshFleetLowStockAlert,
+} from "@/lib/platform/vehicle-stock-notifications";
+import { stockGroupKey } from "@/lib/vehicles/low-stock";
 
 export type VehicleStockIdentity = {
   id: string;
@@ -18,14 +21,11 @@ export type SoldStatusTransition = {
   availableSiblings: number;
 };
 
-/** Group key for counting same-type inventory (make + model + year). */
-export function stockGroupKey(make: string, model: string, year: number): string {
-  return `${make.trim().toLowerCase()}|${model.trim().toLowerCase()}|${year}`;
-}
+export { stockGroupKey };
 
 /** Other approved listings of the same type still marked available. */
 export async function countAvailableSiblings(
-  supabase: AdminSupabase,
+  supabase: SupabaseClient,
   vehicle: Pick<VehicleStockIdentity, "id" | "make" | "model" | "year">
 ): Promise<number> {
   const { count, error } = await supabase
@@ -56,7 +56,7 @@ export function resolveStatusAfterSoldTransition(
 }
 
 export async function applySoldStatusTransition(
-  supabase: AdminSupabase,
+  supabase: SupabaseClient,
   vehicle: VehicleStockIdentity,
   options?: {
     auth?: PlatformAuthContext | null;
@@ -88,12 +88,34 @@ export async function applySoldStatusTransition(
     });
   }
 
+  try {
+    await maybeNotifyVehicleStockAction(supabase, {
+      id: vehicle.id,
+      slug: vehicle.slug,
+      year: vehicle.year,
+      make: vehicle.make,
+      model: vehicle.model,
+      availableSiblings,
+      autoPreOrder,
+      source: "sold",
+      sourceDetail: options?.source ?? "sold_transition",
+    });
+  } catch (err) {
+    console.error("[stock-automation] stock action notify failed:", err);
+  }
+
+  try {
+    await refreshFleetLowStockAlert(supabase);
+  } catch (err) {
+    console.error("[stock-automation] fleet low stock notify failed:", err);
+  }
+
   return { status, autoPreOrder, availableSiblings };
 }
 
 /** Resolve sold → pre_order when admin requests sold on the last available unit. */
 export async function resolveRequestedSoldStatus(
-  supabase: AdminSupabase,
+  supabase: SupabaseClient,
   vehicle: VehicleStockIdentity
 ): Promise<"sold" | "pre_order"> {
   const availableSiblings = await countAvailableSiblings(supabase, vehicle);

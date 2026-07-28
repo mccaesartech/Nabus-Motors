@@ -115,7 +115,7 @@ export function VehicleCard({
 
         <div className="mt-2.5 flex items-baseline justify-between">
           <VehicleCardPrice
-            usdAmount={vehicle.price}
+            vehicle={vehicle}
             className="text-lg font-semibold tabular-nums text-foreground"
           />
         </div>

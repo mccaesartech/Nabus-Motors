@@ -17,6 +17,12 @@ import {
   listDismissedAdminNotificationKeys,
   LOW_STOCK_NOTIFICATION_ID,
 } from "@/lib/platform/notification-read-state";
+import {
+  filterOutTrashedAdminNotifications,
+  listTrashedAdminNotificationIds,
+} from "@/lib/platform/admin-notification-trash";
+import { buildFleetLowStockMessage } from "@/lib/vehicles/low-stock";
+import { reportSchemaIssue } from "@/lib/observability/schema-issue";
 
 export type AdminNotification = {
   id: string;
@@ -225,12 +231,17 @@ export async function buildFallbackNotifications(
       id: "low-stock",
       type: "low_stock",
       title: "Low inventory alert",
-      message: `Only ${availableVehicles} vehicles available for sale`,
-      link: "/platform/inventory",
+      message: buildFleetLowStockMessage(availableVehicles, lowStockThreshold),
+      link: "/platform/inventory?stock=low",
       sourceTable: null,
       sourceId: null,
       readAt: null,
       createdAt: now,
+      metadata: {
+        available_vehicles: availableVehicles,
+        threshold: lowStockThreshold,
+        suggestion: "add_or_import",
+      },
     });
   }
 
@@ -248,15 +259,37 @@ export async function fetchAdminNotifications(
 ): Promise<{ notifications: AdminNotification[]; fromTable: boolean }> {
   const lowStockThreshold = options?.lowStockThreshold ?? 5;
   const notifyLowStockEnabled = options?.notifyLowStockEnabled ?? true;
-  let query = supabase.from("admin_notifications").select("*");
+  let query = supabase.from("admin_notifications").select("*").is("deleted_at", null);
   if (auth) {
     query = query.or(recipientFilterOr(auth));
   }
-  const { data, error } = await query.order("created_at", { ascending: false }).limit(limit);
+  let { data, error } = await query.order("created_at", { ascending: false }).limit(limit);
+
+  // Graceful fallback when migration 080 (deleted_at) is not applied yet.
+  if (error && /deleted_at/i.test(error.message)) {
+    reportSchemaIssue({
+      table: "admin_notifications",
+      column: "deleted_at",
+      migration: "080_admin_notification_soft_delete.sql",
+      source: "fetchAdminNotifications",
+      message: error.message,
+    });
+    let fallbackQuery = supabase.from("admin_notifications").select("*");
+    if (auth) {
+      fallbackQuery = fallbackQuery.or(recipientFilterOr(auth));
+    }
+    const retry = await fallbackQuery.order("created_at", { ascending: false }).limit(limit);
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error) {
     const fallback = await buildFallbackNotifications(supabase, availableVehicles, options);
-    return { notifications: fallback.slice(0, limit), fromTable: false };
+    const trashedIds = await listTrashedAdminNotificationIds(supabase);
+    return {
+      notifications: filterOutTrashedAdminNotifications(fallback, trashedIds).slice(0, limit),
+      fromTable: false,
+    };
   }
 
   const notifications = (data ?? []).map((row) => mapRow(row as NotificationRow));
@@ -268,12 +301,17 @@ export async function fetchAdminNotifications(
         id: "low-stock",
         type: "low_stock",
         title: "Low inventory alert",
-        message: `Only ${availableVehicles} vehicles available for sale`,
-        link: "/platform/inventory",
+        message: buildFleetLowStockMessage(availableVehicles, lowStockThreshold),
+        link: "/platform/inventory?stock=low",
         sourceTable: null,
         sourceId: null,
         readAt: null,
         createdAt: new Date().toISOString(),
+        metadata: {
+          available_vehicles: availableVehicles,
+          threshold: lowStockThreshold,
+          suggestion: "add_or_import",
+        },
       });
     }
   }
@@ -281,7 +319,7 @@ export async function fetchAdminNotifications(
   const { data: failedDeliveries } = await supabase
     .from("notification_log")
     .select("id, template, channel, status, recipient, detail, created_at, source_table, source_id")
-    .in("status", ["failed", "deferred"])
+    .in("status", ["failed", "deferred", "undeliverable"])
     .order("created_at", { ascending: false })
     .limit(5);
 
@@ -293,6 +331,9 @@ export async function fetchAdminNotifications(
   }
 
   let finalNotifications = notifications.slice(0, limit);
+  const trashedIds = await listTrashedAdminNotificationIds(supabase);
+  finalNotifications = filterOutTrashedAdminNotifications(finalNotifications, trashedIds);
+
   if (auth) {
     const scope = adminNotificationRecipientScope(auth);
     const dismissedKeys = await listDismissedAdminNotificationKeys(supabase, scope);
@@ -313,25 +354,51 @@ export async function countUnreadNotifications(
   let query = supabase
     .from("admin_notifications")
     .select("*", { count: "exact", head: true })
-    .is("read_at", null);
+    .is("read_at", null)
+    .is("deleted_at", null);
   if (auth) {
     query = query.or(recipientFilterOr(auth));
   }
-  const { count, error } = await query;
+  let { count, error } = await query;
+
+  if (error && /deleted_at/i.test(error.message)) {
+    reportSchemaIssue({
+      table: "admin_notifications",
+      column: "deleted_at",
+      migration: "080_admin_notification_soft_delete.sql",
+      source: "countUnreadNotifications",
+      message: error.message,
+    });
+    let fallbackQuery = supabase
+      .from("admin_notifications")
+      .select("*", { count: "exact", head: true })
+      .is("read_at", null);
+    if (auth) {
+      fallbackQuery = fallbackQuery.or(recipientFilterOr(auth));
+    }
+    const retry = await fallbackQuery;
+    count = retry.count;
+    error = retry.error;
+  }
 
   if (error) {
     const fallback = await buildFallbackNotifications(supabase, availableVehicles, options);
-    return fallback.length;
+    const trashedIds = await listTrashedAdminNotificationIds(supabase);
+    return filterOutTrashedAdminNotifications(fallback, trashedIds).length;
   }
+
+  const trashedIds = await listTrashedAdminNotificationIds(supabase);
 
   let unread = count ?? 0;
   if (notifyLowStockEnabled && availableVehicles < lowStockThreshold) {
-    if (auth) {
-      const scope = adminNotificationRecipientScope(auth);
-      const dismissedKeys = await listDismissedAdminNotificationKeys(supabase, scope);
-      if (!dismissedKeys.has(LOW_STOCK_NOTIFICATION_ID)) unread += 1;
-    } else {
-      unread += 1;
+    if (!trashedIds.has(LOW_STOCK_NOTIFICATION_ID)) {
+      if (auth) {
+        const scope = adminNotificationRecipientScope(auth);
+        const dismissedKeys = await listDismissedAdminNotificationKeys(supabase, scope);
+        if (!dismissedKeys.has(LOW_STOCK_NOTIFICATION_ID)) unread += 1;
+      } else {
+        unread += 1;
+      }
     }
   }
   return unread;

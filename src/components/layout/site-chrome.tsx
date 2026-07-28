@@ -12,6 +12,7 @@ import { Footer } from "@/components/layout/footer";
 import { MaintenanceBanner } from "@/components/layout/maintenance-banner";
 import { InstallCustomerAppBanner } from "@/components/pwa/install-customer-app-banner";
 import { PwaInstallToastHost } from "@/components/pwa/pwa-install-toast-host";
+import { PlatformPublicHistoryBounce } from "@/components/layout/platform-public-history-bounce";
 import { isAdminAppPath } from "@/lib/pwa/routes";
 import type { OperationalSettings, SiteSettings } from "@/lib/platform/site-settings";
 import { toOperationalSettings } from "@/lib/platform/site-settings";
@@ -64,7 +65,12 @@ export function SiteChrome({
   }, [content, operational.featureShowSparePartsNav]);
 
   if (isAdmin) {
-    return <>{children}</>;
+    return (
+      <>
+        <PlatformPublicHistoryBounce />
+        {children}
+      </>
+    );
   }
 
   const useAutoHeader = isAutoDivisionPath(pathname);
@@ -72,6 +78,7 @@ export function SiteChrome({
 
   return (
     <>
+      <PlatformPublicHistoryBounce />
       {operational.maintenanceMode ? (
         <MaintenanceBanner message={operational.maintenance_message} />
       ) : null}

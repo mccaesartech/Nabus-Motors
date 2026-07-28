@@ -30,7 +30,7 @@ function usePreferenceVersion() {
 
 export function RecommendedVehiclesSection({
   variant = "homepage",
-  excludeIds = [],
+  excludeIds,
 }: RecommendedVehiclesSectionProps) {
   const version = usePreferenceVersion();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -40,18 +40,25 @@ export function RecommendedVehiclesSection({
 
   const preferences = useMemo(() => readVehiclePreferences(), [version]);
 
+  // Stable identity for the effect below — a default `[]` prop would be a new
+  // array every render and re-trigger the fetch in a loop.
+  const excludeKey = excludeIds?.join(",") ?? "";
+  const stableExcludeIds = useMemo(
+    () => (excludeKey ? excludeKey.split(",") : []),
+    [excludeKey]
+  );
+
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
-      setLoading(true);
       try {
         const res = await fetch("/api/vehicles/recommendations", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             preferences,
-            excludeIds,
+            excludeIds: stableExcludeIds,
             limit: variant === "inventory" ? 4 : 6,
           }),
         });
@@ -80,8 +87,10 @@ export function RecommendedVehiclesSection({
     return () => {
       cancelled = true;
     };
-  }, [preferences, excludeIds, variant]);
+  }, [preferences, stableExcludeIds, variant]);
 
+  // Only hide before the first load; on refetches keep showing stale content
+  // so the section doesn't unmount/remount and shift the page layout.
   if (loading) return null;
   if (!hasMeaningfulPreferences(preferences)) return null;
   if (vehicles.length === 0) return null;

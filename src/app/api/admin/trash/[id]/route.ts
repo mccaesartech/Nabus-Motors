@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin/auth";
+import { canPermanentlyDeleteTrash, requireAdmin } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { permanentlyDeleteTrashEntry } from "@/lib/platform/trash";
 
@@ -11,9 +11,9 @@ export async function DELETE(_req: NextRequest, context: RouteContext) {
     return NextResponse.json({ ok: false }, { status: auth.status });
   }
 
-  if (auth.auth.type !== "owner" && auth.auth.role !== "owner") {
+  if (!canPermanentlyDeleteTrash(auth.auth)) {
     return NextResponse.json(
-      { ok: false, message: "Only the owner can permanently delete items." },
+      { ok: false, message: "Only the owner or super admin can permanently delete items." },
       { status: 403 }
     );
   }

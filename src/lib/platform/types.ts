@@ -56,6 +56,8 @@ export type DbVehicle = {
   year: number;
   trim?: string | null;
   price: number;
+  price_currency?: string | null;
+  listed_price?: number | null;
   mileage: number;
   fuel_type: string;
   transmission: string;

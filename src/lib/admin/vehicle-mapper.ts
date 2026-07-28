@@ -8,8 +8,10 @@ import {
   syncVehicleImagesFromPrimaryAndAdditional,
 } from "./vehicle-fields";
 import { omitEmptyOptionalVehicleFields } from "@/lib/admin/vehicle-columns";
+import { requirePrimaryVehicleImage } from "@/lib/admin/vehicle-publish-gates";
 import { buildVehicleSpecs } from "@/lib/admin/vehicle-specs";
 import { DEFAULT_TRUST_BADGES } from "@/lib/vehicles/trust-badges";
+import { BASE_CURRENCY, toStoredVehiclePrice } from "@/lib/currency";
 
 export function rowFromInput(
   input: VehicleInput,
@@ -29,6 +31,11 @@ export function rowFromInput(
   );
   const gallery = synced.gallery ?? galleryFromInput(input.gallery, input.images);
   const images = synced.images ?? imagesFromGallery(gallery);
+  const storedPrice = toStoredVehiclePrice(
+    Number(input.price),
+    // Unspecified currency stays USD for legacy callers/tests; forms always set this.
+    input.price_currency || BASE_CURRENCY
+  );
 
   return omitEmptyOptionalVehicleFields({
     slug,
@@ -36,7 +43,9 @@ export function rowFromInput(
     model: input.model.trim(),
     year: Number(input.year),
     trim: input.trim?.trim() || null,
-    price: Number(input.price),
+    price: storedPrice.price,
+    listed_price: storedPrice.listed_price,
+    price_currency: storedPrice.price_currency,
     mileage: Number(input.mileage),
     fuel_type: input.fuel_type,
     transmission: input.transmission,
@@ -108,6 +117,9 @@ export function validateVehicleInput(
         "Locally available stock cannot also be marked for shipment. Turn off one of them.",
     };
   }
+
+  const imageError = requirePrimaryVehicleImage(input);
+  if (imageError) return { ok: false, message: imageError };
 
   return { ok: true, data: input as VehicleInput };
 }

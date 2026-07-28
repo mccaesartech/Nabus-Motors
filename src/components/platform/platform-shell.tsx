@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { PlatformSidebar } from "./sidebar";
 import { PlatformTopbar } from "./topbar";
 import { PlatformDbBanner } from "./platform-db-banner";
+import { PlatformHistoryGuard } from "./platform-history-guard";
 import { AdminNotificationsProvider } from "@/context/admin-notifications-context";
 import { PlatformCurrencyProvider } from "@/context/platform-currency-context";
 import { PwaInstallToastHost } from "@/components/pwa/pwa-install-toast-host";
@@ -12,6 +13,7 @@ import { useLockBodyScroll } from "@/hooks/use-lock-body-scroll";
 import { initDeferredInstallPromptCapture } from "@/lib/pwa/install-utils";
 import { cn } from "@/lib/utils";
 import type { PlatformPermission, PlatformRole } from "@/lib/platform/permissions";
+import { DEFAULT_DISPLAY_CURRENCY } from "@/lib/currency";
 
 type SessionPermissions = Record<PlatformPermission, boolean>;
 
@@ -36,6 +38,8 @@ type PlatformShellProps = {
   permissions: SessionPermissions;
   authType: "owner" | "user";
   authUserId?: string;
+  /** site_settings.default_currency_display — platform only, not public. */
+  defaultCurrencyDisplay?: string;
 };
 
 export function PlatformShell({
@@ -46,6 +50,7 @@ export function PlatformShell({
   permissions,
   authType,
   authUserId,
+  defaultCurrencyDisplay = DEFAULT_DISPLAY_CURRENCY,
 }: PlatformShellProps) {
   const pathname = usePathname() ?? "";
   const [collapsed, setCollapsed] = useState(false);
@@ -126,9 +131,10 @@ export function PlatformShell({
   const showMobileIconRail = collapsed && !mobileOpen;
 
   return (
-    <PlatformCurrencyProvider>
+    <PlatformCurrencyProvider settingsDefaultCurrency={defaultCurrencyDisplay}>
     <AdminNotificationsProvider realtimeSession={realtimeSession}>
     <PlatformSessionContext.Provider value={resolved}>
+      <PlatformHistoryGuard />
       <div
         className={cn(
           // overflow-x-clip (not overflow-hidden) so portrait content can't trap zoom/scroll;

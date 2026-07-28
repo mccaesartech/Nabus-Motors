@@ -20,7 +20,7 @@ import type { Vehicle } from "@/lib/types";
 export function GarageView() {
   const { user, loading: authLoading } = useRequireCustomerAuth();
   const { savedIds, priceMap, recentIds, loaded, clearSaved } = useGarage();
-  const { formatPrice } = useCurrency();
+  const { formatPrice, formatVehicleListPrice } = useCurrency();
   const [toast, setToast] = useState<string | null>(null);
 
   const handleSaveToggle = useCallback((action: "saved" | "removed") => {
@@ -221,7 +221,11 @@ export function GarageView() {
                   </thead>
                   <tbody>
                     {[
-                      { label: "Price", get: (v: Vehicle) => formatPrice(v.price) },
+                      { label: "Price", get: (v: Vehicle) => formatVehicleListPrice({
+                        price: v.price,
+                        priceCurrency: v.priceCurrency,
+                        listedPrice: v.listedPrice,
+                      }) },
                       { label: "Mileage", get: (v: Vehicle) => v.mileage.toLocaleString() + " mi" },
                       { label: "Year", get: (v: Vehicle) => String(v.year) },
                       { label: "Fuel", get: (v: Vehicle) => v.fuelType },

@@ -15,6 +15,7 @@ export function navHrefForNotification(notification: AdminNotification): string 
       return platformPath("messages");
     case "low_stock":
     case "vehicle_pending_approval":
+    case "vehicle_stock_action":
       return platformPath("inventory");
     case "finance":
       return platformPath("finance");

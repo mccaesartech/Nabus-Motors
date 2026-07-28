@@ -2,8 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Mail, MessageSquarePlus, Search, Send, User } from "lucide-react";
+import { Mail, MessageSquarePlus, Search, Send, Trash2, User } from "lucide-react";
 import { PageHeader } from "@/components/platform/page-header";
+import {
+  ConfirmDialog,
+  DELETE_CONFIRM_PHRASE,
+} from "@/components/platform/confirm-dialog";
 import { usePlatformSession } from "@/components/platform/platform-shell";
 import { CustomerMessageReplyAssist } from "@/components/platform/customer-message-reply-assist";
 import { adminLoginPath } from "@/lib/admin/paths";
@@ -55,6 +59,7 @@ export default function PlatformMessagesPage() {
   const [customers, setCustomers] = useState<CustomerProfileOption[]>([]);
   const [platformUsers, setPlatformUsers] = useState<PlatformUserOption[]>([]);
   const [canOversight, setCanOversight] = useState(false);
+  const [canDelete, setCanDelete] = useState(false);
   const [messages, setMessages] = useState<CustomerChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
@@ -65,6 +70,10 @@ export default function PlatformMessagesPage() {
   const [selectedId, setSelectedId] = useState<string | null>(
     () => searchParams.get("conversation")
   );
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [deleteTarget, setDeleteTarget] = useState<CustomerConversation | null>(null);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -109,6 +118,7 @@ export default function PlatformMessagesPage() {
     setCustomers(json.customers ?? []);
     setPlatformUsers(json.platformUsers ?? []);
     setCanOversight(Boolean(json.canOversight));
+    setCanDelete(Boolean(json.canDelete));
     setLoading(false);
   }, [router]);
 
@@ -386,6 +396,72 @@ export default function PlatformMessagesPage() {
     await loadConversations();
   }
 
+  async function deleteTickets(ids: string[]) {
+    if (ids.length === 0) return;
+    setDeleting(true);
+    setSaveError(null);
+    const res = await fetch("/api/admin/customer-messages", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setDeleting(false);
+    if (!res.ok) {
+      setSaveError(json.message ?? "Could not delete ticket(s).");
+      setToast(json.message ?? "Could not delete ticket(s).");
+      setToastVariant("warning");
+      return;
+    }
+
+    const deleted = new Set<string>(
+      Array.isArray(json.deletedIds) ? json.deletedIds.map(String) : ids
+    );
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of deleted) next.delete(id);
+      return next;
+    });
+    if (selectedId && deleted.has(selectedId)) {
+      setSelectedId(null);
+      setMessages([]);
+    }
+    setDeleteTarget(null);
+    setBulkDeleteConfirm(false);
+    setToast(
+      json.message ??
+        (deleted.size === 1
+          ? "Ticket moved to trash."
+          : `${deleted.size} tickets moved to trash.`)
+    );
+    setToastVariant("success");
+    await loadConversations();
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllFiltered() {
+    const visibleIds = filtered.map((c) => c.id);
+    const allSelected =
+      visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        for (const id of visibleIds) next.delete(id);
+      } else {
+        for (const id of visibleIds) next.add(id);
+      }
+      return next;
+    });
+  }
+
   async function sendMessage(
     body: string,
     conversationId?: string,
@@ -598,14 +674,56 @@ export default function PlatformMessagesPage() {
         ))}
       </div>
 
+      {canDelete && selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[var(--platform-border)] bg-[var(--platform-surface)] px-4 py-3 text-sm">
+          <span>
+            <span className="font-medium">{selectedIds.size}</span> selected
+          </span>
+          <button
+            type="button"
+            className="platform-btn-secondary inline-flex items-center gap-2 text-xs text-red-700"
+            disabled={deleting}
+            onClick={() => setBulkDeleteConfirm(true)}
+          >
+            <Trash2 className="size-3.5" />
+            Move to trash
+          </button>
+          <button
+            type="button"
+            className="platform-btn-ghost text-xs"
+            disabled={deleting}
+            onClick={() => setSelectedIds(new Set())}
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-[minmax(0,20rem)_1fr] xl:grid-cols-[minmax(0,22rem)_1fr]">
         <div className="platform-card overflow-hidden rounded-xl">
-          <div className="border-b border-[var(--platform-border)] px-4 py-3 text-xs text-[var(--platform-text-secondary)]">
-            {filtered.length} conversations
-            {unreadTotal > 0 && (
-              <span className="ml-2 rounded-full bg-violet-600 px-2 py-0.5 font-bold text-white">
-                {unreadTotal} unread
-              </span>
+          <div className="flex items-center justify-between gap-2 border-b border-[var(--platform-border)] px-4 py-3 text-xs text-[var(--platform-text-secondary)]">
+            <span>
+              {filtered.length} conversations
+              {unreadTotal > 0 && (
+                <span className="ml-2 rounded-full bg-violet-600 px-2 py-0.5 font-bold text-white">
+                  {unreadTotal} unread
+                </span>
+              )}
+            </span>
+            {canDelete && filtered.length > 0 && (
+              <label className="inline-flex cursor-pointer items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={
+                    filtered.length > 0 &&
+                    filtered.every((c) => selectedIds.has(c.id))
+                  }
+                  onChange={toggleSelectAllFiltered}
+                  className="size-3.5 rounded border-[var(--platform-border)]"
+                  aria-label="Select all visible tickets"
+                />
+                Select all
+              </label>
             )}
           </div>
           <ul className="platform-scrollbar max-h-[min(70vh,36rem)] divide-y divide-[var(--platform-border)] overflow-y-auto">
@@ -617,7 +735,19 @@ export default function PlatformMessagesPage() {
               filtered.map((conv) => {
                 const active = conv.id === selectedId && !showNewChat;
                 return (
-                  <li key={conv.id}>
+                  <li key={conv.id} className="flex items-stretch">
+                    {canDelete && (
+                      <div className="flex items-start px-2 pt-3.5">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(conv.id)}
+                          onChange={() => toggleSelected(conv.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="size-3.5 rounded border-[var(--platform-border)]"
+                          aria-label={`Select ${conv.subject}`}
+                        />
+                      </div>
+                    )}
                     <button
                       type="button"
                       onClick={() => {
@@ -627,7 +757,8 @@ export default function PlatformMessagesPage() {
                         setReplyAssistKey((key) => key + 1);
                       }}
                       className={cn(
-                        "w-full px-4 py-3 text-left transition-colors",
+                        "min-w-0 flex-1 px-4 py-3 text-left transition-colors",
+                        !canDelete && "w-full",
                         active
                           ? "bg-[rgba(139,92,246,0.08)]"
                           : "hover:bg-[rgba(76,29,149,0.04)]"
@@ -944,6 +1075,17 @@ export default function PlatformMessagesPage() {
                         </button>
                       </div>
                     )}
+                    {canDelete && (
+                      <button
+                        type="button"
+                        className="platform-btn-secondary inline-flex items-center gap-1.5 text-xs text-red-700"
+                        disabled={deleting}
+                        onClick={() => setDeleteTarget(selected)}
+                      >
+                        <Trash2 className="size-3.5" />
+                        Delete
+                      </button>
+                    )}
                     <span
                       className={cn(
                         "rounded px-2 py-1 text-[10px] font-semibold uppercase",
@@ -1048,6 +1190,41 @@ export default function PlatformMessagesPage() {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setDeleteTarget(null);
+        }}
+        title={deleteTarget ? `Delete “${deleteTarget.subject}”?` : "Delete ticket?"}
+        description={
+          deleteTarget
+            ? `Move this support ticket with ${deleteTarget.customer_name} to trash? It will be removed from Messages but kept in Trash where it can be restored.`
+            : ""
+        }
+        confirmLabel="Move to trash"
+        busyLabel="Moving…"
+        destructive
+        confirmPhrase={DELETE_CONFIRM_PHRASE}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          return deleteTickets([deleteTarget.id]);
+        }}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteConfirm}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setBulkDeleteConfirm(false);
+        }}
+        title="Delete selected tickets?"
+        description={`Move ${selectedIds.size} support ticket${selectedIds.size === 1 ? "" : "s"} to trash? They will be removed from Messages but kept in Trash where they can be restored.`}
+        confirmLabel="Move to trash"
+        busyLabel="Moving…"
+        destructive
+        confirmPhrase={DELETE_CONFIRM_PHRASE}
+        onConfirm={() => deleteTickets([...selectedIds])}
+      />
     </div>
   );
 }

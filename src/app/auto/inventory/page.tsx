@@ -57,7 +57,7 @@ interface InventoryPageProps {
 export const metadata = {
   title: "Inventory",
   description:
-    "Browse our verified vehicle inventory. Filter by price, make, model, year, and more.",
+    "Browse and search our verified vehicle inventory by make, model, year, and more.",
 };
 
 function FiltersFallback() {

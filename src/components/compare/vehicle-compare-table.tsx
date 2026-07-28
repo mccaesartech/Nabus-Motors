@@ -28,7 +28,7 @@ function trustBadgeSummary(vehicle: Vehicle): string {
 }
 
 export function VehicleCompareTable({ vehicles }: { vehicles: Vehicle[] }) {
-  const { formatPrice } = useCurrency();
+  const { formatVehicleListPrice } = useCurrency();
 
   const rows: CompareRow[] = [
     { label: "Make", get: (v) => v.make },
@@ -36,7 +36,15 @@ export function VehicleCompareTable({ vehicles }: { vehicles: Vehicle[] }) {
     { label: "Year", get: (v) => String(v.year) },
     {
       label: "Price",
-      get: (v) => <span className="font-semibold">{formatPrice(v.price)}</span>,
+      get: (v) => (
+        <span className="font-semibold">
+          {formatVehicleListPrice({
+            price: v.price,
+            priceCurrency: v.priceCurrency,
+            listedPrice: v.listedPrice,
+          })}
+        </span>
+      ),
     },
     { label: "Mileage", get: (v) => formatMileage(v.mileage) },
     { label: "Fuel", get: (v) => v.fuelType },

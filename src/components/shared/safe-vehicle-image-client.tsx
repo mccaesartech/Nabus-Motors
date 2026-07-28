@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { PLACEHOLDER_IMAGE } from "@/lib/data/vehicle-images";
+import { isSupabaseStoragePublicUrl } from "@/lib/site-content/media-url";
 import { cn } from "@/lib/utils";
 
 const DEFAULT_SIZES =
@@ -47,6 +48,9 @@ export function SafeVehicleImageClient({
   const failed = failedSrc === src;
   const imgSrc = failed ? PLACEHOLDER_IMAGE : src;
   const showImage = isPlaceholder || failed || loadedSrc === imgSrc;
+  // Uploaded listing photos are already resized/compressed in storage — skip the
+  // Next.js optimizer hop so the first public paint hits Supabase CDN directly.
+  const unoptimized = !isPlaceholder && isSupabaseStoragePublicUrl(imgSrc);
 
   const handleError = () => {
     if (imgSrc !== PLACEHOLDER_IMAGE) {
@@ -109,6 +113,7 @@ export function SafeVehicleImageClient({
         loading={priority ? undefined : "lazy"}
         decoding="async"
         referrerPolicy="no-referrer"
+        unoptimized={unoptimized}
         className={imageClassName}
         onError={handleError}
         onLoad={handleLoad}
@@ -127,6 +132,7 @@ export function SafeVehicleImageClient({
       loading={priority ? undefined : "lazy"}
       decoding="async"
       referrerPolicy="no-referrer"
+      unoptimized={unoptimized}
       className={imageClassName}
       onError={handleError}
       onLoad={handleLoad}

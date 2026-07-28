@@ -7,6 +7,15 @@ import { mergeSiteSettings } from "@/lib/platform/site-settings";
 import { getAutoSiteUrl, getPublicSiteUrl } from "@/lib/site-url";
 import { getEmailDeliveryHealth } from "@/lib/email/delivery-health";
 import { isTermiiProviderEnv } from "@/lib/notifications/termii-config";
+import {
+  isArkeselProviderEnv,
+  readArkeselConfigFromEnv,
+} from "@/lib/notifications/arkesel-config";
+import { readWhatsAppConfigFromEnv } from "@/lib/notifications/whatsapp-config";
+import {
+  maskSettingsSecrets,
+  stripMaskedSecretUpdates,
+} from "@/lib/platform/settings-secrets";
 
 export async function GET() {
   const auth = await requirePermission("settings");
@@ -17,9 +26,24 @@ export async function GET() {
   const db = await checkDbHealth();
   const emailDelivery = getEmailDeliveryHealth();
   const termiiRecommended = isTermiiProviderEnv();
+  const arkeselRecommended = isArkeselProviderEnv();
+  const envWhatsApp = readWhatsAppConfigFromEnv();
+  const envArkesel = readArkeselConfigFromEnv();
   const notificationMeta = {
-    recommendedProvider: termiiRecommended ? "termii" : null,
+    recommendedProvider: arkeselRecommended
+      ? "arkesel"
+      : termiiRecommended
+        ? "termii"
+        : envWhatsApp.provider === "meta"
+          ? "meta"
+          : null,
     termiiEnvConfigured: Boolean(process.env.TERMII_API_KEY?.trim()),
+    arkeselEnvConfigured: envArkesel.configured,
+    whatsappEnvConfigured: envWhatsApp.configured,
+    whatsappEnvProvider: envWhatsApp.provider || null,
+    whatsappEnvEnabled: envWhatsApp.enabled,
+    webhookVerifyConfigured: Boolean(process.env.WHATSAPP_VERIFY_TOKEN?.trim()),
+    webhookSecretConfigured: Boolean(process.env.WHATSAPP_APP_SECRET?.trim()),
   };
 
   const supabase = createAdminSupabase();
@@ -27,7 +51,7 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       configured: false,
-      settings: DEFAULT_SITE_SETTINGS,
+      settings: maskSettingsSecrets(DEFAULT_SITE_SETTINGS),
       db,
       meta: {
         publicSiteUrl: getPublicSiteUrl(),
@@ -45,7 +69,7 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       configured: true,
-      settings: DEFAULT_SITE_SETTINGS,
+      settings: maskSettingsSecrets(DEFAULT_SITE_SETTINGS),
       db: { ...db, connected: false, error: error.message },
       meta: {
         publicSiteUrl: getPublicSiteUrl(),
@@ -56,7 +80,7 @@ export async function GET() {
     });
   }
 
-  const settings = mergeSiteSettings(data);
+  const settings = maskSettingsSecrets(mergeSiteSettings(data));
 
   return NextResponse.json({
     ok: true,
@@ -67,6 +91,7 @@ export async function GET() {
       publicSiteUrl: getPublicSiteUrl(),
       autoSiteUrl: getAutoSiteUrl(),
       emailDelivery,
+      notification: notificationMeta,
     },
   });
 }
@@ -78,9 +103,11 @@ export async function PATCH(req: NextRequest) {
   }
 
   const body = (await req.json()) as Record<string, string>;
-  const updates = Object.fromEntries(
-    Object.entries(body).filter(([key]) =>
-      SITE_SETTING_KEYS.includes(key as SiteSettingKey)
+  const updates = stripMaskedSecretUpdates(
+    Object.fromEntries(
+      Object.entries(body).filter(([key]) =>
+        SITE_SETTING_KEYS.includes(key as SiteSettingKey)
+      )
     )
   );
 
@@ -94,7 +121,7 @@ export async function PATCH(req: NextRequest) {
       ok: true,
       configured: false,
       message: "Saved locally only — configure Supabase to persist.",
-      settings: { ...DEFAULT_SITE_SETTINGS, ...updates },
+      settings: maskSettingsSecrets({ ...DEFAULT_SITE_SETTINGS, ...updates }),
     });
   }
 

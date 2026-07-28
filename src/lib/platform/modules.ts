@@ -64,6 +64,16 @@ export const SITE_SETTING_KEY_LIST = [
   "whatsapp_api_provider",
   "whatsapp_phone_number_id",
   "whatsapp_api_access_token",
+  "whatsapp_enabled",
+  "whatsapp_business_account_id",
+  "whatsapp_default_country",
+  "notify_team_whatsapp_enabled",
+  "whatsapp_template_password_reset",
+  "whatsapp_template_team_invite",
+  "whatsapp_template_team_welcome",
+  "whatsapp_template_team_role_changed",
+  "whatsapp_template_team_password_set",
+  "whatsapp_template_language",
   "twilio_account_sid",
   "twilio_auth_token",
   "twilio_whatsapp_from",
@@ -72,6 +82,10 @@ export const SITE_SETTING_KEY_LIST = [
   "termii_whatsapp_device",
   "termii_base_url",
   "termii_sms_channel",
+  "arkesel_api_key",
+  "arkesel_sender_id",
+  "arkesel_base_url",
+  "arkesel_enabled",
 ] as const;
 
 export type SiteSettingKey = (typeof SITE_SETTING_KEY_LIST)[number];
@@ -120,6 +134,16 @@ export const DEFAULT_SITE_SETTINGS: SiteSettingsMap = {
   whatsapp_api_provider: "",
   whatsapp_phone_number_id: "",
   whatsapp_api_access_token: "",
+  whatsapp_enabled: "true",
+  whatsapp_business_account_id: "",
+  whatsapp_default_country: "GH",
+  notify_team_whatsapp_enabled: "true",
+  whatsapp_template_password_reset: "password_reset",
+  whatsapp_template_team_invite: "team_invite",
+  whatsapp_template_team_welcome: "team_welcome",
+  whatsapp_template_team_role_changed: "team_role_changed",
+  whatsapp_template_team_password_set: "team_password_set",
+  whatsapp_template_language: "en",
   twilio_account_sid: "",
   twilio_auth_token: "",
   twilio_whatsapp_from: "",
@@ -128,6 +152,10 @@ export const DEFAULT_SITE_SETTINGS: SiteSettingsMap = {
   termii_whatsapp_device: "",
   termii_base_url: "https://api.ng.termii.com",
   termii_sms_channel: "dnd",
+  arkesel_api_key: "",
+  arkesel_sender_id: "",
+  arkesel_base_url: "https://sms.arkesel.com",
+  arkesel_enabled: "true",
 };
 
 export const SITE_SETTING_KEYS: SiteSettingKey[] = [...SITE_SETTING_KEY_LIST];
@@ -148,6 +176,13 @@ export type PlatformUserInviteInfo = {
   needsRegenerate?: boolean;
 };
 
+/** Delivery outcome for invite / role / password team notifications. */
+export type PlatformUserNotifyInfo = {
+  channel: "sms" | "whatsapp" | "none" | "email";
+  status: "sent" | "skipped_no_phone" | "skipped_not_configured" | "failed" | "pending";
+  label: string;
+};
+
 export type PlatformUserRow = {
   id: string;
   name: string;
@@ -161,6 +196,8 @@ export type PlatformUserRow = {
   activated_at: string | null;
   last_login_at: string | null;
   invite?: PlatformUserInviteInfo;
+  /** Last invite/role notification status from this session (not persisted). */
+  notify?: PlatformUserNotifyInfo;
 };
 
 export type PlatformInviteRow = {

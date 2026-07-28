@@ -36,9 +36,9 @@ export function formatFilterPriceLabel(
   return `Up to ${formatUsdPrice(usdAmount, displayCurrency)}`;
 }
 
-/** Compact multi-currency preview for admin dashboards */
+/** Compact multi-currency preview for admin dashboards (amounts are USD). */
 export function formatAdminCurrencyPreviews(usdAmount: number): string {
-  const codes = ["GHS", "ZWL", "ZAR"] as const;
+  const codes = ["GHS", "USD", "EUR"] as const;
   return codes.map((code) => formatUsdPrice(usdAmount, code)).join(" · ");
 }
 

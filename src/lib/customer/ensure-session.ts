@@ -1,5 +1,6 @@
 import { markSessionPreferencePromptPending } from "@/lib/customer/session-preference";
 import { customerLoginErrorMessage } from "@/lib/customer/login-errors";
+import { validateEmailLocal } from "@/lib/email/validate-email";
 import { supabase } from "@/lib/supabase/client";
 
 export type EnsureCustomerSessionResult =
@@ -31,7 +32,33 @@ export async function ensureCustomerSession({
     return { ok: false, message: "Account registration is not configured yet." };
   }
 
-  const trimmedEmail = email.trim();
+  const localEmail = validateEmailLocal(email);
+  if (!localEmail.ok || !localEmail.normalized) {
+    return { ok: false, message: localEmail.message };
+  }
+
+  try {
+    const validateRes = await fetch("/api/customer/validate-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: localEmail.normalized }),
+    });
+    const validateBody = (await validateRes.json().catch(() => null)) as {
+      ok?: boolean;
+      message?: string;
+    } | null;
+    if (!validateRes.ok || !validateBody?.ok) {
+      return {
+        ok: false,
+        message:
+          validateBody?.message || "This email domain looks invalid.",
+      };
+    }
+  } catch {
+    return { ok: false, message: "Could not verify email. Please try again." };
+  }
+
+  const trimmedEmail = localEmail.normalized;
 
   const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
     email: trimmedEmail,

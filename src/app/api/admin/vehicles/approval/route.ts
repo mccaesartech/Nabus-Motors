@@ -14,7 +14,11 @@ import { clearVehiclePendingNotifications } from "@/lib/platform/vehicle-approva
 import type { DbVehicle } from "@/lib/platform/types";
 import { vehicleWriteWithOptionalFallback } from "@/lib/admin/vehicle-columns";
 import { createAdminSupabase } from "@/lib/supabase/admin";
-import { resolveRequestedSoldStatus } from "@/lib/vehicles/stock-automation";
+import {
+  countAvailableSiblings,
+  resolveRequestedSoldStatus,
+} from "@/lib/vehicles/stock-automation";
+import { maybeNotifyVehicleStockAction, refreshFleetLowStockAlert } from "@/lib/platform/vehicle-stock-notifications";
 
 export async function POST(req: NextRequest) {
   const auth = await requirePermission("inventory_approve");
@@ -34,6 +38,7 @@ export async function POST(req: NextRequest) {
     id?: string;
     action?: string;
     note?: string;
+    publishConfirmed?: boolean;
   };
 
   const id = body.id?.trim();
@@ -47,6 +52,18 @@ export async function POST(req: NextRequest) {
   if (action !== "approve" && action !== "reject" && action !== "dismiss") {
     return NextResponse.json(
       { ok: false, message: 'Action must be "approve", "reject", or "dismiss".' },
+      { status: 400 }
+    );
+  }
+
+  if (action === "approve" && body.publishConfirmed !== true) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          "Confirm the full vehicle details and photos before publishing to the public website.",
+        code: "PUBLISH_CONFIRMATION_REQUIRED",
+      },
       { status: 400 }
     );
   }
@@ -79,6 +96,13 @@ export async function POST(req: NextRequest) {
   const reviewedAt = new Date().toISOString();
 
   let updatePayload: Record<string, unknown>;
+  let approvedSoldTransition: {
+    autoPreOrder: boolean;
+    availableSiblings: number;
+    make: string;
+    model: string;
+    year: number;
+  } | null = null;
 
   if (action === "approve") {
     updatePayload = {
@@ -92,20 +116,36 @@ export async function POST(req: NextRequest) {
     if (isEditPending) {
       const pending = { ...(existing.pending_changes as VehiclePendingChanges) };
       if (pending.status === "sold") {
+        const make = String(pending.make ?? existing.make);
+        const model = String(pending.model ?? existing.model);
+        const year = Number(pending.year ?? existing.year);
+        const availableSiblings = await countAvailableSiblings(supabase, {
+          id,
+          make,
+          model,
+          year,
+        });
         const resolved = await resolveRequestedSoldStatus(supabase, {
           id,
           slug: existing.slug,
-          make: String(pending.make ?? existing.make),
-          model: String(pending.model ?? existing.model),
-          year: Number(pending.year ?? existing.year),
+          make,
+          model,
+          year,
         });
         pending.status = resolved;
+        approvedSoldTransition = {
+          autoPreOrder: resolved === "pre_order",
+          availableSiblings,
+          make,
+          model,
+          year,
+        };
         if (resolved === "pre_order") {
           await logPlatformActivity(auth.auth, "vehicle_auto_pre_order", existing.slug, {
             id,
-            make: String(pending.make ?? existing.make),
-            model: String(pending.model ?? existing.model),
-            year: Number(pending.year ?? existing.year),
+            make,
+            model,
+            year,
             source: "approval_status_change",
           });
         }
@@ -179,6 +219,25 @@ export async function POST(req: NextRequest) {
   const vehicle = data as DbVehicle;
 
   await clearVehiclePendingNotifications(supabase, id);
+
+  if (action === "approve" && approvedSoldTransition) {
+    try {
+      await maybeNotifyVehicleStockAction(supabase, {
+        id: vehicle.id,
+        slug: vehicle.slug,
+        year: approvedSoldTransition.year,
+        make: approvedSoldTransition.make,
+        model: approvedSoldTransition.model,
+        availableSiblings: approvedSoldTransition.availableSiblings,
+        autoPreOrder: approvedSoldTransition.autoPreOrder,
+        source: "sold",
+        sourceDetail: "approval_status_change",
+      });
+      await refreshFleetLowStockAlert(supabase);
+    } catch (err) {
+      console.error("[vehicles/approval] stock action notify failed:", err);
+    }
+  }
 
   if (action === "approve" || (action === "dismiss" && isEditPending)) {
     revalidatePublicSite(vehicle.slug);

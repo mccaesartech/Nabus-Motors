@@ -26,13 +26,30 @@ import type { VehicleGalleryData } from "@/lib/types";
 import { EMPTY_VEHICLE_GALLERY } from "@/lib/types";
 import { primaryAndAdditionalToGallery } from "@/lib/data/vehicle-images";
 import { omitEmptyOptionalVehicleFields } from "@/lib/admin/vehicle-columns";
+import {
+  buildVehiclePublishSummary,
+  listingImageUrls,
+  requirePrimaryVehicleImage,
+  type VehiclePublishSummary,
+} from "@/lib/admin/vehicle-publish-gates";
 import { makes } from "@/lib/data/catalog-meta";
-import { formatAdminCurrencyPreviews } from "@/lib/currency";
+import {
+  BASE_CURRENCY,
+  convertBetweenCurrencies,
+  formatAmount,
+  formatUsdPrice,
+  LISTING_PRICE_CURRENCIES,
+  toStoredVehiclePrice,
+} from "@/lib/currency";
 import { usePlatformCurrency } from "@/context/platform-currency-context";
 import { CategoryBadges } from "@/components/admin/category-badges";
 import { VehicleAiChat } from "@/components/platform/vehicle-ai-chat";
 import { VehicleImageUpload } from "@/components/platform/vehicle-image-upload";
 import { VehicleColorField } from "@/components/shared/vehicle-color-field";
+import { VehicleImageMismatchDialog } from "@/components/platform/vehicle-image-mismatch-dialog";
+import { VehiclePublishConfirmDialog } from "@/components/platform/vehicle-publish-confirm-dialog";
+import type { VehicleImageMatchIssue } from "@/lib/ai/vehicle-image-match-types";
+import { adminErrorMessage, parseAdminResponse } from "@/lib/admin/client";
 
 export type PlatformVehicle = VehicleInput & {
   id?: string;
@@ -41,9 +58,13 @@ export type PlatformVehicle = VehicleInput & {
 
 type PlatformVehicleFormProps = {
   initial?: PlatformVehicle | null;
-  onSave: (data: VehicleInput) => Promise<void>;
+  onSave: (data: VehicleInput & { publishConfirmed?: boolean }) => Promise<void>;
   onCancel: () => void;
   saving?: boolean;
+  /** Owner/super-admin saves that go live immediately. */
+  requiresPublishConfirmation?: boolean;
+  /** Shown on the primary submit button when publishing live. */
+  publishButtonLabel?: string;
 };
 
 function Field({
@@ -53,7 +74,7 @@ function Field({
   className,
 }: {
   label: string;
-  hint?: string;
+  hint?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
 }) {
@@ -61,7 +82,9 @@ function Field({
     <div className={className ?? "space-y-1.5"}>
       <label className="block text-sm font-medium text-[var(--platform-text)]">{label}</label>
       {children}
-      {hint && <p className="text-xs text-[var(--platform-text-secondary)]">{hint}</p>}
+      {hint && (
+        <div className="text-xs text-[var(--platform-text-secondary)]">{hint}</div>
+      )}
     </div>
   );
 }
@@ -80,8 +103,11 @@ export function PlatformVehicleForm({
   onSave,
   onCancel,
   saving,
+  requiresPublishConfirmation = false,
+  publishButtonLabel,
 }: PlatformVehicleFormProps) {
-  const { formatPrice } = usePlatformCurrency();
+  const { formatVehicleListPrice, settingsDefaultCurrency, currency } =
+    usePlatformCurrency();
   const [form, setForm] = useState<VehicleInput>(() =>
     initial
       ? {
@@ -90,6 +116,8 @@ export function PlatformVehicleForm({
           year: initial.year,
           trim: initial.trim ?? "",
           price: initial.price,
+          price_currency:
+            initial.price_currency || settingsDefaultCurrency || "GHS",
           mileage: initial.mileage,
           fuel_type: initial.fuel_type,
           transmission: initial.transmission,
@@ -119,7 +147,7 @@ export function PlatformVehicleForm({
           customs_clearing_available: initial.customs_clearing_available ?? false,
           available_locally: initial.available_locally ?? false,
         }
-      : emptyVehicleForm()
+      : emptyVehicleForm(settingsDefaultCurrency || currency || "GHS")
   );
   const initialImages = primaryAndAdditionalFromVehicle(
     initial ?? { gallery: EMPTY_VEHICLE_GALLERY, images: [] }
@@ -133,9 +161,25 @@ export function PlatformVehicleForm({
     )
   );
   const [error, setError] = useState("");
+  const [verifyingImages, setVerifyingImages] = useState(false);
+  const [mismatchOpen, setMismatchOpen] = useState(false);
+  const [mismatchSummary, setMismatchSummary] = useState("");
+  const [mismatchIssues, setMismatchIssues] = useState<VehicleImageMatchIssue[]>([]);
+  const [mismatchAllowManualConfirm, setMismatchAllowManualConfirm] = useState(false);
+  const [publishConfirmOpen, setPublishConfirmOpen] = useState(false);
+  const [publishSummary, setPublishSummary] = useState<VehiclePublishSummary | null>(null);
+  const [pendingSavePayload, setPendingSavePayload] = useState<VehicleInput | null>(null);
+  const [, setImagesAcknowledged] = useState(false);
+  const imagesAcknowledgedRef = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
 
   const totalPhotos = (primaryImageUrl ? 1 : 0) + additionalImages.length;
+  const submitBusy = Boolean(saving || verifyingImages);
+
+  function markImagesAcknowledged(value: boolean) {
+    imagesAcknowledgedRef.current = value;
+    setImagesAcknowledged(value);
+  }
 
   function syncGalleryFromImages(primary: string, additional: string[]) {
     const nextGallery = primaryAndAdditionalToGallery(primary, additional);
@@ -146,11 +190,13 @@ export function PlatformVehicleForm({
   function updatePrimaryImage(urls: string[]) {
     const nextPrimary = urls[0] ?? "";
     setPrimaryImageUrl(nextPrimary);
+    markImagesAcknowledged(false);
     syncGalleryFromImages(nextPrimary, additionalImages);
   }
 
   function updateAdditionalImages(urls: string[]) {
     setAdditionalImages(urls);
+    markImagesAcknowledged(false);
     syncGalleryFromImages(primaryImageUrl, urls);
   }
 
@@ -162,6 +208,15 @@ export function PlatformVehicleForm({
   }
 
   function update<K extends keyof VehicleInput>(key: K, value: VehicleInput[K]) {
+    if (
+      key === "make" ||
+      key === "model" ||
+      key === "year" ||
+      key === "color" ||
+      key === "body_type"
+    ) {
+      markImagesAcknowledged(false);
+    }
     setForm((prev) => {
       const next = { ...prev, [key]: value };
       if (key === "available_locally" && value === true) {
@@ -174,27 +229,170 @@ export function PlatformVehicleForm({
     });
   }
 
+  function setPriceCurrency(nextCurrency: string) {
+    setForm((prev) => {
+      const from = prev.price_currency || settingsDefaultCurrency || "GHS";
+      const to = nextCurrency.toUpperCase();
+      if (from === to) {
+        return { ...prev, price_currency: to };
+      }
+      const converted =
+        prev.price > 0
+          ? Math.round(convertBetweenCurrencies(prev.price, from, to))
+          : prev.price;
+      return { ...prev, price_currency: to, price: converted };
+    });
+  }
+
+  function buildSyncedPayload(): VehicleInput {
+    const synced = syncVehicleImagesFromPrimaryAndAdditional(
+      primaryImageUrl,
+      additionalImages
+    );
+    return omitEmptyOptionalVehicleFields({
+      ...form,
+      primary_image_url: synced.primary_image_url,
+      additional_images: synced.additional_images,
+      gallery: synced.gallery,
+      images: synced.images,
+    });
+  }
+
+  async function verifyImagesForPayload(payload: VehicleInput): Promise<{
+    blocked: boolean;
+    manualReviewRequired: boolean;
+    summary: string;
+    issues: VehicleImageMatchIssue[];
+  }> {
+    const imageError = requirePrimaryVehicleImage(payload);
+    if (imageError) {
+      return {
+        blocked: true,
+        manualReviewRequired: false,
+        summary: imageError,
+        issues: [
+          {
+            url: "",
+            status: "no_vehicle",
+            reason: imageError,
+          },
+        ],
+      };
+    }
+
+    const res = await fetch("/api/admin/vehicles/verify-images", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({
+        images: listingImageUrls(payload).slice(0, 3),
+        vehicle: {
+          make: payload.make,
+          model: payload.model,
+          year: payload.year,
+          color: payload.color,
+          body_type: payload.body_type,
+        },
+      }),
+    });
+    const json = await parseAdminResponse(res);
+    if (!res.ok || !json.ok) {
+      throw new Error(adminErrorMessage(json, "Could not verify listing photos."));
+    }
+
+    return {
+      blocked: Boolean(json.blocked),
+      manualReviewRequired: Boolean(json.manualReviewRequired),
+      summary: String(json.summary ?? "Photo review completed."),
+      issues: Array.isArray(json.issues) ? (json.issues as VehicleImageMatchIssue[]) : [],
+    };
+  }
+
+  async function commitSave(payload: VehicleInput, publishConfirmed: boolean) {
+    await onSave({
+      ...payload,
+      ...(publishConfirmed ? { publishConfirmed: true } : {}),
+    });
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (saving) return;
+    if (submitBusy) return;
     setError("");
+
+    const payload = buildSyncedPayload();
+    const imageError = requirePrimaryVehicleImage(payload);
+    if (imageError) {
+      setMismatchSummary(imageError);
+      setMismatchIssues([
+        {
+          url: "",
+          status: "no_vehicle",
+          reason: imageError,
+        },
+      ]);
+      setMismatchAllowManualConfirm(false);
+      setMismatchOpen(true);
+      return;
+    }
+
+    setVerifyingImages(true);
     try {
-      const synced = syncVehicleImagesFromPrimaryAndAdditional(
-        primaryImageUrl,
-        additionalImages
-      );
-      await onSave(
-        omitEmptyOptionalVehicleFields({
-          ...form,
-          primary_image_url: synced.primary_image_url,
-          additional_images: synced.additional_images,
-          gallery: synced.gallery,
-          images: synced.images,
-        })
-      );
+      if (!imagesAcknowledgedRef.current) {
+        const review = await verifyImagesForPayload(payload);
+        if (review.blocked || review.manualReviewRequired) {
+          setMismatchSummary(review.summary);
+          setMismatchIssues(review.issues);
+          setMismatchAllowManualConfirm(!review.blocked && review.manualReviewRequired);
+          setMismatchOpen(true);
+          return;
+        }
+      }
+
+      setPendingSavePayload(payload);
+      if (requiresPublishConfirmation) {
+        setPublishSummary(buildVehiclePublishSummary(payload));
+        setPublishConfirmOpen(true);
+        return;
+      }
+
+      await commitSave(payload, false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save vehicle.");
+    } finally {
+      setVerifyingImages(false);
     }
+  }
+
+  function rejectFlaggedImages() {
+    const flagged = new Set(
+      mismatchIssues
+        .filter(
+          (issue) =>
+            issue.status === "mismatch" ||
+            issue.status === "no_vehicle" ||
+            issue.status === "uncertain"
+        )
+        .map((issue) => issue.url)
+        .filter(Boolean)
+    );
+
+    if (flagged.size === 0) {
+      setPrimaryImageUrl("");
+      setAdditionalImages([]);
+      syncGalleryFromImages("", []);
+      markImagesAcknowledged(false);
+      setError("Add photos of the actual vehicle, then try again.");
+      return;
+    }
+
+    const nextPrimary = primaryImageUrl && flagged.has(primaryImageUrl) ? "" : primaryImageUrl;
+    const nextAdditional = additionalImages.filter((url) => !flagged.has(url));
+    setPrimaryImageUrl(nextPrimary);
+    setAdditionalImages(nextAdditional);
+    syncGalleryFromImages(nextPrimary, nextAdditional);
+    markImagesAcknowledged(false);
+    setError("Flagged photos were removed. Upload matching photos of this vehicle, then submit again.");
   }
 
   function handleFormKeyDown(e: React.KeyboardEvent<HTMLFormElement>) {
@@ -215,6 +413,20 @@ export function PlatformVehicleForm({
       formRef.current?.requestSubmit();
     }
   }
+
+  const primarySubmitLabel = submitBusy
+    ? verifyingImages
+      ? "Checking photos…"
+      : "Saving…"
+    : publishButtonLabel
+      ? publishButtonLabel
+      : requiresPublishConfirmation
+        ? initial?.id
+          ? "Review & publish changes"
+          : "Review & publish"
+        : initial?.id
+          ? "Save changes"
+          : "Submit for approval";
 
   return (
     <div className="grid gap-6 pb-4 lg:grid-cols-[minmax(0,1fr)_min(100%,22rem)] lg:items-start">
@@ -389,7 +601,8 @@ export function PlatformVehicleForm({
               inputClassName="platform-input"
             />
             <p className="mt-1 text-xs text-[var(--platform-text-secondary)]">
-              Choose the color that matches the car in the primary photo.
+              Pick a named color from the list, or choose Custom to type your own.
+              Match the color to the car in the primary photo.
             </p>
           </Field>
           <Field label="VIN / Stock #">
@@ -464,24 +677,66 @@ export function PlatformVehicleForm({
 
       <Section title="Pricing & status">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="List price *">
-            <input
-              type="number"
-              min={0}
-              value={form.price || ""}
-              onChange={(e) => update("price", Number(e.target.value))}
-              required
-              className="platform-input"
-            />
-            {form.price > 0 && (
-              <p className="mt-1 text-xs text-[var(--platform-text-secondary)]">
-                ≈ {formatPrice(form.price)}
-                <span className="text-[var(--platform-text-secondary)]/70">
-                  {" "}
-                  · {formatAdminCurrencyPreviews(form.price)}
-                </span>
-              </p>
-            )}
+          <Field
+            label="List price *"
+            hint="Enter the amount in the listing currency below. This does not change the public site currency for visitors."
+            className="sm:col-span-2 lg:col-span-2"
+          >
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+              <input
+                type="number"
+                min={0}
+                value={form.price || ""}
+                onChange={(e) => update("price", Number(e.target.value))}
+                required
+                className="platform-input min-w-0 flex-1"
+              />
+              <select
+                value={form.price_currency || settingsDefaultCurrency || "GHS"}
+                onChange={(e) => setPriceCurrency(e.target.value)}
+                className="platform-select w-full sm:w-36"
+                aria-label="Listing price currency"
+              >
+                {LISTING_PRICE_CURRENCIES.map((code) => (
+                  <option key={code} value={code}>
+                    {code}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {form.price > 0 &&
+              (() => {
+                const listingCurrency =
+                  form.price_currency || settingsDefaultCurrency || "GHS";
+                const stored = toStoredVehiclePrice(form.price, listingCurrency);
+                return (
+                  <p className="mt-1 text-xs text-[var(--platform-text-secondary)]">
+                    Listing {formatAmount(form.price, listingCurrency)}
+                    {listingCurrency !== BASE_CURRENCY && (
+                      <>
+                        {" "}
+                        · stores as ≈ {formatAmount(stored.price, BASE_CURRENCY)}
+                      </>
+                    )}
+                    {currency !== listingCurrency && (
+                      <>
+                        {" "}
+                        · dashboard ≈{" "}
+                        {formatVehicleListPrice({
+                          price: stored.price,
+                          priceCurrency: listingCurrency,
+                          listedPrice: form.price,
+                        })}
+                      </>
+                    )}
+                    <span className="text-[var(--platform-text-secondary)]/70">
+                      {" "}
+                      · {formatUsdPrice(stored.price, "USD")} ·{" "}
+                      {formatUsdPrice(stored.price, "EUR")}
+                    </span>
+                  </p>
+                );
+              })()}
           </Field>
           <Field label="Mileage (km) *">
             <input
@@ -573,22 +828,48 @@ export function PlatformVehicleForm({
             </label>
           ))}
         </div>
-        <Field label="Inspection summary" className="mt-4">
+        <Field
+          label="Inspection summary"
+          className="mt-4"
+          hint={
+            <div className="space-y-1.5">
+              <p>
+                Shown under Trust &amp; Inspection on the vehicle page. Write a clear,
+                buyer-facing summary of the inspection — not just “OK.” Cover what was
+                checked and the outcome (pass / minor issues / needs attention).
+              </p>
+              <p className="font-medium text-[var(--platform-text)]">Include when known:</p>
+              <ul className="list-disc space-y-0.5 pl-4">
+                <li>Exterior — paint, body panels, glass, lights, dents/chips/scratches</li>
+                <li>Interior — seats, trim, odors, controls, AC/heat</li>
+                <li>Mechanical — engine/motor, transmission/drive, fluids, leaks, battery (EV/hybrid)</li>
+                <li>Tires &amp; brakes — tread, wear, pads/rotors, spare</li>
+                <li>Electronics — infotainment, cameras, sensors, warning lights</li>
+                <li>Issues found — list defects honestly; note what was repaired or deferred</li>
+                <li>Overall result — e.g. “Passed multi-point inspection” or “Passed with notes”</li>
+              </ul>
+            </div>
+          }
+        >
           <textarea
             value={form.inspection_summary ?? ""}
             onChange={(e) => update("inspection_summary", e.target.value)}
-            rows={4}
-            className="platform-textarea min-h-[6rem]"
-            placeholder="Brief inspection notes shown on the vehicle detail page…"
+            rows={6}
+            className="platform-textarea min-h-[8rem]"
+            placeholder="e.g. Passed multi-point inspection with notes. Exterior: clean paint, minor stone chips on front bumper; Interior: clean, AC cold; Mechanical: no leaks, battery health good; Tires & brakes: even tread, pads ~60%; Electronics: all systems normal, no warning lights. Ready for sale."
           />
         </Field>
-        <Field label="Warranty notes" className="mt-4">
+        <Field
+          label="Warranty notes"
+          className="mt-4"
+          hint="What coverage the buyer gets. Leave blank to use the standard text for this vehicle's condition (New / CPO / Used)."
+        >
           <textarea
             value={form.warranty_notes ?? ""}
             onChange={(e) => update("warranty_notes", e.target.value)}
             rows={3}
             className="platform-textarea min-h-[5rem]"
-            placeholder="Optional warranty coverage notes — leave blank to use condition-based defaults"
+            placeholder="e.g. Remaining manufacturer warranty through Dec 2027 or 100,000 km. Optional 12-month extended cover available."
           />
         </Field>
         <Field
@@ -661,7 +942,8 @@ export function PlatformVehicleForm({
 
       <Section title="Primary image">
         <p className="mb-4 text-sm text-[var(--platform-text-secondary)]">
-          Main photo shown on inventory cards and as the hero on the vehicle detail page.
+          Main photo shown on inventory cards and as the hero on the vehicle detail page. Photos
+          must show this vehicle — mismatched or empty submissions are blocked until corrected.
         </p>
         <div className="rounded-lg border border-[var(--platform-border)] bg-[var(--platform-bg)] p-4">
           <VehicleImageUpload
@@ -696,7 +978,7 @@ export function PlatformVehicleForm({
       <Section title="Description">
         <Field
           label="Listing description"
-          hint="Shift+Enter for new line · Enter to save"
+          hint="Short sales pitch shown on the vehicle page. Mention standout features, condition, and why it's a good buy. Shift+Enter for a new line · Enter to save."
         >
           <textarea
             value={form.description}
@@ -704,7 +986,7 @@ export function PlatformVehicleForm({
             onKeyDown={handleDescriptionKeyDown}
             rows={5}
             className="platform-textarea"
-            placeholder="Short description for the listing page"
+            placeholder="e.g. Well-maintained low-mileage Atto 3 with panoramic roof and full service history. Ready for local delivery."
           />
         </Field>
       </Section>
@@ -716,13 +998,13 @@ export function PlatformVehicleForm({
       )}
 
       <div className="flex flex-wrap gap-3 pt-1">
-        <button type="submit" disabled={saving} className="platform-btn-primary">
-          {saving ? "Saving…" : initial?.id ? "Save changes" : "Add vehicle"}
+        <button type="submit" disabled={submitBusy} className="platform-btn-primary">
+          {primarySubmitLabel}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          disabled={saving}
+          disabled={submitBusy}
           className="platform-btn-ghost"
         >
           Cancel
@@ -737,6 +1019,7 @@ export function PlatformVehicleForm({
           slug={initial?.slug}
           onApplyFields={(fields) => {
             setForm((prev) => ({ ...prev, ...fields }));
+            markImagesAcknowledged(false);
           }}
           onApplyGallery={(nextGallery) => {
             setGallery(nextGallery);
@@ -744,9 +1027,47 @@ export function PlatformVehicleForm({
               primaryAndAdditionalFromVehicle({ gallery: nextGallery });
             setPrimaryImageUrl(nextPrimary);
             setAdditionalImages(nextAdditional);
+            markImagesAcknowledged(false);
           }}
         />
       </div>
+
+      <VehicleImageMismatchDialog
+        open={mismatchOpen}
+        onOpenChange={setMismatchOpen}
+        summary={mismatchSummary}
+        issues={mismatchIssues}
+        allowManualConfirm={mismatchAllowManualConfirm}
+        onRejectImages={rejectFlaggedImages}
+        onCorrect={() => {
+          setError(
+            "Correct the listing details or replace the flagged photos, then submit again."
+          );
+        }}
+        onManualConfirm={() => {
+          markImagesAcknowledged(true);
+          setError("");
+          formRef.current?.requestSubmit();
+        }}
+      />
+
+      {publishSummary ? (
+        <VehiclePublishConfirmDialog
+          open={publishConfirmOpen}
+          onOpenChange={setPublishConfirmOpen}
+          summary={publishSummary}
+          mode="publish"
+          onConfirm={async () => {
+            if (!pendingSavePayload) return;
+            try {
+              await commitSave(pendingSavePayload, true);
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Could not save vehicle.");
+              throw err;
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
 }

@@ -166,10 +166,22 @@ export function VehicleCardFooter({
 
 export function VehicleCardPrice({
   usdAmount,
+  vehicle,
   className,
 }: {
-  usdAmount: number;
+  usdAmount?: number;
+  vehicle?: {
+    price: number;
+    priceCurrency?: string | null;
+    listedPrice?: number | null;
+  };
   className?: string;
 }) {
-  return <VehiclePrice usdAmount={usdAmount} className={className} />;
+  return (
+    <VehiclePrice
+      usdAmount={usdAmount}
+      vehicle={vehicle}
+      className={className}
+    />
+  );
 }

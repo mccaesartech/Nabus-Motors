@@ -45,6 +45,9 @@ let vehicleImageColumnsAvailable: boolean | null = null;
 /** After first trust/filter column schema error, use legacy listing select. */
 let vehicleTrustColumnsAvailable: boolean | null = null;
 
+/** After first price_currency / listed_price schema error, omit those columns. */
+let vehiclePriceCurrencyColumnsAvailable: boolean | null = null;
+
 function isVehicleTrustColumnsSchemaError(message?: string | null): boolean {
   if (!message) return false;
   const lower = message.toLowerCase();
@@ -57,6 +60,12 @@ function isVehicleTrustColumnsSchemaError(message?: string | null): boolean {
     lower.includes("available_locally") ||
     lower.includes("local_availability_at")
   );
+}
+
+function isVehiclePriceCurrencySchemaError(message?: string | null): boolean {
+  if (!message) return false;
+  const lower = message.toLowerCase();
+  return lower.includes("price_currency") || lower.includes("listed_price");
 }
 
 function isVehicleImageColumnsSchemaError(message?: string | null): boolean {
@@ -113,6 +122,20 @@ async function runPublicListingQuery(
         );
       }
       const fallback = await build(approvalOr, PUBLIC_LISTING_SELECT_LEGACY);
+      if (!fallback.error) return fallback;
+    }
+  }
+
+  if (isVehiclePriceCurrencySchemaError(primary.error.message)) {
+    vehiclePriceCurrencyColumnsAvailable = false;
+    const priceFallback = PUBLIC_LISTING_SELECT_WITH_IMAGES_NO_PRICE_CURRENCY;
+    if (listingSelect !== priceFallback) {
+      if (process.env.NODE_ENV === "development") {
+        console.warn(
+          "[vehicles] price_currency/listed_price columns missing — using listing select without them"
+        );
+      }
+      const fallback = await build(approvalOr, priceFallback);
       if (!fallback.error) return fallback;
     }
   }
@@ -181,6 +204,9 @@ async function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
 
 /** Listing/card views — omit heavy JSON columns (specs, history, description, gallery). */
 const PUBLIC_LISTING_SELECT_WITH_IMAGES =
+  "id, slug, make, model, year, trim, price, price_currency, listed_price, mileage, fuel_type, transmission, condition, body_type, location, featured, images, primary_image_url, additional_images, status, trust_badges, country_of_origin, financing_available, shipment_available, customs_clearing_available, available_locally, local_availability_at, created_at";
+
+const PUBLIC_LISTING_SELECT_WITH_IMAGES_NO_PRICE_CURRENCY =
   "id, slug, make, model, year, trim, price, mileage, fuel_type, transmission, condition, body_type, location, featured, images, primary_image_url, additional_images, status, trust_badges, country_of_origin, financing_available, shipment_available, customs_clearing_available, available_locally, local_availability_at, created_at";
 
 const PUBLIC_LISTING_SELECT_LEGACY =
@@ -196,6 +222,9 @@ function publicListingSelect(): string {
   if (vehicleTrustColumnsAvailable === false) {
     return PUBLIC_LISTING_SELECT_WITH_IMAGES_LEGACY_TRUST;
   }
+  if (vehiclePriceCurrencyColumnsAvailable === false) {
+    return PUBLIC_LISTING_SELECT_WITH_IMAGES_NO_PRICE_CURRENCY;
+  }
   return PUBLIC_LISTING_SELECT_WITH_IMAGES;
 }
 
@@ -207,6 +236,8 @@ export interface VehicleRow {
   year: number;
   trim: string | null;
   price: number;
+  price_currency?: string | null;
+  listed_price?: number | null;
   mileage: number;
   fuel_type: string;
   transmission: string;
@@ -264,6 +295,8 @@ export function mapRow(row: VehicleRow): Vehicle {
     year: row.year,
     trim: row.trim ?? undefined,
     price: row.price,
+    priceCurrency: row.price_currency ?? "USD",
+    listedPrice: row.listed_price ?? null,
     mileage: row.mileage,
     fuelType: row.fuel_type as Vehicle["fuelType"],
     transmission: row.transmission as Vehicle["transmission"],

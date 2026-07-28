@@ -66,7 +66,8 @@ export default function AdminLoginPage() {
       return;
     }
 
-    window.location.assign(data.redirect ?? adminDashboardPath());
+    // replace — avoid leaving public UI / login under the Back stack
+    window.location.replace(data.redirect ?? adminDashboardPath());
   }
 
   async function handlePasskeyLogin() {
@@ -87,7 +88,7 @@ export default function AdminLoginPage() {
     try {
       const result = await loginWithPasskey(normalizedEmail);
       if (result.ok) {
-        window.location.assign(result.redirect ?? adminDashboardPath());
+        window.location.replace(result.redirect ?? adminDashboardPath());
         return;
       }
       setError(result.message ?? "Passkey sign-in failed.");
@@ -111,7 +112,7 @@ export default function AdminLoginPage() {
 
     const result = await loginWithBackupCode(normalizedEmail, backupCode);
     if (result.ok) {
-      window.location.assign(result.redirect ?? adminDashboardPath());
+      window.location.replace(result.redirect ?? adminDashboardPath());
       return;
     }
 
