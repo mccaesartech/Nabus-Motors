@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { dbFailure } from "@/lib/errors/api";
 import { requireAdmin } from "@/lib/admin/auth";
 import { hasPermission } from "@/lib/platform/permissions";
 import { bucketMovements, runningNetTotals, summarizeMovements } from "@/lib/platform/inventory-movements/aggregate";
@@ -102,7 +103,11 @@ export async function GET(req: NextRequest) {
         },
       });
     }
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.admin.inventory-movements.GET",
+      message: "We could not load the movement ledger. Try again.",
+      request: req,
+    });
   }
 
   const movements = (data ?? []) as InventoryMovementRow[];

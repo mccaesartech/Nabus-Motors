@@ -18,6 +18,7 @@ import {
   VEHICLE_STATUS_LABELS,
   type VehicleInput,
 } from "@/lib/admin/vehicle-fields";
+import { friendlyErrorMessage } from "@/lib/errors/client";
 import { makes } from "@/lib/data/catalog-meta";
 import {
   BASE_CURRENCY,
@@ -127,7 +128,7 @@ export function VehicleForm({ initial, onSave, onCancel, saving }: VehicleFormPr
         images: parseImagesInput(imageText),
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save vehicle.");
+      setError(friendlyErrorMessage(err, "The vehicle could not be saved. Try again."));
     }
   }
 

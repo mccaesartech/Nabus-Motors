@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { dbFailure } from "@/lib/errors/api";
 import { getPlatformAuth } from "@/lib/admin/auth";
 import { getCustomerFromAuthHeader } from "@/lib/customer/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
@@ -92,10 +93,11 @@ export async function POST(req: NextRequest) {
         );
 
   if (error) {
-    return NextResponse.json(
-      { ok: false, message: error.message ?? "Failed to store subscription." },
-      { status: 500 }
-    );
+    return dbFailure(error, {
+      module: "api.push.subscribe.POST.store",
+      message: "Push notifications could not be enabled. Try again.",
+      request: req,
+    });
   }
 
   return NextResponse.json({ ok: true, configured: true });
@@ -130,7 +132,11 @@ export async function DELETE(req: NextRequest) {
     ? await deleteQuery.eq("customer_user_id", customer.id).eq("role", "customer")
     : await deleteQuery.eq("platform_user_id", platformAuth!.userId!).eq("role", "admin");
   if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.push.subscribe.DELETE",
+      message: "Push notifications could not be enabled. Try again.",
+      request: req,
+    });
   }
 
   return NextResponse.json({ ok: true });

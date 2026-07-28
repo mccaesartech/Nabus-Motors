@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { dbFailure } from "@/lib/errors/api";
 import { requirePermission } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import {
@@ -37,7 +38,11 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await query;
   if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.admin.parts.GET",
+      message: "The spare part could not be saved. Try again.",
+      request: req,
+    });
   }
 
   return NextResponse.json({ ok: true, configured: true, parts: data ?? [] });
@@ -82,7 +87,11 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.admin.parts.POST",
+      message: "The spare part could not be saved. Try again.",
+      request: req,
+    });
   }
 
   const stockQty = Number(body.stock_quantity) || 0;
@@ -161,7 +170,11 @@ export async function PATCH(req: NextRequest) {
     .maybeSingle();
 
   if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.admin.parts.PATCH",
+      message: "The spare part could not be saved. Try again.",
+      request: req,
+    });
   }
 
   if (priorStock != null && body.stock_quantity !== undefined && data) {
@@ -203,7 +216,11 @@ export async function DELETE(req: NextRequest) {
 
   const { error } = await supabase.from("parts").delete().eq("id", id);
   if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.admin.parts.DELETE",
+      message: "The spare part could not be saved. Try again.",
+      request: req,
+    });
   }
 
   return NextResponse.json({ ok: true });

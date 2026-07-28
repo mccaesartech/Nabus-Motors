@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { apiFailure } from "@/lib/errors/api";
 import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
 import { buildPlatformLoginResponse } from "@/lib/admin/platform-login";
 import {
@@ -34,7 +35,11 @@ export async function POST(req: NextRequest) {
     );
     return buildPlatformLoginResponse(user);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Passkey sign-in failed.";
-    return NextResponse.json({ ok: false, message }, { status: 401 });
+    return apiFailure(error, {
+      module: "api.admin.passkeys.login.verify.POST",
+      message: "Passkey sign-in failed.",
+      status: 401,
+      request: req,
+    });
   }
 }

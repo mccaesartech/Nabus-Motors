@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { dbFailure } from "@/lib/errors/api";
 import { requirePermission } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { notifyCustomer } from "@/lib/notifications/customer-notify";
@@ -25,7 +26,10 @@ export async function GET() {
     .limit(200);
 
   if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.admin.appointments.GET",
+      message: "The appointment could not be saved. Try again.",
+    });
   }
 
   return NextResponse.json({ ok: true, configured: true, appointments: data ?? [] });
@@ -69,7 +73,11 @@ export async function PATCH(req: NextRequest) {
     .maybeSingle();
 
   if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.admin.appointments.PATCH",
+      message: "The appointment could not be saved. Try again.",
+      request: req,
+    });
   }
 
   let notificationResult = null;
@@ -126,7 +134,11 @@ export async function DELETE(req: NextRequest) {
 
   const { error } = await supabase.from("vehicle_appointments").delete().eq("id", id);
   if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.admin.appointments.DELETE",
+      message: "The appointment could not be saved. Try again.",
+      request: req,
+    });
   }
 
   return NextResponse.json({ ok: true });

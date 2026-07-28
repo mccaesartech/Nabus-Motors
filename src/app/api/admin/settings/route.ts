@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { dbFailure } from "@/lib/errors/api";
+import { logAppError } from "@/lib/errors/logger";
 import { requirePermission } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { checkDbHealth } from "@/lib/supabase/health";
@@ -16,6 +18,9 @@ import {
   maskSettingsSecrets,
   stripMaskedSecretUpdates,
 } from "@/lib/platform/settings-secrets";
+
+const SETTINGS_DB_UNREACHABLE =
+  "Settings could not be read from the database, so defaults are shown. Reload to retry.";
 
 export async function GET() {
   const auth = await requirePermission("settings");
@@ -65,12 +70,19 @@ export async function GET() {
   const { data, error } = await supabase.from("site_settings").select("key, value");
 
   if (error) {
-    console.error("Supabase site_settings fetch failed:", error.message);
+    const errorId = logAppError({
+      error,
+      module: "api.admin.settings.GET",
+      userMessage: SETTINGS_DB_UNREACHABLE,
+      kind: "database",
+      status: 200,
+      dbCode: error.code,
+    });
     return NextResponse.json({
       ok: true,
       configured: true,
       settings: maskSettingsSecrets(DEFAULT_SITE_SETTINGS),
-      db: { ...db, connected: false, error: error.message },
+      db: { ...db, connected: false, error: `${SETTINGS_DB_UNREACHABLE} (Reference ${errorId})` },
       meta: {
         publicSiteUrl: getPublicSiteUrl(),
         autoSiteUrl: getAutoSiteUrl(),
@@ -135,7 +147,11 @@ export async function PATCH(req: NextRequest) {
 
   if (error) {
     console.error("Supabase site_settings upsert failed:", error.message);
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.admin.settings.PATCH",
+      message: "Your settings could not be saved. Try again.",
+      request: req,
+    });
   }
 
   return NextResponse.json({ ok: true, configured: true });

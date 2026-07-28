@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { dbFailure } from "@/lib/errors/api";
 import { canManageTrash, requirePermission } from "@/lib/admin/auth";
 import {
   buildConversationSummaries,
@@ -434,7 +435,11 @@ export async function PATCH(req: NextRequest) {
     .single();
 
   if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.admin.customer-messages.PATCH",
+      message: "The message could not be sent. Try again.",
+      request: req,
+    });
   }
 
   return NextResponse.json({ ok: true, conversation: data });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/admin/auth";
+import { externalFailure } from "@/lib/errors/api";
 import { enhanceUploadImage } from "@/lib/images/enhance-upload";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { mediaBytesMatchMime } from "@/lib/security/media-signature";
@@ -113,10 +114,17 @@ export async function POST(req: NextRequest) {
     const message = error.message.includes("Bucket not found")
       ? 'Storage bucket "vehicle-images" not found. Run supabase migration 011_vehicle_images_storage.sql or create the bucket in Supabase Dashboard → Storage (public read).'
       : error.message.includes("mime type") || error.message.includes("not allowed")
-        ? `Upload rejected by storage: ${error.message}. Allowed types: JPEG, PNG, WebP.`
-        : error.message;
+        ? "Storage rejected that image. Use a JPEG, PNG, or WebP under 5MB."
+        : "The image could not be uploaded. Try again, or use a different image.";
 
-    return NextResponse.json({ ok: false, message }, { status: 500 });
+    return externalFailure(error, {
+      module: "api.admin.vehicles.upload-image.POST",
+      message,
+      status: 500,
+      request: req,
+      actor: { id: auth.auth.userId, role: auth.auth.role, type: auth.auth.type },
+      context: { ext: uploadExt, bytes: uploadBuffer.byteLength },
+    });
   }
 
   const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(path);

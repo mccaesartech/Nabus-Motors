@@ -50,6 +50,9 @@ import { VehicleImageMismatchDialog } from "@/components/platform/vehicle-image-
 import { VehiclePublishConfirmDialog } from "@/components/platform/vehicle-publish-confirm-dialog";
 import type { VehicleImageMatchIssue } from "@/lib/ai/vehicle-image-match-types";
 import { adminErrorMessage, parseAdminResponse } from "@/lib/admin/client";
+import { friendlyErrorMessage } from "@/lib/errors/client";
+
+const SAVE_FAILED_MESSAGE = "The vehicle could not be saved. Review the details and try again.";
 
 export type PlatformVehicle = VehicleInput & {
   id?: string;
@@ -359,7 +362,7 @@ export function PlatformVehicleForm({
 
       await commitSave(payload, false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save vehicle.");
+      setError(friendlyErrorMessage(err, SAVE_FAILED_MESSAGE));
     } finally {
       setVerifyingImages(false);
     }
@@ -1088,7 +1091,7 @@ export function PlatformVehicleForm({
             try {
               await commitSave(pendingSavePayload, true);
             } catch (err) {
-              setError(err instanceof Error ? err.message : "Could not save vehicle.");
+              setError(friendlyErrorMessage(err, SAVE_FAILED_MESSAGE));
               throw err;
             }
           }}

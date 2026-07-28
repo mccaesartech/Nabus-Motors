@@ -36,10 +36,13 @@ import {
 import type { VehicleGalleryData, VehicleImageCategory } from "@/lib/types";
 import { VEHICLE_GALLERY_ORDER } from "@/lib/types";
 import { PLACEHOLDER_IMAGE } from "@/lib/data/vehicle-images";
+import { describeApiFailure, friendlyErrorMessage } from "@/lib/errors/client";
 import { SafeVehicleImage } from "@/components/shared/safe-vehicle-image";
 import { mapWithConcurrency } from "@/lib/images/prepare-client-upload";
 import { uploadVehicleImageFile } from "@/lib/images/upload-vehicle-image-client";
 import { cn } from "@/lib/utils";
+
+const STOCK_PHOTOS_FAILED_MESSAGE = "Stock photo suggestions are unavailable right now. Try again.";
 
 const STOCK_PHOTOS_ACTION = "Find stock photos (free)";
 const EDIT_DESCRIPTION_ACTION = "Edit description";
@@ -464,7 +467,7 @@ export function VehicleAiChat({
         setMessages((prev) => [...prev, userMsg, assistantMsg]);
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Image upload failed");
+      setError(friendlyErrorMessage(err, "That image could not be uploaded. Try again."));
     } finally {
       setUploadingImage(false);
       textareaRef.current?.focus();
@@ -632,7 +635,7 @@ export function VehicleAiChat({
       const json = await res.json();
 
       if (!res.ok || !json.ok) {
-        throw new Error(json.message ?? "Could not fetch stock photos");
+        throw new Error(describeApiFailure(json, STOCK_PHOTOS_FAILED_MESSAGE).display);
       }
 
       const assistantMsg: VehicleAiChatClientMessage = {
@@ -647,7 +650,7 @@ export function VehicleAiChat({
 
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not fetch stock photos");
+      setError(friendlyErrorMessage(err, STOCK_PHOTOS_FAILED_MESSAGE));
     } finally {
       setLoading(false);
       textareaRef.current?.focus();
@@ -783,7 +786,9 @@ export function VehicleAiChat({
         );
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "AI request failed");
+      setError(
+        friendlyErrorMessage(err, "The AI assistant did not respond. Try again in a moment.")
+      );
     } finally {
       setLoading(false);
       textareaRef.current?.focus();

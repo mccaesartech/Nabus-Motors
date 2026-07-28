@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { dbFailure } from "@/lib/errors/api";
 import sharp from "sharp";
 import { requirePermission } from "@/lib/admin/auth";
 import {
@@ -168,7 +169,11 @@ export async function POST(req: NextRequest) {
   });
 
   if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.admin.vehicles.edit-image.POST",
+      message: "The image could not be edited. Try again.",
+      request: req,
+    });
   }
 
   const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(path);

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { dbFailure } from "@/lib/errors/api";
 import { requirePermission } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { sendShipmentTrackingEmail } from "@/lib/email/shipment-tracking";
@@ -91,7 +92,11 @@ export async function GET(req: NextRequest) {
   if (id) {
     const { shipment, error } = await loadShipmentWithEvents(supabase, id);
     if (error) {
-      return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+      return dbFailure(error, {
+        module: "api.admin.freight.shipments.GET",
+        message: "The shipment could not be saved. Try again.",
+        request: req,
+      });
     }
     if (!shipment) {
       return NextResponse.json({ ok: false, message: "Shipment not found." }, { status: 404 });
@@ -112,7 +117,11 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await query;
   if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.admin.freight.shipments.GET",
+      message: "The shipment could not be saved. Try again.",
+      request: req,
+    });
   }
 
   return NextResponse.json({ ok: true, configured: true, shipments: data ?? [] });
@@ -209,7 +218,11 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.admin.freight.shipments.POST",
+      message: "The shipment could not be saved. Try again.",
+      request: req,
+    });
   }
 
   if (body.initial_event?.title) {
@@ -323,7 +336,11 @@ export async function PATCH(req: NextRequest) {
   if (Object.keys(updates).length > 0) {
     const { error } = await supabase.from("shipment_tracking").update(updates).eq("id", id);
     if (error) {
-      return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+      return dbFailure(error, {
+        module: "api.admin.freight.shipments.PATCH",
+        message: "The shipment could not be saved. Try again.",
+        request: req,
+      });
     }
   }
 
@@ -390,7 +407,11 @@ export async function PATCH(req: NextRequest) {
         : [],
     });
     if (error) {
-      return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+      return dbFailure(error, {
+        module: "api.admin.freight.shipments.PATCH",
+        message: "The shipment could not be saved. Try again.",
+        request: req,
+      });
     }
 
     const shouldNotifyEvent = !milestonesOnly || isMilestone;
@@ -430,7 +451,11 @@ export async function PATCH(req: NextRequest) {
         .eq("id", body.update_event.id)
         .eq("shipment_id", id);
       if (error) {
-        return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+        return dbFailure(error, {
+          module: "api.admin.freight.shipments.PATCH",
+          message: "The shipment could not be saved. Try again.",
+          request: req,
+        });
       }
     }
   }
@@ -471,7 +496,11 @@ export async function DELETE(req: NextRequest) {
 
   const { error } = await supabase.from("shipment_tracking").delete().eq("id", id);
   if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.admin.freight.shipments.DELETE",
+      message: "The shipment could not be saved. Try again.",
+      request: req,
+    });
   }
 
   return NextResponse.json({ ok: true });

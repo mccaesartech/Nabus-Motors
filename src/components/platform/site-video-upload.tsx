@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { Film, Loader2, Upload, X } from "lucide-react";
+import { describeApiFailure, friendlyErrorMessage } from "@/lib/errors/client";
 import { isValidVideoUrl, parseEmbedVideoUrl } from "@/lib/site-content/video";
 import {
   getVideoFrameClassName,
@@ -12,6 +13,9 @@ import {
 import type { SiteVideoEmbedSettings } from "@/lib/site-content/video-embed";
 import { SiteVideoDisplayControls } from "@/components/platform/site-video-display-controls";
 import { SiteVideoEmbedControls } from "@/components/platform/site-video-embed-controls";
+
+const VIDEO_UPLOAD_FAILED_MESSAGE =
+  "That video could not be uploaded. Use an MP4 or WebM under 50MB and try again.";
 
 type SiteVideoUploadProps = {
   label?: string;
@@ -62,13 +66,13 @@ export function SiteVideoUpload({
       const res = await fetch(uploadEndpoint, { method: "POST", body: formData });
       const json = await res.json();
       if (!res.ok || !json.ok) {
-        throw new Error(json.message ?? "Upload failed");
+        throw new Error(describeApiFailure(json, VIDEO_UPLOAD_FAILED_MESSAGE).display);
       }
       onFileUrlChange(json.url as string);
       onEmbedUrlChange("");
       setEmbedInput("");
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Upload failed");
+      setUploadError(friendlyErrorMessage(err, VIDEO_UPLOAD_FAILED_MESSAGE));
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";

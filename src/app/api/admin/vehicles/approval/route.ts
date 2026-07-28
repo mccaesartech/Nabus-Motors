@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/admin/auth";
-import { friendlyAdminDbError } from "@/lib/admin/api-errors";
+import { dbFailure } from "@/lib/errors/api";
 import { revalidatePublicSite } from "@/lib/admin/revalidate";
 import { VEHICLE_APPROVAL_STATUSES } from "@/lib/admin/vehicle-approval";
 import {
@@ -75,10 +75,13 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   if (fetchError) {
-    return NextResponse.json(
-      { ok: false, message: friendlyAdminDbError(fetchError.message) },
-      { status: 500 }
-    );
+    return dbFailure(fetchError, {
+      module: "api.admin.vehicles.approval.POST.load",
+      message: "We could not load that vehicle for review. Try again.",
+      request: req,
+      actor: { id: auth.auth.userId, role: auth.auth.role, type: auth.auth.type },
+      context: { vehicleId: id },
+    });
   }
 
   if (!existing) {
@@ -206,10 +209,13 @@ export async function POST(req: NextRequest) {
   const { data, error } = result;
 
   if (error) {
-    return NextResponse.json(
-      { ok: false, message: friendlyAdminDbError(error.message) },
-      { status: 500 }
-    );
+    return dbFailure(error, {
+      module: "api.admin.vehicles.approval.POST",
+      message: "The approval decision could not be saved. Try again.",
+      request: req,
+      actor: { id: auth.auth.userId, role: auth.auth.role, type: auth.auth.type },
+      context: { vehicleId: id },
+    });
   }
 
   if (!data) {

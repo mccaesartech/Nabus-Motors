@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { apiFailure } from "@/lib/errors/api";
 import type { RegistrationResponseJSON } from "@simplewebauthn/server";
 import { requireAdmin } from "@/lib/admin/auth";
 import { isWebAuthnEnabled, verifyRegistrationForUser } from "@/lib/admin/webauthn";
@@ -37,7 +38,11 @@ export async function POST(req: NextRequest) {
     );
     return NextResponse.json({ ok: true, message: "Passkey registered successfully." });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Passkey registration failed.";
-    return NextResponse.json({ ok: false, message }, { status: 400 });
+    return apiFailure(error, {
+      module: "api.admin.passkeys.register.verify.POST",
+      message: "Passkey registration failed.",
+      status: 400,
+      request: req,
+    });
   }
 }

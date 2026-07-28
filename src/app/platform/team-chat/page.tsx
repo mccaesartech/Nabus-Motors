@@ -21,6 +21,7 @@ import {
   isTeamChatSetupError,
   parseAdminResponse,
 } from "@/lib/admin/client";
+import { friendlyErrorMessage } from "@/lib/errors/client";
 import {
   participantLabel,
   type TeamChannelSummary,
@@ -128,8 +129,10 @@ export default function TeamChatPage() {
       setLoading(false);
       return json;
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Could not load team messages. Check your connection.";
+      const message = friendlyErrorMessage(
+        err,
+        "Could not load team messages. Check your connection and try again."
+      );
       setLoadError(message);
       setSetupRequired(isTeamChatSetupError(message));
       setLoading(false);
@@ -164,7 +167,7 @@ export default function TeamChatPage() {
         await loadConversations();
       } catch (err) {
         setMessagesError(
-          err instanceof Error ? err.message : "Could not load messages. Check your connection."
+          friendlyErrorMessage(err, "Could not load messages. Check your connection and try again.")
         );
         setMessages([]);
       } finally {

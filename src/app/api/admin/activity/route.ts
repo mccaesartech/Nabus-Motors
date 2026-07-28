@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { dbFailure } from "@/lib/errors/api";
 import { requirePermission } from "@/lib/admin/auth";
 import { enrichActivityLog } from "@/lib/platform/activity-enrich";
 import { createAdminSupabase } from "@/lib/supabase/admin";
@@ -29,7 +30,11 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await query;
   if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.admin.activity.GET",
+      message: "We could not load the activity log. Try again.",
+      request: req,
+    });
   }
 
   const activity = await enrichActivityLog(data ?? []);

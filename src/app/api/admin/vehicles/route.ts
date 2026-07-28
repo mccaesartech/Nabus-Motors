@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { canManageTrash, requirePermission } from "@/lib/admin/auth";
 import { logPlatformActivity } from "@/lib/platform/activity";
 import { recordVehicleReceived, recordVehicleSold } from "@/lib/platform/inventory-movements/record";
-import { friendlyAdminDbError } from "@/lib/admin/api-errors";
+import { dbFailure } from "@/lib/errors/api";
 import { revalidatePublicSite } from "@/lib/admin/revalidate";
 import {
   defaultApprovalStatusForCreate,
@@ -254,7 +254,7 @@ function validatePatchUpdates(
   return null;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const auth = await requirePermission("inventory");
   if (!auth.ok) {
     return NextResponse.json({ ok: false, message: auth.message }, { status: auth.status });
@@ -270,10 +270,25 @@ export async function GET() {
     });
   }
 
-  let selectColumns = adminVehicleSelectColumns("full");
+  // Default list-tier (no gallery/description blobs). Edit forms pass fields=full.
+  const fieldsParam = req.nextUrl.searchParams.get("fields");
+  const selectMode =
+    fieldsParam === "full" ? "full" : fieldsParam === "safe" ? "safe" : "list";
+
+  let selectColumns = adminVehicleSelectColumns(selectMode);
   let { data, error } = await notDeletedFilter(
     supabase.from("vehicles").select(selectColumns)
   ).order("created_at", { ascending: false });
+
+  if (error && selectMode === "list") {
+    // Optional columns may be missing — fall back to safe core+approval set.
+    selectColumns = adminVehicleSelectColumns("safe");
+    const listFallback = await notDeletedFilter(
+      supabase.from("vehicles").select(selectColumns)
+    ).order("created_at", { ascending: false });
+    data = listFallback.data;
+    error = listFallback.error;
+  }
 
   if (error) {
     selectColumns = adminVehicleSelectColumns("safe");
@@ -285,10 +300,12 @@ export async function GET() {
   }
 
   if (error) {
-    return NextResponse.json(
-      { ok: false, message: friendlyAdminDbError(error.message) },
-      { status: 500 }
-    );
+    return dbFailure(error, {
+      module: "api.admin.vehicles.GET",
+      message: "We could not load the vehicle list. Try again in a moment.",
+      request: req,
+      actor: { id: auth.auth.userId, role: auth.auth.role, type: auth.auth.type },
+    });
   }
 
   const operational = toOperationalSettings(await getAdminSiteSettings());
@@ -368,10 +385,13 @@ export async function POST(req: NextRequest) {
   const { data, error } = insertResult;
 
   if (error) {
-    return NextResponse.json(
-      { ok: false, message: friendlyAdminDbError(error.message) },
-      { status: 500 }
-    );
+    return dbFailure(error, {
+      module: "api.admin.vehicles.POST",
+      message: "The vehicle could not be created. Check the details and try again.",
+      request: req,
+      requestBody: vehicleBody,
+      actor: { id: auth.auth.userId, role: auth.auth.role, type: auth.auth.type },
+    });
   }
 
   if (!data) {
@@ -489,10 +509,13 @@ export async function PATCH(req: NextRequest) {
       .eq("id", id)
       .maybeSingle();
     if (minimal.error) {
-      return NextResponse.json(
-        { ok: false, message: friendlyAdminDbError(minimal.error.message) },
-        { status: 500 }
-      );
+      return dbFailure(minimal.error, {
+        module: "api.admin.vehicles.PATCH.load",
+        message: "We could not load that vehicle to update it. Try again.",
+        request: req,
+        actor: { id: auth.auth.userId, role: auth.auth.role, type: auth.auth.type },
+        context: { vehicleId: id },
+      });
     }
     if (!minimal.data) {
       return NextResponse.json({ ok: false, message: "Vehicle not found." }, { status: 404 });
@@ -573,10 +596,14 @@ export async function PATCH(req: NextRequest) {
     const { data, error } = result;
 
     if (error) {
-      return NextResponse.json(
-        { ok: false, message: friendlyAdminDbError(error.message) },
-        { status: 500 }
-      );
+      return dbFailure(error, {
+        module: "api.admin.vehicles.PATCH.pending",
+        message: "Your changes could not be submitted for approval. Try again.",
+        request: req,
+        requestBody: updates,
+        actor: { id: auth.auth.userId, role: auth.auth.role, type: auth.auth.type },
+        context: { vehicleId: id },
+      });
     }
 
     if (!data) {
@@ -684,10 +711,14 @@ export async function PATCH(req: NextRequest) {
   const { data, error } = result;
 
   if (error) {
-    return NextResponse.json(
-      { ok: false, message: friendlyAdminDbError(error.message) },
-      { status: 500 }
-    );
+    return dbFailure(error, {
+      module: "api.admin.vehicles.PATCH",
+      message: "The vehicle could not be saved. Review the details and try again.",
+      request: req,
+      requestBody: updates,
+      actor: { id: auth.auth.userId, role: auth.auth.role, type: auth.auth.type },
+      context: { vehicleId: id },
+    });
   }
 
   if (!data) {
@@ -846,10 +877,13 @@ export async function DELETE(req: NextRequest) {
     .in("id", ids);
 
   if (existingError) {
-    return NextResponse.json(
-      { ok: false, message: friendlyAdminDbError(existingError.message) },
-      { status: 500 }
-    );
+    return dbFailure(existingError, {
+      module: "api.admin.vehicles.DELETE.load",
+      message: "We could not check those vehicles before removing them. Try again.",
+      request: req,
+      actor: { id: auth.auth.userId, role: auth.auth.role, type: auth.auth.type },
+      context: { count: ids.length },
+    });
   }
 
   const byId = new Map(

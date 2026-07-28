@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { dbFailure } from "@/lib/errors/api";
 import { requireAdmin } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import {
@@ -32,12 +33,14 @@ export async function GET(req: NextRequest) {
   }
 
   const limit = Number(req.nextUrl.searchParams.get("limit") ?? 50);
-  const operational = toOperationalSettings(await getAdminSiteSettings());
 
-  const { count: availableVehicles } = await supabase
-    .from("vehicles")
-    .select("*", { count: "exact", head: true })
-    .eq("status", "available");
+  const [operational, availableRes] = await Promise.all([
+    getAdminSiteSettings().then((s) => toOperationalSettings(s)),
+    supabase
+      .from("vehicles")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "available"),
+  ]);
 
   const stockOptions = {
     lowStockThreshold: operational.lowStockThreshold,
@@ -46,7 +49,7 @@ export async function GET(req: NextRequest) {
 
   const { notifications, fromTable } = await fetchAdminNotifications(
     supabase,
-    availableVehicles ?? 0,
+    availableRes.count ?? 0,
     limit,
     auth.auth,
     stockOptions
@@ -97,7 +100,11 @@ export async function PATCH(req: NextRequest) {
     const { error } = await query;
 
     if (error) {
-      return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+      return dbFailure(error, {
+        module: "api.admin.notifications.PATCH",
+        message: "We could not load your notifications. Try again.",
+        request: req,
+      });
     }
 
     await dismissAllEphemeralAdminNotifications(supabase, scope);
@@ -124,7 +131,11 @@ export async function PATCH(req: NextRequest) {
     const { error } = await query;
 
     if (error) {
-      return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+      return dbFailure(error, {
+        module: "api.admin.notifications.PATCH",
+        message: "We could not load your notifications. Try again.",
+        request: req,
+      });
     }
 
     return NextResponse.json({ ok: true });
@@ -145,7 +156,11 @@ export async function PATCH(req: NextRequest) {
     .eq("id", id);
 
   if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.admin.notifications.PATCH",
+      message: "We could not load your notifications. Try again.",
+      request: req,
+    });
   }
 
   return NextResponse.json({ ok: true });

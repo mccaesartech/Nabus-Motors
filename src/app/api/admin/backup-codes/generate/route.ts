@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { dbFailure } from "@/lib/errors/api";
 import { requireAdmin } from "@/lib/admin/auth";
 import { isWebAuthnEnabled } from "@/lib/admin/webauthn";
 import { createAdminSupabase } from "@/lib/supabase/admin";
@@ -53,7 +54,10 @@ export async function POST() {
 
   const { error } = await supabase.from("platform_user_backup_codes").insert(rows);
   if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.admin.backup-codes.generate.POST",
+      message: "Backup codes could not be generated. Try again.",
+    });
   }
 
   return NextResponse.json({

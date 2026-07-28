@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { dbFailure } from "@/lib/errors/api";
 import { getCustomerFromAuthHeader } from "@/lib/customer/auth";
 import {
   fetchCustomerNotifications,
@@ -62,7 +63,11 @@ export async function PATCH(req: NextRequest) {
       .is("read_at", null);
 
     if (error) {
-      return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+      return dbFailure(error, {
+        module: "api.customer.notifications.PATCH",
+        message: "We could not load your notifications. Try again.",
+        request: req,
+      });
     }
     return NextResponse.json({ ok: true });
   }
@@ -79,7 +84,11 @@ export async function PATCH(req: NextRequest) {
 
     const { error } = await query;
     if (error) {
-      return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+      return dbFailure(error, {
+        module: "api.customer.notifications.PATCH",
+        message: "We could not load your notifications. Try again.",
+        request: req,
+      });
     }
     return NextResponse.json({ ok: true });
   }
@@ -98,7 +107,11 @@ export async function PATCH(req: NextRequest) {
     .maybeSingle();
 
   if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.customer.notifications.PATCH",
+      message: "We could not load your notifications. Try again.",
+      request: req,
+    });
   }
 
   return NextResponse.json({

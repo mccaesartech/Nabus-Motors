@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { apiFailure } from "@/lib/errors/api";
 import { requireAdmin } from "@/lib/admin/auth";
 import { createRegistrationOptionsForUser, isWebAuthnEnabled } from "@/lib/admin/webauthn";
 
@@ -28,7 +29,10 @@ export async function POST(req: NextRequest) {
     );
     return NextResponse.json({ ok: true, options });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not start passkey registration.";
-    return NextResponse.json({ ok: false, message }, { status: 500 });
+    return apiFailure(error, {
+      module: "api.admin.passkeys.register.options.POST",
+      message: "Could not start passkey registration.",
+      request: req,
+    });
   }
 }

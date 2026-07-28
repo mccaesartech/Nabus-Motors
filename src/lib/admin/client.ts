@@ -1,4 +1,6 @@
 import { adminLoginPath } from "@/lib/admin/paths";
+import { describeApiFailure } from "@/lib/errors/client";
+import { defaultMessageForKind, kindForStatus } from "@/lib/errors/kinds";
 
 /** True only when the server rejected the session — not for 5xx or network errors. */
 export function isAdminAuthError(res: Response): boolean {
@@ -7,8 +9,10 @@ export function isAdminAuthError(res: Response): boolean {
 
 export type AdminApiJson = {
   ok?: boolean;
+  success?: boolean;
   message?: string;
   warning?: string;
+  errorId?: string;
   [key: string]: unknown;
 };
 
@@ -17,6 +21,7 @@ export async function parseAdminResponse(res: Response): Promise<AdminApiJson> {
   if (res.status === 401) {
     return {
       ok: false,
+      success: false,
       message: "Session expired. Please sign in again.",
     };
   }
@@ -25,28 +30,32 @@ export async function parseAdminResponse(res: Response): Promise<AdminApiJson> {
   if (!text.trim()) {
     return {
       ok: false,
-      message: res.ok ? "Empty response from server." : `Request failed (${res.status}).`,
+      success: false,
+      message: res.ok ? "The server returned an empty response. Try again." : statusMessage(res.status),
     };
   }
 
   try {
     return JSON.parse(text) as AdminApiJson;
   } catch {
-    return {
-      ok: false,
-      message: text.slice(0, 240) || `Request failed (${res.status}).`,
-    };
+    // Non-JSON body (proxy/HTML error page). Never echo it back to the user.
+    return { ok: false, success: false, message: statusMessage(res.status) };
   }
 }
 
+function statusMessage(status: number): string {
+  return defaultMessageForKind(kindForStatus(status));
+}
+
+/**
+ * User-safe message for an admin API failure, including the support reference
+ * when the server supplied one.
+ */
 export function adminErrorMessage(
   json: AdminApiJson,
-  fallback = "Save failed"
+  fallback = "That could not be saved. Please try again."
 ): string {
-  if (json.warning && json.message) {
-    return `${json.message} ${json.warning}`;
-  }
-  return json.message || json.warning || fallback;
+  return describeApiFailure(json, fallback).display;
 }
 
 export function redirectToAdminLogin(router: { push: (path: string) => void }) {

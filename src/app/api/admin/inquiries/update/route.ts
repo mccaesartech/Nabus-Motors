@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { dbFailure } from "@/lib/errors/api";
 import { requireAdmin } from "@/lib/admin/auth";
 import { logPlatformActivity } from "@/lib/platform/activity";
 import { notifyCustomerPreorderUpdate } from "@/lib/customer/notifications-server";
@@ -81,7 +82,11 @@ export async function PATCH(req: NextRequest) {
     .single();
 
   if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.admin.inquiries.update.PATCH",
+      message: "The lead could not be updated. Try again.",
+      request: req,
+    });
   }
 
   if (type === "preorder" && updates.status && data) {

@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImagePlus, Loader2, RotateCcw, Upload, X } from "lucide-react";
 import { isValidImageUrl, PLACEHOLDER_IMAGE } from "@/lib/data/vehicle-images";
+import { describeApiFailure, friendlyErrorMessage } from "@/lib/errors/client";
 import { normalizeMediaUrl } from "@/lib/site-content/media-url";
+
+const UPLOAD_FAILED_MESSAGE = "That image could not be uploaded. Try again with a JPEG, PNG, or WebP.";
 
 type PreviewSize = "compact" | "large" | "category";
 
@@ -94,12 +97,12 @@ export function SiteImageUpload({
       const res = await fetch(uploadEndpoint, { method: "POST", body: formData });
       const json = await res.json();
       if (!res.ok || !json.ok) {
-        throw new Error(json.message ?? "Upload failed");
+        throw new Error(describeApiFailure(json, UPLOAD_FAILED_MESSAGE).display);
       }
       setUrlInput("");
       onChange(json.url as string);
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Upload failed");
+      setUploadError(friendlyErrorMessage(err, UPLOAD_FAILED_MESSAGE));
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { dbFailure } from "@/lib/errors/api";
 import { requirePermission } from "@/lib/admin/auth";
 import type { PlatformAuthContext } from "@/lib/admin/auth";
 import { revalidatePublicSite } from "@/lib/admin/revalidate";
@@ -333,7 +334,11 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) {
-      return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+      return dbFailure(error, {
+        module: "api.admin.sales.POST",
+        message: "The sale could not be saved. Try again.",
+        request: req,
+      });
     }
 
     return NextResponse.json({ ok: true, sale: data });
@@ -373,7 +378,11 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.admin.sales.POST",
+      message: "The sale could not be saved. Try again.",
+      request: req,
+    });
   }
 
   return NextResponse.json({ ok: true, sale: data });
@@ -450,7 +459,11 @@ export async function PATCH(req: NextRequest) {
     .single();
 
   if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.admin.sales.PATCH",
+      message: "The sale could not be saved. Try again.",
+      request: req,
+    });
   }
 
   return NextResponse.json({ ok: true, sale: data });

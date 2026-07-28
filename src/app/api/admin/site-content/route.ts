@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { friendlyAdminDbError } from "@/lib/admin/api-errors";
+import { dbFailure } from "@/lib/errors/api";
 import { requirePermission } from "@/lib/admin/auth";
 import { revalidateSiteContent } from "@/lib/admin/revalidate";
 import { isValidImageUrl } from "@/lib/data/vehicle-images";
@@ -189,11 +190,13 @@ export async function PATCH(req: NextRequest) {
   const { error } = await supabase.from("site_content").upsert(rows, { onConflict: "section" });
 
   if (error) {
-    console.error("site_content upsert failed:", error.message);
-    return NextResponse.json(
-      { ok: false, message: friendlyAdminDbError(error.message) },
-      { status: 500 }
-    );
+    return dbFailure(error, {
+      module: "api.admin.site-content.PATCH",
+      message: "Your website content could not be saved. Try again.",
+      request: req,
+      actor: { id: auth.auth.userId, role: auth.auth.role, type: auth.auth.type },
+      context: { sections: Object.keys(updates) },
+    });
   }
 
   revalidateSiteContent();

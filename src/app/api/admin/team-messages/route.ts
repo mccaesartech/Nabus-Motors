@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { dbFailure } from "@/lib/errors/api";
 import { requirePermission } from "@/lib/admin/auth";
-import { friendlyAdminDbError } from "@/lib/admin/api-errors";
+import { mapDatabaseError } from "@/lib/errors/db-errors";
 import { logPlatformActivity } from "@/lib/platform/activity";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import {
@@ -35,6 +36,9 @@ import { ROLE_LABELS } from "@/lib/platform/permissions";
 const TEAM_CHAT_SETUP_MESSAGE =
   "Group channels are temporarily unavailable. Direct messages still work.";
 
+const TEAM_CHAT_UNAVAILABLE_MESSAGE =
+  "Team chat is temporarily unavailable. Try again in a moment.";
+
 function isChannelTypeSchemaError(message: string): boolean {
   const lower = message.toLowerCase();
   return (
@@ -68,7 +72,7 @@ async function checkTeamChannelsReady(
     return { ready: false, message: TEAM_CHAT_SETUP_MESSAGE };
   }
 
-  return { ready: false, message: friendlyAdminDbError(error.message) };
+  return { ready: false, message: mapDatabaseError(error, TEAM_CHAT_UNAVAILABLE_MESSAGE).message };
 }
 
 export async function GET(req: NextRequest) {
@@ -114,14 +118,13 @@ export async function GET(req: NextRequest) {
         .maybeSingle();
 
       if (convError) {
-        return NextResponse.json(
-          {
-            ok: false,
-            setupRequired: isChannelTypeSchemaError(convError.message),
-            message: friendlyAdminDbError(convError.message),
-          },
-          { status: 500 }
-        );
+        return dbFailure(convError, {
+          module: "api.admin.team-messages.GET.conversation",
+          message: "We could not open that conversation. Try again.",
+          request: req,
+          actor: { id: auth.userId, role: auth.role, type: auth.type },
+          extra: { setupRequired: isChannelTypeSchemaError(convError.message) },
+        });
       }
 
       channelType = conversation?.channel_type ?? null;
@@ -153,7 +156,11 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: true });
 
     if (error) {
-      return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+      return dbFailure(error, {
+        module: "api.admin.team-messages.GET",
+        message: "Team chat could not be updated. Try again.",
+        request: req,
+      });
     }
 
     const now = new Date().toISOString();
@@ -188,15 +195,17 @@ export async function GET(req: NextRequest) {
   try {
     conversations = await buildConversationSummaries(supabase, auth, userMap);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Could not load conversations";
+    const message = err instanceof Error ? err.message : "";
     if (!setupRequired && isChannelTypeSchemaError(message)) {
       setupRequired = true;
       setupMessage = TEAM_CHAT_SETUP_MESSAGE;
     } else if (!setupRequired) {
-      return NextResponse.json(
-        { ok: false, message: friendlyAdminDbError(message) },
-        { status: 500 }
-      );
+      return dbFailure({ message }, {
+        module: "api.admin.team-messages.GET.conversations",
+        message: "We could not load your conversations. Try again.",
+        request: req,
+        actor: { id: auth.userId, role: auth.role, type: auth.type },
+      });
     }
   }
 
@@ -206,15 +215,17 @@ export async function GET(req: NextRequest) {
       allStaff = channelData.allStaff;
       groups = channelData.groups;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Could not load channels";
+      const message = err instanceof Error ? err.message : "";
       if (isChannelTypeSchemaError(message)) {
         setupRequired = true;
         setupMessage = TEAM_CHAT_SETUP_MESSAGE;
       } else {
-        return NextResponse.json(
-          { ok: false, message: friendlyAdminDbError(message) },
-          { status: 500 }
-        );
+        return dbFailure({ message }, {
+          module: "api.admin.team-messages.GET.channels",
+          message: "We could not load your group channels. Try again.",
+          request: req,
+          actor: { id: auth.userId, role: auth.role, type: auth.type },
+        });
       }
     }
   }
@@ -340,7 +351,11 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.admin.team-messages.POST",
+      message: "Team chat could not be updated. Try again.",
+      request: req,
+    });
   }
 
   await supabase

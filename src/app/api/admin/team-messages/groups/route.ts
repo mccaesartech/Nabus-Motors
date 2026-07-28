@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { apiFailure } from "@/lib/errors/api";
 import { requirePermission } from "@/lib/admin/auth";
 import { logPlatformActivity } from "@/lib/platform/activity";
 import { createAdminSupabase } from "@/lib/supabase/admin";
@@ -122,8 +123,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, groupId });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Could not create group";
-    return NextResponse.json({ ok: false, message }, { status: 500 });
+    return apiFailure(err, {
+      module: "api.admin.team-messages.groups.POST",
+      message: "Could not create group",
+      request: req,
+    });
   }
 }
 
@@ -188,8 +192,12 @@ export async function PATCH(req: NextRequest) {
     try {
       await updateGroupMembers(supabase, groupId, memberUserIds);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Could not update members";
-      return NextResponse.json({ ok: false, message }, { status: 400 });
+      return apiFailure(err, {
+        module: "api.admin.team-messages.groups.PATCH",
+        message: "Could not update members",
+        status: 400,
+        request: req,
+      });
     }
   }
 

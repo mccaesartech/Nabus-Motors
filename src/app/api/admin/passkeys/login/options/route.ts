@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { apiFailure } from "@/lib/errors/api";
 import {
   clientIp,
   isPasskeyRateLimited,
@@ -28,7 +29,11 @@ export async function POST(req: NextRequest) {
     );
     return NextResponse.json({ ok: true, options, platformUserId });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not start passkey sign-in.";
-    return NextResponse.json({ ok: false, message }, { status: 400 });
+    return apiFailure(error, {
+      module: "api.admin.passkeys.login.options.POST",
+      message: "Could not start passkey sign-in.",
+      status: 400,
+      request: req,
+    });
   }
 }

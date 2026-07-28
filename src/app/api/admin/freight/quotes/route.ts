@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { dbFailure } from "@/lib/errors/api";
 import { requirePermission } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { isMissingTableError } from "@/lib/platform/inquiry-notifications";
@@ -25,14 +26,13 @@ export async function GET() {
     .limit(200);
 
   if (error) {
-    return NextResponse.json(
-      {
-        ok: false,
-        message: error.message,
+    return dbFailure(error, {
+      module: "api.admin.freight.quotes.GET",
+      message: "We could not load freight quote requests. Try again.",
+      extra: {
         tableMissing: isMissingTableError(error.message, "freight_quote_requests"),
       },
-      { status: 500 }
-    );
+    });
   }
 
   const quotes = data ?? [];
@@ -167,7 +167,11 @@ export async function PATCH(req: NextRequest) {
     .maybeSingle();
 
   if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.admin.freight.quotes.PATCH",
+      message: "The freight quote could not be saved. Try again.",
+      request: req,
+    });
   }
 
   return NextResponse.json({ ok: true, quote: data });
@@ -191,7 +195,11 @@ export async function DELETE(req: NextRequest) {
 
   const { error } = await supabase.from("freight_quote_requests").delete().eq("id", id);
   if (error) {
-    return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
+    return dbFailure(error, {
+      module: "api.admin.freight.quotes.DELETE",
+      message: "The freight quote could not be saved. Try again.",
+      request: req,
+    });
   }
 
   return NextResponse.json({ ok: true });

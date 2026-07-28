@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requirePermission } from "@/lib/admin/auth";
+import { apiFailure } from "@/lib/errors/api";
 import { logPlatformActivity } from "@/lib/platform/activity";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import {
@@ -165,8 +166,12 @@ export async function GET(req: NextRequest) {
     await logPlatformActivity(auth.auth, "export", type, { from, to });
     return csvResponse(filename, content);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Export failed";
-    console.error("[reports/export]", message);
-    return NextResponse.json({ ok: false, message }, { status: 500 });
+    return apiFailure(err, {
+      module: "api.admin.reports.export.GET",
+      message: "The export could not be generated. Try again.",
+      request: req,
+      actor: { id: auth.auth.userId, role: auth.auth.role, type: auth.auth.type },
+      context: { type, from, to },
+    });
   }
 }
