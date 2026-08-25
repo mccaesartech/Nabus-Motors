@@ -93,19 +93,18 @@ export async function loadAutomatedWhatsAppHistory(
       .limit(limit);
 
     const rows = (data ?? []) as NotificationLogRow[];
-    return rows
-      .map((row) => {
-        const body = parseNotificationDetail(row.detail);
-        if (!body) return null;
-        return {
-          role: "system" as const,
-          body: `[${row.template}] ${body}`,
-          at: row.created_at,
-          source: "notification_log",
-        };
-      })
-      .filter((row): row is WhatsAppConversationTurn => row !== null)
-      .reverse();
+    const turns: WhatsAppConversationTurn[] = [];
+    for (const row of rows) {
+      const body = parseNotificationDetail(row.detail);
+      if (!body) continue;
+      turns.push({
+        role: "system",
+        body: `[${row.template}] ${body}`,
+        at: row.created_at,
+        source: "notification_log",
+      });
+    }
+    return turns.reverse();
   } catch {
     return [];
   }
