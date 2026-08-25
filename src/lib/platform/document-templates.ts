@@ -22,6 +22,13 @@ function docTitle(docType: string) {
   return "Document";
 }
 
+function docTypeLabel(docType: string): string {
+  if (docType === "sales_agreement") return "AGREEMENT";
+  if (docType === "preorder_agreement") return "PRE-ORDER";
+  if (docType === "invoice") return "INVOICE";
+  return "DOCUMENT";
+}
+
 export function buildDocumentHtml({
   docType,
   customerName,
@@ -78,7 +85,7 @@ export function buildDocumentHtml({
   return wrapDocument(
     title,
     `
-      ${brandHeader()}
+      ${brandHeader(undefined, docTypeLabel(docType))}
       ${body}
       ${documentFooter()}
     `,

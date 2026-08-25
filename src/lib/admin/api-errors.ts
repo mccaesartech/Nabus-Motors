@@ -3,6 +3,15 @@ export function friendlyAdminDbError(message: string): string {
   const lower = message.toLowerCase();
 
   if (
+    lower.includes("stock_quantity") &&
+    (lower.includes("schema cache") ||
+      lower.includes("does not exist") ||
+      lower.includes("could not find"))
+  ) {
+    return "Database is missing stock_quantity. Run supabase/migrations/082_vehicle_stock_quantity.sql in the Supabase SQL Editor, then try again.";
+  }
+
+  if (
     lower.includes("gallery") &&
     (lower.includes("schema cache") || lower.includes("does not exist"))
   ) {

@@ -26,7 +26,7 @@ describe("mobile dashboard summaries", () => {
   it("keeps owner availability and business statistics in the dashboard KPI data", () => {
     const permissions = buildSessionPermissions("owner");
     const persona = resolveDashboardPersona("owner", permissions);
-    const cards = getKpisForPersona(persona, buildKpiValues(stats), permissions);
+    const cards = getKpisForPersona(persona, buildKpiValues(stats), permissions, "owner");
 
     expect(cards.map(({ definition }) => definition.key)).toEqual(
       expect.arrayContaining([
@@ -47,5 +47,14 @@ describe("mobile dashboard summaries", () => {
     expect(values.vehiclesAvailable).toBe(7);
     expect(values.pendingReservations).toBe(5);
     expect(values.preOrders).toBe(3);
+  });
+
+  it("hides revenue KPIs from manager dashboard cards", () => {
+    const permissions = buildSessionPermissions("manager");
+    const persona = resolveDashboardPersona("manager", permissions);
+    const cards = getKpisForPersona(persona, buildKpiValues(stats), permissions, "manager");
+
+    expect(cards.map(({ definition }) => definition.key)).not.toContain("todayRevenue");
+    expect(cards.map(({ definition }) => definition.key)).not.toContain("pendingFinance");
   });
 });

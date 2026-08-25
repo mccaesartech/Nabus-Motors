@@ -176,14 +176,14 @@ export async function sendWhatsAppMessage(
       return { sent: false, reason: "Invalid phone number", waMeUrl };
     }
 
+    let reusableLogId: string | null = null;
     if (options?.idempotencyKey) {
       const existing = await findNotificationByIdempotencyKey(options.idempotencyKey);
       if (
         existing &&
         (existing.status === "sent" ||
           existing.status === "delivered" ||
-          existing.status === "read" ||
-          existing.status === "queued")
+          existing.status === "read")
       ) {
         return {
           sent: true,
@@ -193,9 +193,12 @@ export async function sendWhatsAppMessage(
           logId: existing.id,
         };
       }
+      // A "queued" row means a previous attempt never reached the provider.
+      // Reuse it (the idempotency key is unique) rather than reporting success.
+      if (existing) reusableLogId = existing.id;
     }
 
-    let logId = options?.logId ?? null;
+    let logId = options?.logId ?? reusableLogId;
     if (shouldPersist && !logId) {
       logId = await insertWhatsAppNotificationLog({
         sourceTable: options?.sourceTable,

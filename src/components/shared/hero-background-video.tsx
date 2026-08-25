@@ -67,9 +67,11 @@ function tryPlayVideo(video: HTMLVideoElement) {
 function HeroPosterFallback({
   poster,
   className,
+  preload = true,
 }: {
   poster: string;
   className: string;
+  preload?: boolean;
 }) {
   const [src, setSrc] = useState(poster);
 
@@ -80,7 +82,7 @@ function HeroPosterFallback({
         alt=""
         aria-hidden
         fill
-        preload
+        preload={preload}
         sizes="100vw"
         decoding="async"
         className="object-cover object-center"

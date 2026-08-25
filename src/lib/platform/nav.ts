@@ -3,8 +3,10 @@ import {
   BarChart3,
   Calendar,
   Car,
+  ClipboardList,
   CreditCard,
   FileText,
+  History,
   LayoutDashboard,
   MessageSquare,
   MessagesSquare,
@@ -13,7 +15,6 @@ import {
   Package,
   Palette,
   Settings,
-  ShieldAlert,
   Ship,
   ShoppingCart,
   Tags,
@@ -51,6 +52,14 @@ const dashboard: PlatformNavItem = {
   groupId: "dashboard",
 };
 
+const customers: PlatformNavItem = {
+  label: "Customers",
+  href: platformPath("customers"),
+  icon: Users,
+  description: "Buyer profiles & contacts",
+  groupId: "customers",
+};
+
 const salesGroup: PlatformNavGroup = {
   id: "sales",
   label: "Sales",
@@ -76,6 +85,13 @@ const salesGroup: PlatformNavGroup = {
       href: platformPath("appointments"),
       icon: Calendar,
       description: "Viewings & test drives",
+      groupId: "sales",
+    },
+    {
+      label: "Messages",
+      href: platformPath("messages"),
+      icon: MessageSquare,
+      description: "Logged-in customer chat",
       groupId: "sales",
     },
   ],
@@ -120,6 +136,13 @@ const inventoryGroup: PlatformNavGroup = {
       href: platformPath("inventory/movements"),
       icon: ArrowLeftRight,
       description: "In/out records & financial trace",
+      groupId: "inventory",
+    },
+    {
+      label: "AI Usage",
+      href: platformPath("inventory/ai-usage"),
+      icon: History,
+      description: "AI Editor history & cleanup",
       groupId: "inventory",
     },
   ],
@@ -227,28 +250,6 @@ const marketingGroup: PlatformNavGroup = {
   ],
 };
 
-const customersGroup: PlatformNavGroup = {
-  id: "customers",
-  label: "Customers",
-  icon: Users,
-  items: [
-    {
-      label: "Customers",
-      href: platformPath("customers"),
-      icon: Users,
-      description: "Buyer profiles",
-      groupId: "customers",
-    },
-    {
-      label: "Messages",
-      href: platformPath("messages"),
-      icon: MessageSquare,
-      description: "Logged-in customer chat",
-      groupId: "customers",
-    },
-  ],
-};
-
 const administrationGroup: PlatformNavGroup = {
   id: "administration",
   label: "Administration",
@@ -283,17 +284,17 @@ const administrationGroup: PlatformNavGroup = {
       groupId: "administration",
     },
     {
+      label: "Audit Log",
+      href: platformPath("audit-log"),
+      icon: ClipboardList,
+      description: "Security & ops activity trail",
+      groupId: "administration",
+    },
+    {
       label: "Users",
       href: platformPath("users"),
       icon: UserCog,
       description: "Team and permissions",
-      groupId: "administration",
-    },
-    {
-      label: "Error Log",
-      href: platformPath("error-log"),
-      icon: ShieldAlert,
-      description: "Handled failures & support references",
       groupId: "administration",
     },
     {
@@ -309,6 +310,9 @@ const administrationGroup: PlatformNavGroup = {
 /** Standalone dashboard entry (not inside an expandable group). */
 export const PLATFORM_DASHBOARD_ITEM: PlatformNavItem = dashboard;
 
+/** Standalone customers entry — top-level for quick access (not inside an expandable group). */
+export const PLATFORM_CUSTOMERS_ITEM: PlatformNavItem = customers;
+
 /** Department-grouped navigation for the admin sidebar. */
 export const PLATFORM_NAV_DEPARTMENTS: PlatformNavGroup[] = [
   salesGroup,
@@ -318,7 +322,6 @@ export const PLATFORM_NAV_DEPARTMENTS: PlatformNavGroup[] = [
   partsGroup,
   financeGroup,
   marketingGroup,
-  customersGroup,
   administrationGroup,
 ];
 
@@ -331,6 +334,7 @@ export const PLATFORM_NAV_GROUPS: PlatformNavGroup[] = [
 /** Flat list for page title resolution and search */
 export const PLATFORM_NAV: PlatformNavItem[] = [
   dashboard,
+  customers,
   ...PLATFORM_NAV_DEPARTMENTS.flatMap((g) => g.items),
 ];
 

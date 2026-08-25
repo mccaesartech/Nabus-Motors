@@ -5,7 +5,7 @@
 import fs from "fs";
 import path from "path";
 
-const BASE = process.env.AUDIT_BASE_URL || "https://truegoshen.vercel.app";
+const BASE = process.env.AUDIT_BASE_URL || "https://www.truegoshengh.com";
 const OUT = path.join("scripts", ".inventory-color-audit.json");
 
 async function fetchText(url) {

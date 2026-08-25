@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbFailure } from "@/lib/errors/api";
-import { requireAdmin } from "@/lib/admin/auth";
+import { requireDirectMutation } from "@/lib/admin/auth";
 import { logPlatformActivity } from "@/lib/platform/activity";
 import { notifyCustomerPreorderUpdate } from "@/lib/customer/notifications-server";
 import { notifyCustomer } from "@/lib/notifications/customer-notify";
@@ -19,7 +19,7 @@ const TABLE_MAP: Record<string, string> = {
 };
 
 export async function PATCH(req: NextRequest) {
-  const auth = await requireAdmin();
+  const auth = await requireDirectMutation("leads");
   if (!auth.ok) {
     return NextResponse.json({ ok: false }, { status: auth.status });
   }

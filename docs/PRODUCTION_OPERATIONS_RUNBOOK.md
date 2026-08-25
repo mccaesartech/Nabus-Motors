@@ -31,7 +31,9 @@ users, storage buckets, provider API keys, or webhook credentials.
 | --- | --- | --- | --- | --- |
 | Development | Local or Development variables | Dedicated development project | Synthetic only | `http://localhost:3000` |
 | Staging | Preview or dedicated staging project | Dedicated staging project | Synthetic/anonymized only | Explicit staging URL |
-| Production | Production variables | Dedicated production project | Production | `https://truegoshen.vercel.app` |
+| Production | Production variables | Dedicated production project | Production | `https://www.truegoshengh.com` |
+
+**Invite / public links:** Production `NEXT_PUBLIC_SITE_URL` must be `https://www.truegoshengh.com` and resolve in public DNS. Fix Namecheap DNS/DNSSEC before flipping env (see `LAUNCH_DOMAIN_CUTOVER.md`). Do not leave `PUBLIC_SITE_URL_EMERGENCY_FALLBACK` set for launch.
 
 Verify these variable names independently in every environment:
 
@@ -183,6 +185,76 @@ Repository limits are not capacity evidence. Before launch, record:
 Process-local rate limiting is not shared across serverless instances. Replace
 it with an existing provider/distributed primitive before relying on it as a
 production abuse ceiling.
+
+## Vercel pause / `402 DEPLOYMENT_DISABLED`
+
+### What it means
+
+If production returns **HTTP 402** with `X-Vercel-Error: DEPLOYMENT_DISABLED`
+(body often `Payment required` / `DEPLOYMENT_DISABLED`), Vercel has **disabled
+serving** the deployment. This is **not** an application bug, DNS failure, or
+bad build.
+
+Common causes on team **mccaesartech** / project **truegoshenauto**:
+
+- Hobby (or other) **usage limits** exceeded (Fluid CPU, provisioned memory,
+  bandwidth, invocations, cron invocations) in the rolling usage window
+- Missing / failed **payment method** or unpaid invoice on a paid plan
+- Fair-use / ToS pause that requires support review
+
+CLI may still list the latest production deployment as **Ready** and show the
+correct aliases (`www.truegoshengh.com`, etc.). That only means the last build
+exists — **edge serving is still disabled** until the account/team is unpaused.
+
+**Do not redeploy while 402 is active.** A new deploy will not restore traffic
+and can waste build minutes. Fix billing/usage first, confirm `200` on the
+public host, then deploy only if a code change is needed.
+
+Official reference: [DEPLOYMENT_DISABLED](https://vercel.com/docs/errors/deployment_disabled).
+
+### Unpause now (dashboard — team mccaesartech)
+
+Owner with billing access must do this in the browser (CLI cannot clear a
+billing/usage pause):
+
+1. Sign in at [vercel.com](https://vercel.com) as a member of team
+   **McCaesar TEchnology Solutions** (`mccaesartech`).
+2. Switch to that team in the top-left team switcher.
+3. Open **Settings → Billing** (team billing):
+   [vercel.com/mccaesartech/~/settings/billing](https://vercel.com/mccaesartech/~/settings/billing)
+4. Resolve the pause:
+   - **Payment / invoice:** add a valid payment method, pay any open invoice,
+     confirm the card is not expired/declined.
+   - **Hobby usage pause:** open **Usage** for the team, note which meter is
+     over limit. Fastest restore is usually **Upgrade to Pro** (pay-as-you-go
+     overages). Staying on Hobby may require waiting until the rolling window
+     drops below limits **and** requesting unpause via
+     [vercel.com/help](https://vercel.com/help) if it does not auto-resume.
+   - **Banner “Paused — Upgrade to resume”:** follow the upgrade CTA or the
+     email Vercel sent about the pause.
+5. Confirm restore (no redeploy yet):
+   ```powershell
+   curl.exe -sI "https://www.truegoshengh.com"
+   ```
+   Expect `HTTP/1.1 200` (or a normal app redirect), **not** `402` /
+   `DEPLOYMENT_DISABLED`. Also check `/api/health/live` and `/api/health/ready`.
+6. Redeploy **only if** you still need a new release after serving is back.
+
+If billing looks fine and the site remains 402, contact Vercel support from
+[vercel.com/help](https://vercel.com/help) with team slug `mccaesartech`,
+project `truegoshenauto`, and a sample `X-Vercel-Id` from the 402 response.
+
+### Prevention checklist (do not skip)
+
+| Control | Action |
+| --- | --- |
+| Payment method | Keep a valid card on the team that owns production; set invoice/receipt email to an monitored inbox. |
+| Usage alerts | In Vercel → team **Usage** / billing alerts, notify before hitting Fluid CPU, memory, bandwidth, and function/cron invocation thresholds. |
+| Plan fit | Production customer traffic on **Hobby** is risky (hard pauses). Prefer **Pro** for `truegoshenauto` / `www.truegoshengh.com`. |
+| Cron inventory | Keep `vercel.json` cron count and frequency low. Current jobs: `account-deletion-cleanup` (`0 3 * * *`), `correct-vehicle-colors` (`15 4 * * *`), `whatsapp-retry` (`45 3 * * *`). Avoid sub-hourly crons; move heavy work off Vercel Functions when possible. |
+| Multi-project load | Team pause affects **all** projects under `mccaesartech`. Monitor aggregate usage across every production site on the team, not only True Goshen. |
+| Uptime monitors | Alert on **402** / `DEPLOYMENT_DISABLED` as well as 5xx — treat as a billing/ops incident, not an app deploy. |
+| After near-miss | Document which meter tripped, owner, and corrective action (upgrade, cron trim, or workload move). |
 
 ## Incident closure
 

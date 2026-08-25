@@ -33,6 +33,8 @@ const ACTION_LABELS: Record<string, string> = {
   team_group_updated: "Group updated",
   sale_updated: "Sale updated",
   settings_updated: "Settings updated",
+  maintenance_enabled: "Maintenance mode enabled",
+  maintenance_disabled: "Maintenance mode disabled",
   export: "Data exported",
   expense_added: "Expense added",
   item_deleted: "Item deleted",
@@ -88,7 +90,8 @@ export default function ActivityPage() {
       />
 
       <div className="platform-card overflow-hidden rounded-xl">
-        <table className="platform-table w-full text-left text-sm">
+        <div className="scroll-touch overflow-x-auto">
+        <table className="platform-table w-full min-w-[560px] text-left text-sm">
           <thead>
             <tr className="text-xs text-[var(--platform-text-secondary)]">
               <th className="px-4 py-3 font-medium">When</th>
@@ -148,6 +151,7 @@ export default function ActivityPage() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

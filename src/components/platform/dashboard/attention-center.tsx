@@ -14,7 +14,8 @@ import { semanticToneClasses, type SemanticTone } from "@/lib/platform/design-to
 import { platformPath } from "@/lib/platform/paths";
 import type { PlatformStats } from "@/lib/platform/types";
 import type { AdminNotification } from "@/lib/platform/types";
-import type { PlatformPermission } from "@/lib/platform/permissions";
+import type { PlatformPermission, PlatformRole } from "@/lib/platform/permissions";
+import { canViewFinance } from "@/lib/platform/permissions";
 import { cn } from "@/lib/utils";
 
 type AttentionItem = {
@@ -30,6 +31,7 @@ type AttentionCenterProps = {
   stats: PlatformStats | null;
   notifications: AdminNotification[];
   permissions: Record<PlatformPermission, boolean>;
+  role: PlatformRole;
   extras?: {
     pendingShipments?: number;
     delayedShipments?: number;
@@ -41,9 +43,12 @@ function buildAttentionItems(
   stats: PlatformStats | null,
   notifications: AdminNotification[],
   permissions: Record<PlatformPermission, boolean>,
+  role: PlatformRole,
   extras: AttentionCenterProps["extras"] = {}
 ): AttentionItem[] {
   if (!stats) return [];
+
+  const financeVisible = canViewFinance(role);
 
   const unread = notifications.filter((n) => !n.readAt).length;
   const items: AttentionItem[] = [];
@@ -112,7 +117,7 @@ function buildAttentionItems(
     });
   }
 
-  if ((stats.pendingFinance ?? 0) > 0 && permissions.finance) {
+  if ((stats.pendingFinance ?? 0) > 0 && financeVisible) {
     items.push({
       id: "pending-finance",
       label: "Pending finance applications",
@@ -123,7 +128,7 @@ function buildAttentionItems(
     });
   }
 
-  if ((extras?.failedPayments ?? 0) > 0 && permissions.finance) {
+  if ((extras?.failedPayments ?? 0) > 0 && financeVisible) {
     items.push({
       id: "failed-payments",
       label: "Failed payments",
@@ -148,9 +153,10 @@ export function AttentionCenter({
   stats,
   notifications,
   permissions,
+  role,
   extras,
 }: AttentionCenterProps) {
-  const items = buildAttentionItems(stats, notifications, permissions, extras);
+  const items = buildAttentionItems(stats, notifications, permissions, role, extras);
 
   return (
     <section aria-label="Attention center" className="space-y-2.5">

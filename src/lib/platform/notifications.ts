@@ -23,6 +23,11 @@ import {
 } from "@/lib/platform/admin-notification-trash";
 import { buildFleetLowStockMessage } from "@/lib/vehicles/low-stock";
 import { reportSchemaIssue } from "@/lib/observability/schema-issue";
+import {
+  SCHEMA_CAPS,
+  isSchemaMissing,
+  markSchemaPresent,
+} from "@/lib/observability/schema-capability";
 
 export type AdminNotification = {
   id: string;
@@ -259,7 +264,11 @@ export async function fetchAdminNotifications(
 ): Promise<{ notifications: AdminNotification[]; fromTable: boolean }> {
   const lowStockThreshold = options?.lowStockThreshold ?? 5;
   const notifyLowStockEnabled = options?.notifyLowStockEnabled ?? true;
-  let query = supabase.from("admin_notifications").select("*").is("deleted_at", null);
+  const skipDeletedAt = isSchemaMissing(SCHEMA_CAPS.adminNotificationsDeletedAt);
+  let query = supabase.from("admin_notifications").select("*");
+  if (!skipDeletedAt) {
+    query = query.is("deleted_at", null);
+  }
   if (auth) {
     query = query.or(recipientFilterOr(auth));
   }
@@ -270,7 +279,7 @@ export async function fetchAdminNotifications(
     reportSchemaIssue({
       table: "admin_notifications",
       column: "deleted_at",
-      migration: "080_admin_notification_soft_delete.sql",
+      migration: "080_admin_notification_soft_delete.sql / 086_postgres_error_clearance.sql",
       source: "fetchAdminNotifications",
       message: error.message,
     });
@@ -281,6 +290,8 @@ export async function fetchAdminNotifications(
     const retry = await fallbackQuery.order("created_at", { ascending: false }).limit(limit);
     data = retry.data;
     error = retry.error;
+  } else if (!error && !skipDeletedAt) {
+    markSchemaPresent(SCHEMA_CAPS.adminNotificationsDeletedAt);
   }
 
   if (error) {
@@ -356,11 +367,14 @@ export async function countUnreadNotifications(
 ): Promise<number> {
   const lowStockThreshold = options?.lowStockThreshold ?? 5;
   const notifyLowStockEnabled = options?.notifyLowStockEnabled ?? true;
+  const skipDeletedAt = isSchemaMissing(SCHEMA_CAPS.adminNotificationsDeletedAt);
   let query = supabase
     .from("admin_notifications")
     .select("*", { count: "exact", head: true })
-    .is("read_at", null)
-    .is("deleted_at", null);
+    .is("read_at", null);
+  if (!skipDeletedAt) {
+    query = query.is("deleted_at", null);
+  }
   if (auth) {
     query = query.or(recipientFilterOr(auth));
   }
@@ -370,7 +384,7 @@ export async function countUnreadNotifications(
     reportSchemaIssue({
       table: "admin_notifications",
       column: "deleted_at",
-      migration: "080_admin_notification_soft_delete.sql",
+      migration: "080_admin_notification_soft_delete.sql / 086_postgres_error_clearance.sql",
       source: "countUnreadNotifications",
       message: error.message,
     });
@@ -384,6 +398,8 @@ export async function countUnreadNotifications(
     const retry = await fallbackQuery;
     count = retry.count;
     error = retry.error;
+  } else if (!error && !skipDeletedAt) {
+    markSchemaPresent(SCHEMA_CAPS.adminNotificationsDeletedAt);
   }
 
   if (error) {

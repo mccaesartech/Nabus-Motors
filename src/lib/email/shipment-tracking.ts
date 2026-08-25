@@ -1,6 +1,6 @@
 import "server-only";
 import { getPublicSiteUrl } from "@/lib/site-url";
-import { readResendApiKey } from "@/lib/email/platform-invite";
+import { sendEmail } from "@/lib/email/resend";
 
 type ShipmentTrackingEmailParams = {
   to: string;
@@ -10,19 +10,6 @@ type ShipmentTrackingEmailParams = {
   originCountry?: string | null;
   destination?: string | null;
 };
-
-function normalizeEnvSecret(value: string | undefined): string {
-  if (!value) return "";
-  return value.trim().replace(/^["']|["']$/g, "");
-}
-
-function getFromAddress(): string | null {
-  const from =
-    normalizeEnvSecret(process.env.RESEND_FROM_EMAIL) ||
-    normalizeEnvSecret(process.env.FROM_EMAIL) ||
-    "True Goshen <onboarding@resend.dev>";
-  return from || null;
-}
 
 function escapeHtml(value: string): string {
   return value
@@ -69,39 +56,22 @@ function buildHtml(params: ShipmentTrackingEmailParams): string {
 export async function sendShipmentTrackingEmail(
   params: ShipmentTrackingEmailParams
 ): Promise<{ sent: boolean; reason?: string }> {
-  const apiKey = readResendApiKey();
-  const from = getFromAddress();
-  if (!apiKey || !from) {
-    return { sent: false, reason: "email_not_configured" };
-  }
-
   const to = params.to.trim();
   if (!to) return { sent: false, reason: "missing_recipient" };
 
   try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from,
-        to: [to],
-        subject: `Your True Goshen tracking number: ${params.trackingNumber}`,
-        html: buildHtml(params),
-      }),
+    await sendEmail({
+      to,
+      subject: `Your True Goshen tracking number: ${params.trackingNumber}`,
+      html: buildHtml(params),
     });
-
-    if (!response.ok) {
-      const text = await response.text();
-      console.warn("[shipment-tracking-email] send failed:", text);
-      return { sent: false, reason: "send_failed" };
-    }
 
     return { sent: true };
   } catch (err) {
-    console.warn("[shipment-tracking-email] error:", err);
+    console.warn(
+      "[shipment-tracking-email] error:",
+      err instanceof Error ? err.message : err
+    );
     return { sent: false, reason: "send_error" };
   }
 }

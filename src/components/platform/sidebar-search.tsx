@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Search, X } from "lucide-react";
+import { Search } from "lucide-react";
 import type { PlatformNavItem } from "@/lib/platform/nav";
 import { cn } from "@/lib/utils";
 
@@ -73,19 +73,9 @@ export function SidebarSearch({
           onFocus={() => setFocused(true)}
           onBlur={() => setTimeout(() => setFocused(false), 150)}
           placeholder="Search menu…"
-          className="platform-input platform-input--icon h-9 w-full pr-8 text-sm"
+          className="platform-input platform-input--icon h-9 w-full text-sm"
           autoComplete="off"
         />
-        {query && (
-          <button
-            type="button"
-            onClick={() => setQuery("")}
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--platform-text-secondary)] hover:text-[var(--platform-text)]"
-            aria-label="Clear search"
-          >
-            <X className="size-3.5" />
-          </button>
-        )}
       </div>
 
       {focused && query.trim() && (

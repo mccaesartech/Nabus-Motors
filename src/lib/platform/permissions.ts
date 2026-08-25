@@ -1,4 +1,29 @@
-export const PLATFORM_ROLES = ["owner", "super_admin", "manager", "staff"] as const;
+/**
+ * Product roles — the only roles owners may assign going forward.
+ * Legacy IAM slugs remain in PLATFORM_ROLES for existing DB rows.
+ */
+export const PRODUCT_ROLES = [
+  "owner",
+  "super_admin",
+  "manager",
+  "staff",
+] as const;
+
+export type ProductRole = (typeof PRODUCT_ROLES)[number];
+
+/** All recognized role slugs (product + legacy). Do not use for invite UI. */
+export const PLATFORM_ROLES = [
+  "owner",
+  "super_admin",
+  "manager",
+  "staff",
+  // Legacy IAM titles — permission fallbacks only; not assignable.
+  "administrator",
+  "sales_officer",
+  "inventory_officer",
+  "freight_officer",
+  "accounts",
+] as const;
 
 export type PlatformRole = (typeof PLATFORM_ROLES)[number];
 
@@ -22,66 +47,87 @@ export type PlatformPermission =
   | "settings"
   | "site_content"
   | "activity"
+  | "audit_log"
   | "trash"
-  | "account_lifecycle";
+  | "account_lifecycle"
+  | "mfa_enforce";
 
 export const ROLE_LABELS: Record<PlatformRole, string> = {
   owner: "Owner",
   super_admin: "Super Admin",
   manager: "Manager",
   staff: "Staff",
+  // Legacy display labels for leftover DB rows
+  administrator: "Administrator",
+  sales_officer: "Sales Officer",
+  inventory_officer: "Inventory Officer",
+  freight_officer: "Freight Officer",
+  accounts: "Accounts",
 };
 
-/** Roles the owner can assign when inviting team members */
-export const INVITABLE_ROLES: PlatformRole[] = ["super_admin", "manager", "staff"];
+/**
+ * Roles assignable via invite / role-change UI.
+ * Owner is bootstrap-only (not invited). Legacy IAM roles are excluded.
+ */
+export const INVITABLE_ROLES: PlatformRole[] = [
+  "super_admin",
+  "manager",
+  "staff",
+];
 
+export function isProductRole(role: string): role is ProductRole {
+  return (PRODUCT_ROLES as readonly string[]).includes(role);
+}
+
+export function isAssignableRole(role: string): boolean {
+  return (INVITABLE_ROLES as readonly string[]).includes(role);
+}
+
+const ALL_PERMS: PlatformPermission[] = [
+  "dashboard",
+  "inventory",
+  "inventory_edit",
+  "inventory_approve",
+  "customers",
+  "sales",
+  "finance",
+  "leads",
+  "freight",
+  "parts",
+  "messages",
+  "emails",
+  "team_messages",
+  "documents",
+  "reports",
+  "users",
+  "settings",
+  "site_content",
+  "activity",
+  "audit_log",
+  "trash",
+  "account_lifecycle",
+  "mfa_enforce",
+];
+
+/**
+ * Role model (product):
+ * - owner ≡ super_admin: full access including system changes, trash, and
+ *   direct mutations (approve inventory; execute deletes/writes)
+ * - manager: freight, inventory (+ edit for pending-approval submissions),
+ *   sales, customers, reports, documents, parts, leads, messages — may VIEW
+ *   these modules but must not delete or apply writes. System finance
+ *   (revenue, expenses, profit) is owner/super_admin only.
+ *   directly (except inventory pending_approval path). No settings/users/
+ *   site_content/trash/account_lifecycle/inventory_approve/activity/
+ *   audit_log/mfa_enforce
+ * - staff: limited operational VIEW access (narrower than manager); zero
+ *   permanent delete; no direct mutate without Owner/Super Admin approval
+ *
+ * Legacy officer/administrator/accounts maps kept so leftover DB rows keep working.
+ */
 const ROLE_PERMISSIONS: Record<PlatformRole, ReadonlySet<PlatformPermission>> = {
-  owner: new Set([
-    "dashboard",
-    "inventory",
-    "inventory_edit",
-    "inventory_approve",
-    "customers",
-    "sales",
-    "finance",
-    "leads",
-    "freight",
-    "parts",
-    "messages",
-    "emails",
-    "team_messages",
-    "documents",
-    "reports",
-    "users",
-    "settings",
-    "site_content",
-    "activity",
-    "trash",
-    "account_lifecycle",
-  ]),
-  super_admin: new Set([
-    "dashboard",
-    "inventory",
-    "inventory_edit",
-    "inventory_approve",
-    "customers",
-    "sales",
-    "finance",
-    "leads",
-    "freight",
-    "parts",
-    "messages",
-    "emails",
-    "team_messages",
-    "documents",
-    "reports",
-    "users",
-    "settings",
-    "site_content",
-    "activity",
-    "trash",
-    "account_lifecycle",
-  ]),
+  owner: new Set(ALL_PERMS),
+  super_admin: new Set(ALL_PERMS),
   manager: new Set([
     "dashboard",
     "inventory",
@@ -95,9 +141,7 @@ const ROLE_PERMISSIONS: Record<PlatformRole, ReadonlySet<PlatformPermission>> = 
     "emails",
     "team_messages",
     "documents",
-    "site_content",
-    "trash",
-    "account_lifecycle",
+    "reports",
   ]),
   staff: new Set([
     "dashboard",
@@ -109,6 +153,42 @@ const ROLE_PERMISSIONS: Record<PlatformRole, ReadonlySet<PlatformPermission>> = 
     "emails",
     "team_messages",
   ]),
+  // Legacy fallbacks (not assignable)
+  administrator: new Set(ALL_PERMS.filter((p) => p !== "mfa_enforce" && p !== "audit_log")),
+  sales_officer: new Set([
+    "dashboard",
+    "inventory",
+    "customers",
+    "sales",
+    "leads",
+    "messages",
+    "emails",
+    "team_messages",
+  ]),
+  inventory_officer: new Set([
+    "dashboard",
+    "inventory",
+    "inventory_edit",
+    "parts",
+    "team_messages",
+  ]),
+  freight_officer: new Set([
+    "dashboard",
+    "freight",
+    "leads",
+    "customers",
+    "messages",
+    "team_messages",
+  ]),
+  accounts: new Set([
+    "dashboard",
+    "finance",
+    "sales",
+    "customers",
+    "reports",
+    "documents",
+    "team_messages",
+  ]),
 };
 
 const LEGACY_ROLE_MAP: Record<string, PlatformRole> = {
@@ -116,17 +196,33 @@ const LEGACY_ROLE_MAP: Record<string, PlatformRole> = {
   Owner: "owner",
   super_admin: "super_admin",
   "Super Admin": "super_admin",
+  "Super Administrator": "super_admin",
+  administrator: "administrator",
+  Administrator: "administrator",
   manager: "manager",
   Manager: "manager",
   staff: "staff",
-  "Sales Officer": "staff",
-  "Finance Officer": "staff",
+  Staff: "staff",
+  sales_officer: "sales_officer",
+  "Sales Officer": "sales_officer",
+  inventory_officer: "inventory_officer",
+  "Inventory Officer": "inventory_officer",
+  freight_officer: "freight_officer",
+  "Freight Officer": "freight_officer",
+  accounts: "accounts",
+  Accounts: "accounts",
+  "Finance Officer": "accounts",
   Viewer: "staff",
 };
 
 export function normalizeRole(role: string | null | undefined): PlatformRole {
   if (!role) return "staff";
-  return LEGACY_ROLE_MAP[role] ?? (PLATFORM_ROLES.includes(role as PlatformRole) ? (role as PlatformRole) : "staff");
+  return (
+    LEGACY_ROLE_MAP[role] ??
+    (PLATFORM_ROLES.includes(role as PlatformRole)
+      ? (role as PlatformRole)
+      : "staff")
+  );
 }
 
 export function hasPermission(role: PlatformRole, permission: PlatformPermission): boolean {
@@ -161,8 +257,10 @@ export const ALL_PLATFORM_PERMISSIONS: PlatformPermission[] = [
   "settings",
   "site_content",
   "activity",
+  "audit_log",
   "trash",
   "account_lifecycle",
+  "mfa_enforce",
 ];
 
 export function buildSessionPermissions(
@@ -180,8 +278,9 @@ export function canManageUsers(role: PlatformRole): boolean {
   return hasPermission(role, "users");
 }
 
+/** Business finance (revenue, expenses, profit) — owner and super_admin only. */
 export function canViewFinance(role: PlatformRole): boolean {
-  return hasPermission(role, "finance");
+  return role === "owner" || role === "super_admin";
 }
 
 export function canEditInventory(role: PlatformRole): boolean {
@@ -194,7 +293,12 @@ export function canApproveInventory(role: PlatformRole): boolean {
 
 /** AI-assisted customer-visible shipment / freight notes — owners and managers only. */
 export function canUseCustomerNoteAi(role: PlatformRole): boolean {
-  return role === "owner" || role === "super_admin" || role === "manager";
+  return (
+    role === "owner" ||
+    role === "super_admin" ||
+    role === "administrator" ||
+    role === "manager"
+  );
 }
 
 /** View all customer support tickets and reassign across staff. */
@@ -204,6 +308,7 @@ export function canOversightCustomerTickets(
   return (
     role === "owner" ||
     role === "super_admin" ||
+    role === "administrator" ||
     role === "manager"
   );
 }
@@ -215,6 +320,9 @@ const PLATFORM_PREFIX = platformPathPrefix();
 export function permissionForPath(pathname: string): PlatformPermission | null {
   if (!pathname.startsWith(PLATFORM_PREFIX)) return null;
 
+  // Account self-service — any authenticated platform user (not Settings-gated).
+  if (pathname.startsWith(`${PLATFORM_PREFIX}/account`)) return null;
+
   if (pathname.startsWith(`${PLATFORM_PREFIX}/finance`)) return "finance";
   if (pathname.startsWith(`${PLATFORM_PREFIX}/freight`)) return "freight";
   if (pathname.startsWith(`${PLATFORM_PREFIX}/parts`)) return "parts";
@@ -222,10 +330,10 @@ export function permissionForPath(pathname: string): PlatformPermission | null {
   if (pathname.startsWith(`${PLATFORM_PREFIX}/tracking`)) return "leads";
   if (pathname.startsWith(`${PLATFORM_PREFIX}/users`)) return "users";
   if (pathname.startsWith(`${PLATFORM_PREFIX}/site-content`)) return "site_content";
-  if (pathname.startsWith(`${PLATFORM_PREFIX}/error-log`)) return "activity";
   if (pathname.startsWith(`${PLATFORM_PREFIX}/settings`)) return "settings";
   if (pathname.startsWith(`${PLATFORM_PREFIX}/reports`)) return "reports";
   if (pathname.startsWith(`${PLATFORM_PREFIX}/trash`)) return "trash";
+  if (pathname.startsWith(`${PLATFORM_PREFIX}/audit-log`)) return "audit_log";
   if (pathname.startsWith(`${PLATFORM_PREFIX}/account-lifecycle`)) return "account_lifecycle";
   if (pathname === `${PLATFORM_PREFIX}/inventory/new`) return "inventory_edit";
   if (new RegExp(`^${PLATFORM_PREFIX}/inventory/[^/]+/edit/?$`).test(pathname)) {
@@ -269,8 +377,8 @@ export function navPermissionForHref(href: string): PlatformPermission {
     users: "users",
     settings: "settings",
     "site-content": "site_content",
-    "error-log": "activity",
     trash: "trash",
+    "audit-log": "audit_log",
     "account-lifecycle": "account_lifecycle",
   };
   const segment = href.replace(`${PLATFORM_PREFIX}/`, "").split("/")[0];
@@ -304,6 +412,7 @@ export function getRolePermissionsTable(): Array<{
     "settings",
     "site_content",
     "activity",
+    "audit_log",
     "trash",
     "account_lifecycle",
   ];

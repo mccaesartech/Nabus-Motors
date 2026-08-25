@@ -5,6 +5,8 @@ import { logPlatformActivity } from "@/lib/platform/activity";
 import {
   INQUIRY_TRASH_TYPES,
   TRASH_ENTITY_LABELS,
+  buildTrashSearchOrFilter,
+  sanitizeTrashSearchTerm,
   type PlatformTrashRow,
   type TrashEntityType,
 } from "@/lib/platform/trash-types";
@@ -13,6 +15,8 @@ export {
   INQUIRY_TRASH_TYPES,
   TRASH_ENTITY_LABELS,
   TRASH_ENTITY_TYPES,
+  buildTrashSearchOrFilter,
+  sanitizeTrashSearchTerm,
   type PlatformTrashRow,
   type TrashEntityType,
 } from "@/lib/platform/trash-types";
@@ -38,6 +42,8 @@ export type TrashListFilters = {
   deletedBy?: string;
   dateFrom?: string;
   dateTo?: string;
+  /** Search entity label, id, and common snapshot fields (make/model/VIN/name/…). */
+  q?: string;
   page?: number;
   limit?: number;
 };
@@ -146,16 +152,22 @@ async function markEntityDeleted(
   const table = ENTITY_TABLE[entityType];
   if (!table) return { ok: true };
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from(table)
     .update({
       deleted_at: now,
       deleted_by_user_id: auth.type === "user" ? auth.userId ?? null : null,
     })
-    .eq("id", entityId);
+    .eq("id", entityId)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     return { ok: false, message: error.message };
+  }
+  if (!data?.id) {
+    return { ok: false, message: "Soft-delete did not update the record." };
   }
   return { ok: true };
 }
@@ -206,15 +218,6 @@ async function restoreCustomer(
         updated_at: new Date().toISOString(),
       })
       .eq("id", profile.id);
-
-    try {
-      await supabase.auth.admin.updateUserById(String(profile.id), {
-        ban_duration: "none",
-        user_metadata: { account_deleted: false },
-      });
-    } catch {
-      // Profile may exist without auth user.
-    }
   }
 
   if (email) {
@@ -262,7 +265,10 @@ export async function softDeleteEntity(
   auth: PlatformAuthContext,
   entityType: TrashEntityType,
   entityId: string
-): Promise<{ ok: true; trashId: string } | { ok: false; message: string; status?: number }> {
+): Promise<
+  | { ok: true; trashId: string; publicSlug?: string }
+  | { ok: false; message: string; status?: number }
+> {
   const row = await fetchEntityRow(supabase, entityType, entityId);
   if (!row) {
     return { ok: false, message: "Record not found.", status: 404 };
@@ -278,6 +284,10 @@ export async function softDeleteEntity(
   if (entityType === "platform_user") {
     delete snapshot.password_hash;
   }
+  const publicSlug =
+    entityType === "vehicle" && typeof row.slug === "string" && row.slug.trim()
+      ? row.slug.trim()
+      : undefined;
 
   const marked = await markEntityDeleted(supabase, entityType, entityId, auth, now);
   if (!marked.ok) {
@@ -297,7 +307,7 @@ export async function softDeleteEntity(
     return trash;
   }
 
-  return { ok: true, trashId: trash.id };
+  return { ok: true, trashId: trash.id, publicSlug };
 }
 
 const BATCH_CONCURRENCY = 6;
@@ -370,16 +380,22 @@ export async function softDeleteEntities(
     return { entityId, result };
   });
 
+  const publicSlugs: string[] = [];
   for (const { entityId, result } of results) {
-    if (result.ok) deletedIds.push(entityId);
-    else failed.push({ id: entityId, message: result.message });
+    if (result.ok) {
+      deletedIds.push(entityId);
+      if (result.publicSlug) publicSlugs.push(result.publicSlug);
+    } else failed.push({ id: entityId, message: result.message });
   }
 
   if (
     deletedIds.length > 0 &&
     (entityType === "vehicle" || entityType === "sale" || entityType === "preorder")
   ) {
-    revalidatePublicSite();
+    revalidatePublicSite(publicSlugs[0]);
+    for (let i = 1; i < publicSlugs.length; i++) {
+      revalidatePublicSite(publicSlugs[i]);
+    }
   }
 
   return { deletedIds, failed };
@@ -509,9 +525,16 @@ export async function listTrashEntries(
     query = query.eq("entity_type", filters.entityType);
   }
   if (filters.deletedBy?.trim()) {
-    query = query.or(
-      `deleted_by_email.ilike.%${filters.deletedBy.trim()}%,deleted_by_name.ilike.%${filters.deletedBy.trim()}%`
-    );
+    const deletedBy = sanitizeTrashSearchTerm(filters.deletedBy);
+    if (deletedBy) {
+      query = query.or(
+        `deleted_by_email.ilike.%${deletedBy}%,deleted_by_name.ilike.%${deletedBy}%`
+      );
+    }
+  }
+  const searchOr = filters.q ? buildTrashSearchOrFilter(filters.q) : null;
+  if (searchOr) {
+    query = query.or(searchOr);
   }
   if (filters.dateFrom) {
     query = query.gte("deleted_at", filters.dateFrom);
@@ -642,7 +665,11 @@ export async function restoreTrashEntry(
     entityType === "vehicle" || entityType === "sale" || entityType === "preorder";
 
   if (needsRevalidate && !options.skipRevalidate) {
-    revalidatePublicSite();
+    const slug =
+      entityType === "vehicle" && typeof snapshot.slug === "string"
+        ? snapshot.slug.trim()
+        : undefined;
+    revalidatePublicSite(slug || undefined);
   }
 
   await logPlatformActivity(auth, "item_restored", entry.entity_label, {
@@ -695,7 +722,12 @@ export async function permanentlyDeleteTrashEntry(
     entityType === "vehicle" || entityType === "sale" || entityType === "preorder";
 
   if (needsRevalidate && !options.skipRevalidate) {
-    revalidatePublicSite();
+    const snapshot = (entry.snapshot ?? {}) as Record<string, unknown>;
+    const slug =
+      entityType === "vehicle" && typeof snapshot.slug === "string"
+        ? snapshot.slug.trim()
+        : undefined;
+    revalidatePublicSite(slug || undefined);
   }
 
   const now = new Date().toISOString();

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin/auth";
+import { requireDirectMutation, requirePermission } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { fetchPreorderInquiries } from "@/lib/platform/data";
 import { fetchAdminOrders } from "@/lib/platform/orders-admin";
 import { INQUIRY_TRASH_TYPES, notDeletedFilter, softDeleteEntity } from "@/lib/platform/trash";
 
 export async function GET(req: NextRequest) {
-  const auth = await requireAdmin();
+  const auth = await requirePermission("leads");
   if (!auth.ok) {
     return NextResponse.json({ ok: false }, { status: auth.status });
   }
@@ -100,7 +100,7 @@ const TABLE_MAP: Record<string, string> = {
 };
 
 export async function DELETE(req: NextRequest) {
-  const auth = await requireAdmin();
+  const auth = await requireDirectMutation("leads");
   if (!auth.ok) {
     return NextResponse.json({ ok: false }, { status: auth.status });
   }

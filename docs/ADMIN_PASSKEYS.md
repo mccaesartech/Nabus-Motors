@@ -14,7 +14,7 @@ The bootstrap **owner** account (master `ADMIN_PASSWORD`, no email) does **not**
 
 | Variable | Example | Purpose |
 |----------|---------|---------|
-| `WEBAUTHN_RP_ID` | `truegoshen.vercel.app` | Relying Party ID — must match the site hostname users visit |
+| `WEBAUTHN_RP_ID` | `www.truegoshengh.com` | Relying Party ID — must match the site hostname users visit |
 | `WEBAUTHN_RP_NAME` | `True Goshen Admin` | Human-readable name shown in passkey prompts |
 | `NEXT_PUBLIC_WEBAUTHN_ENABLED` | `true` | Feature flag for login UI and settings |
 

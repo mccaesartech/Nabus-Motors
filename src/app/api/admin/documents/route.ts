@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbFailure } from "@/lib/errors/api";
-import { requirePermission } from "@/lib/admin/auth";
+import { requireDirectMutation, requirePermission } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 
 export async function GET() {
@@ -36,7 +36,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requirePermission("documents");
+  const auth = await requireDirectMutation("documents");
   if (!auth.ok) {
     return NextResponse.json({ ok: false }, { status: auth.status });
   }
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const auth = await requirePermission("documents");
+  const auth = await requireDirectMutation("documents");
   if (!auth.ok) {
     return NextResponse.json({ ok: false }, { status: auth.status });
   }

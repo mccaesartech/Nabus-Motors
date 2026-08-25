@@ -38,6 +38,9 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Run security checks
+        run: npm run test:security
+
       - name: Typecheck
         run: npm run typecheck
 

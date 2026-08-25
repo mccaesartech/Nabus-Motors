@@ -16,19 +16,13 @@ export default function ForgotPasswordPage() {
   const [mode, setMode] = useState<"email" | "phone">("email");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const [deliveryFailed, setDeliveryFailed] = useState(false);
-  const [emailSentTo, setEmailSentTo] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [supportWhatsApp, setSupportWhatsApp] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError("");
     setMessage("");
-    setDeliveryFailed(false);
-    setSupportWhatsApp(null);
-    setEmailSentTo(null);
 
     const payload =
       mode === "email" ? { email: email.trim() } : { phone: phone.trim() };
@@ -37,11 +31,12 @@ export default function ForgotPasswordPage() {
       const res = await fetch("/api/customer/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify(payload),
       });
-      const json = await res.json();
+      const json = await res.json().catch(() => ({}));
 
-      if (!res.ok) {
+      if (res.status === 400 || res.status === 403 || res.status === 500) {
         setError(json.message ?? "Could not send reset instructions.");
         setLoading(false);
         return;
@@ -51,13 +46,6 @@ export default function ForgotPasswordPage() {
         json.message ??
           "If an account exists with that email or phone, we've sent password reset instructions."
       );
-      setDeliveryFailed(Boolean(json.deliveryFailed));
-      if (json.emailSentTo) {
-        setEmailSentTo(String(json.emailSentTo));
-      }
-      if (json.supportWhatsApp) {
-        setSupportWhatsApp(String(json.supportWhatsApp));
-      }
     } catch {
       setError("Could not send reset instructions. Please try again.");
     }
@@ -145,35 +133,9 @@ export default function ForgotPasswordPage() {
 
           {error && <p className="text-sm text-red-600">{error}</p>}
           {message && (
-            <div className="space-y-3">
-              <p
-                className={`rounded-lg border px-4 py-3 text-sm ${
-                  deliveryFailed
-                    ? "border-amber-200 bg-amber-50 text-amber-900"
-                    : "border-green-200 bg-green-50 text-green-800"
-                }`}
-              >
-                {message}
-              </p>
-              {emailSentTo && !deliveryFailed ? (
-                <p className="text-sm font-medium text-green-800">
-                  Check your inbox at {emailSentTo} (and spam folder).
-                </p>
-              ) : null}
-              {supportWhatsApp ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full gap-2"
-                  render={
-                    <a href={supportWhatsApp} target="_blank" rel="noopener noreferrer" />
-                  }
-                >
-                  <MessageCircle className="size-4" />
-                  Contact support on WhatsApp
-                </Button>
-              ) : null}
-            </div>
+            <p className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+              {message}
+            </p>
           )}
 
           <Button type="submit" className="w-full" size="lg" disabled={loading}>

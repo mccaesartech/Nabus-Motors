@@ -31,7 +31,8 @@ When prompted for environment variables, add:
 |------|-------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your Supabase anon key |
-| `NEXT_PUBLIC_SITE_URL` | `https://truegoshen.vercel.app` (canonical public app URL used by invites, metadata, and email links) |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Required for Platform admin writes.** Supabase **service_role** secret (Project Settings → API). Never use the anon key here — vehicles RLS is SELECT-only, so an anon key makes updates match 0 rows (“Vehicle not found or update was blocked”). Server-only; never expose to the client. |
+| `NEXT_PUBLIC_SITE_URL` | `https://www.truegoshengh.com` (canonical public app URL used by invites, metadata, and email links) |
 | `NEXT_PUBLIC_AUTO_SITE_URL` | `https://truegoshenauto.com` (optional — Auto Division direct entry) |
 | `AUTO_DIVISION_HOSTS` | `truegoshenauto.com,truegoshenauto.vercel.app,auto.truegoshen.com` |
 | `NEXT_PUBLIC_WHATSAPP_NUMBER` | Your WhatsApp number (digits only, e.g. `233244876784`) |
@@ -53,13 +54,12 @@ not as Vercel secrets. You still need:
 |------|-------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your Supabase anon key |
-| `NEXT_PUBLIC_SITE_URL` | `https://truegoshen.vercel.app` |
+| `NEXT_PUBLIC_SITE_URL` | `https://www.truegoshengh.com` |
 
-Setup steps: `docs/GOOGLE_AUTH.md` (includes Google consent-screen branding and
-Supabase **Custom Domain** on **`auth.truegoshen.com`** so mobile Google sign-in
-does not show `*.supabase.co`). Paste checklist:
-`docs/SUPABASE_AUTH_DOMAIN.md#chosen-configuration-copy-paste`.
-Email signup checks: `docs/EMAIL_VALIDATION.md`.
+Setup steps: `docs/GOOGLE_AUTH.md` (consent screen + redirects for
+`www.truegoshengh.com`). Optional branded Auth host
+`auth.truegoshengh.com` only after Custom Domain HTTPS is healthy —
+`docs/SUPABASE_AUTH_DOMAIN.md`. Email signup checks: `docs/EMAIL_VALIDATION.md`.
 
 ### Option B — Vercel Dashboard
 
@@ -80,6 +80,14 @@ Email signup checks: `docs/EMAIL_VALIDATION.md`.
 
 For CI gates, rollback, backup/restore validation, environment separation, and
 monitoring setup, follow `docs/PRODUCTION_OPERATIONS_RUNBOOK.md`.
+
+### Site returns `402` / `DEPLOYMENT_DISABLED`
+
+Vercel has paused serving (billing or usage), not a bad build. **Do not
+redeploy** until the public host returns a normal response again. Unpause steps
+and prevention (payment method, usage alerts, Hobby limits, crons): see
+**Vercel pause / `402 DEPLOYMENT_DISABLED`** in
+`docs/PRODUCTION_OPERATIONS_RUNBOOK.md`.
 
 ## Troubleshooting local dev
 

@@ -8,6 +8,28 @@ import {
   passkeyRateLimitMessage,
 } from "@/lib/admin/passkey-rate-limit";
 import { isWebAuthnEnabled, verifyAuthenticationForLogin } from "@/lib/admin/webauthn";
+import { createAdminSupabase } from "@/lib/supabase/admin";
+import { schedulePlatformFailedLoginAlert } from "@/lib/notifications/platform-login-notify";
+
+async function notifyPasskeyLoginFailure(
+  req: NextRequest,
+  platformUserId: string | null
+): Promise<void> {
+  if (!platformUserId) return;
+  const supabase = createAdminSupabase();
+  if (!supabase) return;
+  const { data: user } = await supabase
+    .from("platform_users")
+    .select("email")
+    .eq("id", platformUserId)
+    .maybeSingle();
+  if (!user?.email?.trim()) return;
+  schedulePlatformFailedLoginAlert({
+    email: user.email.trim(),
+    ip: clientIp(req),
+    userAgent: req.headers.get("user-agent"),
+  });
+}
 
 export async function POST(req: NextRequest) {
   if (!isWebAuthnEnabled()) {
@@ -35,6 +57,7 @@ export async function POST(req: NextRequest) {
     );
     return buildPlatformLoginResponse(user);
   } catch (error) {
+    void notifyPasskeyLoginFailure(req, platformUserId);
     return apiFailure(error, {
       module: "api.admin.passkeys.login.verify.POST",
       message: "Passkey sign-in failed.",

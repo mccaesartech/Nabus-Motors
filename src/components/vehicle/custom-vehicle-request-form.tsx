@@ -18,7 +18,6 @@ import {
 import { WhatsAppOptIn } from "@/components/forms/whatsapp-opt-in";
 import { CustomerDataTrustNote } from "@/components/forms/customer-data-trust-note";
 import { useCustomerAuth } from "@/context/customer-auth-context";
-import { supabase } from "@/lib/supabase/client";
 import { makes } from "@/lib/data/catalog-meta";
 import { defaultWhatsAppOptIn } from "@/lib/notifications/phone";
 import { ROUTES } from "@/lib/routes";
@@ -155,16 +154,6 @@ export function CustomVehicleRequestForm({
           text: json.message ?? "Could not submit request. Please try again.",
         });
         return;
-      }
-
-      if (isGuest && supabase) {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
-        if (!signInError) {
-          await refreshProfile();
-        }
       }
 
       setFeedback({ ok: true, text: json.message ?? "Request submitted." });

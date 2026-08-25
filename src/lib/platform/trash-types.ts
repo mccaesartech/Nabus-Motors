@@ -55,6 +55,40 @@ export type PlatformTrashRow = {
   permanently_deleted_at: string | null;
 };
 
+/** Sanitize user search for PostgREST `.or()` / `.ilike` filter strings. */
+export function sanitizeTrashSearchTerm(raw: string): string {
+  return raw
+    .trim()
+    .replace(/[%_,.()"'\\]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+}
+
+/**
+ * Build a PostgREST `or` filter that matches trash rows by label, id, or
+ * common snapshot fields (vehicles: make/model/VIN/slug/year; orders/leads: name/email).
+ */
+export function buildTrashSearchOrFilter(q: string): string | null {
+  const term = sanitizeTrashSearchTerm(q);
+  if (!term) return null;
+  const pattern = `%${term}%`;
+  const columns = [
+    "entity_label",
+    "entity_id",
+    "snapshot->>make",
+    "snapshot->>model",
+    "snapshot->>vin",
+    "snapshot->>slug",
+    "snapshot->>name",
+    "snapshot->>email",
+    "snapshot->>title",
+    "snapshot->>year",
+  ] as const;
+  // Quote patterns so spaces in the term do not break PostgREST `.or()` parsing.
+  return columns.map((col) => `${col}.ilike."${pattern}"`).join(",");
+}
+
 /** Supabase filter helper — hide soft-deleted rows when column exists. */
 export function notDeletedFilter<T extends { is: (col: string, val: null) => T }>(query: T): T {
   return query.is("deleted_at", null);

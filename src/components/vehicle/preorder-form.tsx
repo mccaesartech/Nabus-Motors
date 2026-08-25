@@ -23,7 +23,6 @@ import {
 } from "@/components/ui/dialog";
 import { formatCheckoutPrice } from "@/lib/currency/checkout";
 import { useCustomerAuth } from "@/context/customer-auth-context";
-import { supabase } from "@/lib/supabase/client";
 import {
   downPaymentUsd,
   PREORDER_DOWN_PAYMENT_RATE,
@@ -210,20 +209,11 @@ export function PreorderForm({
         });
         return;
       }
-      if (isGuest && supabase) {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
+      if (isGuest) {
+        setFeedback({
+          ok: true,
+          text: `${json.message} Register through our secure account service to track this pre-order.`,
         });
-        if (signInError) {
-          console.warn("[preorder] post-submit sign-in:", signInError.message);
-          setFeedback({
-            ok: true,
-            text: `${json.message} Sign in at your account page to track this pre-order.`,
-          });
-        } else {
-          await refreshProfile();
-        }
       }
 
       saveCheckoutCompleteContext({

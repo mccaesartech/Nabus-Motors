@@ -6,9 +6,11 @@ import { Download, FileText, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { PageHeader, StatCard } from "@/components/platform/page-header";
 import { ConfirmDialog } from "@/components/platform/confirm-dialog";
 import { SaleStatusBadge } from "@/components/platform/status-badge";
+import { usePlatformSession } from "@/components/platform/platform-shell";
 import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
 import { downloadCsv } from "@/lib/platform/data";
+import { canDirectMutate } from "@/lib/platform/mutation-approval";
 import { usePlatformCurrency } from "@/context/platform-currency-context";
 import {
   exportSalesCsv,
@@ -46,6 +48,8 @@ function defaultValidUntil() {
 
 export default function SalesPage() {
   const router = useRouter();
+  const session = usePlatformSession();
+  const canMutate = session ? canDirectMutate(session.role) : false;
   const { formatPrice } = usePlatformCurrency();
   const searchParams = useSearchParams();
   const [sales, setSales] = useState<SaleRow[]>([]);
@@ -149,6 +153,7 @@ export default function SalesPage() {
         status: "draft",
       }),
     });
+    const json = await res.json();
     setSaving(false);
     if (res.ok) {
       setToast("Quotation created.");
@@ -159,7 +164,11 @@ export default function SalesPage() {
       setSalePrice("");
       setValidUntil(defaultValidUntil());
       setNotes("");
-      load();
+      if (json.sale) {
+        setSales((prev) => [json.sale, ...prev]);
+      } else {
+        load();
+      }
     }
   }
 
@@ -170,10 +179,16 @@ export default function SalesPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ preorder_inquiry_id: preorderId }),
     });
+    const json = await res.json();
     setSaving(false);
     if (res.ok) {
       setToast("Pre-order converted to sale.");
-      load();
+      if (json.sale) {
+        setSales((prev) => [json.sale, ...prev]);
+        setConvertible((prev) => prev.filter((p) => p.id !== preorderId));
+      } else {
+        load();
+      }
     }
   }
 
@@ -183,13 +198,18 @@ export default function SalesPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, status }),
     });
+    const json = await res.json();
     if (res.ok) {
       if (status === "completed") {
         setToast(
           "Sale completed — vehicle marked sold, or moved to pre-order if it was the last available unit."
         );
       }
-      load();
+      if (json.sale) {
+        setSales((prev) => prev.map((sale) => (sale.id === id ? json.sale : sale)));
+      } else {
+        load();
+      }
     }
   }
 
@@ -208,10 +228,15 @@ export default function SalesPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: saleId, action: "revert" }),
     });
+    const json = await res.json();
     setSaving(false);
     if (res.ok) {
       setToast("Sale reverted to pre-order.");
-      load();
+      if (json.sale) {
+        setSales((prev) => prev.map((sale) => (sale.id === saleId ? json.sale : sale)));
+      } else {
+        load();
+      }
     }
   }
 
@@ -477,7 +502,7 @@ export default function SalesPage() {
                             <RotateCcw className="size-4" />
                           </button>
                         )}
-                        {sale.status !== "completed" && (
+                        {canMutate && sale.status !== "completed" && (
                           <button
                             type="button"
                             onClick={() => removeSale(sale.id)}

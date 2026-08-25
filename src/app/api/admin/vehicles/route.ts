@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { canManageTrash, requirePermission } from "@/lib/admin/auth";
 import { logPlatformActivity } from "@/lib/platform/activity";
+import { enqueueAuditLog } from "@/lib/audit/write";
 import { recordVehicleReceived, recordVehicleSold } from "@/lib/platform/inventory-movements/record";
 import { dbFailure } from "@/lib/errors/api";
 import { revalidatePublicSite } from "@/lib/admin/revalidate";
@@ -44,14 +45,17 @@ import { notDeletedFilter, normalizeBatchIds, softDeleteEntities } from "@/lib/p
 import type { VehicleGalleryData } from "@/lib/types";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import {
-  countAvailableSiblings,
-  resolveRequestedSoldStatus,
+  resolveUnitSoldTransition,
 } from "@/lib/vehicles/stock-automation";
+import { listingUnitCount } from "@/lib/vehicles/low-stock";
 import {
   maybeNotifyVehicleStockAction,
   refreshFleetLowStockAlert,
 } from "@/lib/platform/vehicle-stock-notifications";
-import { notifyVehicleLocallyAvailable } from "@/lib/vehicle-interest/server";
+import {
+  notifyPriceDropSubscribers,
+  notifyVehicleLocallyAvailable,
+} from "@/lib/vehicle-interest/server";
 import type { DbVehicle } from "@/lib/platform/types";
 import { getAdminSiteSettings, toOperationalSettings } from "@/lib/platform/site-settings";
 
@@ -406,6 +410,15 @@ export async function POST(req: NextRequest) {
   if (approvalStatus === "approved") {
     revalidatePublicSite(vehicle.slug);
     await logPlatformActivity(auth.auth, "vehicle_created", vehicle.slug, { id: vehicle.id });
+    enqueueAuditLog({
+      action: "vehicle_created",
+      success: true,
+      actor: auth.auth,
+      targetType: "vehicle",
+      targetId: vehicle.id,
+      targetName: vehicle.slug,
+      request: req,
+    });
   } else {
     await notifyVehiclePendingApproval(supabase, {
       id: vehicle.id,
@@ -430,7 +443,8 @@ export async function POST(req: NextRequest) {
       price: vehicle.price,
       created_at: vehicle.created_at,
     },
-    auth.auth
+    auth.auth,
+    { quantity: listingUnitCount(vehicle) }
   );
 
   return NextResponse.json({
@@ -488,6 +502,8 @@ export async function PATCH(req: NextRequest) {
     make: string;
     model: string;
     status: string;
+    price?: number | null;
+    stock_quantity?: number | null;
     available_locally?: boolean | null;
     local_availability_at?: string | null;
     shipment_available?: boolean | null;
@@ -522,6 +538,7 @@ export async function PATCH(req: NextRequest) {
     }
     existing = {
       ...minimal.data,
+      price: (minimal.data as { price?: number | null }).price ?? null,
       available_locally: false,
       local_availability_at: null,
       shipment_available: false,
@@ -551,8 +568,16 @@ export async function PATCH(req: NextRequest) {
     updates.local_availability_at = null;
   }
 
+  // Status / units-in-stock are operational inventory edits (list quick actions),
+  // not full listing republishes — apply live and skip publish-confirm.
+  const updateKeys = Object.keys(updates);
+  const isOperationalStockPatch =
+    updateKeys.length > 0 &&
+    updateKeys.every((key) => key === "status" || key === "stock_quantity");
+
   const stashPendingEdits =
     managerNeedsApproval(auth.auth.role) &&
+    !isOperationalStockPatch &&
     (existing.approval_status === "approved" ||
       existing.approval_status === "rejected" ||
       hasPendingEdits(existing.pending_changes));
@@ -560,7 +585,8 @@ export async function PATCH(req: NextRequest) {
   if (
     rolePublishesImmediately(auth.auth.role) &&
     !stashPendingEdits &&
-    publishConfirmed !== true
+    publishConfirmed !== true &&
+    !isOperationalStockPatch
   ) {
     return NextResponse.json(
       {
@@ -639,6 +665,15 @@ export async function PATCH(req: NextRequest) {
       await logPlatformActivity(auth.auth, "vehicle_updated", pendingVehicle.slug, {
         id: pendingVehicle.id,
       });
+      enqueueAuditLog({
+        action: "vehicle_updated",
+        success: true,
+        actor: auth.auth,
+        targetType: "vehicle",
+        targetId: pendingVehicle.id,
+        targetName: pendingVehicle.slug,
+        request: req,
+      });
     }
 
     return NextResponse.json({
@@ -684,22 +719,29 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
+  let unitSoldTransition: Awaited<ReturnType<typeof resolveUnitSoldTransition>> | null =
+    null;
+
   if (updates.status === "sold") {
     const make = String(updates.make ?? existing.make);
     const model = String(updates.model ?? existing.model);
     const year = Number(updates.year ?? existing.year);
-    const resolved = await resolveRequestedSoldStatus(supabase, {
+    unitSoldTransition = await resolveUnitSoldTransition(supabase, {
       id,
       slug: existing.slug,
       make,
       model,
       year,
+      stock_quantity: existing.stock_quantity,
+      status: existing.status,
     });
-    updates.status = resolved;
+    updates.status = unitSoldTransition.status;
+    updates.stock_quantity = unitSoldTransition.stock_quantity;
   }
 
   let warning: string | undefined;
   let autoPreOrder = false;
+  let unitDecremented = false;
 
   const { result, warning: writeWarning } = await vehicleWriteWithOptionalFallback(
     async (selectColumns, payload) =>
@@ -722,11 +764,16 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (!data) {
+    console.error("[vehicles] PATCH matched 0 rows", {
+      vehicleId: id,
+      updateKeys: Object.keys(updates),
+      operationalStock: isOperationalStockPatch,
+    });
     return NextResponse.json(
       {
         ok: false,
         message:
-          "Vehicle not found or update was blocked. Check the listing still exists and SUPABASE_SERVICE_ROLE_KEY is set to the service role key.",
+          "Vehicle not found or update was blocked. Confirm the listing still exists, migration 082 (stock_quantity) is applied if editing Units, and SUPABASE_SERVICE_ROLE_KEY is the service_role key (not the anon key).",
       },
       { status: 404 }
     );
@@ -734,32 +781,26 @@ export async function PATCH(req: NextRequest) {
 
   const vehicle = data as unknown as DbVehicle;
 
-  if (requestedStatus === "sold" && updates.status === "pre_order") {
-    autoPreOrder = true;
-    await logPlatformActivity(auth.auth, "vehicle_auto_pre_order", vehicle.slug, {
-      id: vehicle.id,
-      make: vehicle.make,
-      model: vehicle.model,
-      year: vehicle.year,
-      source: "admin_status_change",
-    });
-  }
-
-  if (requestedStatus === "sold") {
-    try {
-      const availableSiblings = await countAvailableSiblings(supabase, {
+  if (requestedStatus === "sold" && unitSoldTransition) {
+    autoPreOrder = unitSoldTransition.autoPreOrder;
+    unitDecremented = unitSoldTransition.unitDecremented;
+    if (autoPreOrder) {
+      await logPlatformActivity(auth.auth, "vehicle_auto_pre_order", vehicle.slug, {
         id: vehicle.id,
         make: vehicle.make,
         model: vehicle.model,
         year: vehicle.year,
+        source: "admin_status_change",
       });
+    }
+    try {
       await maybeNotifyVehicleStockAction(supabase, {
         id: vehicle.id,
         slug: vehicle.slug,
         year: vehicle.year,
         make: vehicle.make,
         model: vehicle.model,
-        availableSiblings,
+        availableSiblings: unitSoldTransition.remainingInGroup,
         autoPreOrder,
         source: "sold",
         sourceDetail: "admin_status_change",
@@ -767,6 +808,16 @@ export async function PATCH(req: NextRequest) {
       await refreshFleetLowStockAlert(supabase);
     } catch (err) {
       console.error("[vehicles] stock action notify failed:", err);
+    }
+  } else if (
+    updates.stock_quantity !== undefined &&
+    listingUnitCount({ stock_quantity: updates.stock_quantity as number }) !==
+      listingUnitCount({ stock_quantity: existing.stock_quantity })
+  ) {
+    try {
+      await refreshFleetLowStockAlert(supabase);
+    } catch (err) {
+      console.error("[vehicles] fleet low stock refresh failed:", err);
     }
   }
 
@@ -794,6 +845,15 @@ export async function PATCH(req: NextRequest) {
     });
   } else {
     await logPlatformActivity(auth.auth, "vehicle_updated", vehicle.slug, { id: vehicle.id });
+    enqueueAuditLog({
+      action: "vehicle_updated",
+      success: true,
+      actor: auth.auth,
+      targetType: "vehicle",
+      targetId: vehicle.id,
+      targetName: vehicle.slug,
+      request: req,
+    });
   }
 
   let availabilityNotifications: { notified: number; skipped: number } | undefined;
@@ -812,11 +872,47 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
-  const becameSold =
+  let priceDropNotifications: { notified: number; skipped: number } | undefined;
+  const previousPrice = Number(existing.price);
+  const newPrice = Number(vehicle.price);
+  if (
+    updates.price !== undefined &&
+    Number.isFinite(previousPrice) &&
+    Number.isFinite(newPrice) &&
+    newPrice < previousPrice
+  ) {
+    try {
+      priceDropNotifications = await notifyPriceDropSubscribers(supabase, {
+        id: vehicle.id,
+        slug: vehicle.slug,
+        make: vehicle.make,
+        model: vehicle.model,
+        year: vehicle.year,
+        previousPrice,
+        newPrice,
+      });
+    } catch (err) {
+      console.error("[vehicles] price-drop notify failed:", err);
+    }
+  }
+
+  const priorQty = listingUnitCount({ stock_quantity: existing.stock_quantity });
+  const nextQty = listingUnitCount({
+    stock_quantity:
+      updates.stock_quantity !== undefined
+        ? (updates.stock_quantity as number)
+        : vehicle.stock_quantity,
+  });
+
+  // One physical unit left inventory (status sold/pre_order, or multi-unit decrement).
+  const unitLeftInventory =
     requestedStatus === "sold" &&
-    updates.status === "sold" &&
-    existing.status !== "sold";
-  if (becameSold) {
+    existing.status !== "sold" &&
+    Boolean(unitSoldTransition) &&
+    (unitDecremented ||
+      updates.status === "sold" ||
+      updates.status === "pre_order");
+  if (unitLeftInventory) {
     await recordVehicleSold(
       supabase,
       {
@@ -826,7 +922,34 @@ export async function PATCH(req: NextRequest) {
         model: vehicle.model,
         price: vehicle.price,
       },
-      { auth: auth.auth, movementType: "vehicle_sold" }
+      {
+        auth: auth.auth,
+        movementType: "vehicle_sold",
+        // Unique per unit so multi-unit listings record each decrement.
+        referenceId: `${vehicle.id}:sold:${Date.now()}`,
+      }
+    );
+  } else if (
+    requestedStatus !== "sold" &&
+    updates.stock_quantity !== undefined &&
+    nextQty > priorQty
+  ) {
+    const delta = nextQty - priorQty;
+    await recordVehicleReceived(
+      supabase,
+      {
+        id: vehicle.id,
+        year: vehicle.year,
+        make: vehicle.make,
+        model: vehicle.model,
+        price: vehicle.price,
+      },
+      auth.auth,
+      {
+        quantity: delta,
+        referenceId: `${vehicle.id}:recv:${priorQty}->${nextQty}:${Date.now()}`,
+        description: `Stock increased — ${vehicle.year} ${vehicle.make} ${vehicle.model} (+${delta})`,
+      }
     );
   }
 
@@ -835,8 +958,11 @@ export async function PATCH(req: NextRequest) {
     vehicle,
     warning,
     autoPreOrder,
+    unitDecremented,
+    stock_quantity: listingUnitCount(vehicle),
     pendingApproval: vehicle.approval_status === "pending_approval",
     availabilityNotifications,
+    priceDropNotifications,
   });
 }
 
@@ -933,6 +1059,19 @@ export async function DELETE(req: NextRequest) {
       "vehicle_deleted",
       batch.deletedIds.length === 1 ? batch.deletedIds[0] : `${batch.deletedIds.length} vehicles`
     );
+    enqueueAuditLog({
+      action: "vehicle_deleted",
+      success: true,
+      actor: auth.auth,
+      targetType: "vehicle",
+      targetId: batch.deletedIds.length === 1 ? batch.deletedIds[0] : null,
+      targetName:
+        batch.deletedIds.length === 1
+          ? batch.deletedIds[0]
+          : `${batch.deletedIds.length} vehicles`,
+      metadata: { count: batch.deletedIds.length },
+      request: req,
+    });
   }
 
   if (batch.deletedIds.length === 0) {

@@ -15,6 +15,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { ROUTES } from "@/lib/routes";
 import { useCustomerAuth } from "@/context/customer-auth-context";
 import { useRequireCustomerAuth } from "@/hooks/use-require-customer-auth";
+import {
+  customerAuthProviderLabel,
+  formatMemberSince,
+  resolveCustomerAvatarUrl,
+} from "@/lib/customer/profile";
 import { useCurrency } from "@/context/currency-context";
 import { useCustomerChatRealtime } from "@/lib/customer/realtime";
 import {
@@ -36,6 +41,8 @@ import { AccountSectionHeader } from "@/components/account/account-section-heade
 import { AccountEmptyState } from "@/components/account/account-empty-state";
 import { AccountNotificationsSection } from "@/components/account/account-notifications-section";
 import { VehicleRequestsSection } from "@/components/account/vehicle-requests-section";
+import { ProfileAvatarViewer } from "@/components/account/profile-avatar-viewer";
+import { LogoutConfirmDialog } from "@/components/platform/confirm-dialog";
 import { buildAccountAppointmentContext } from "@/lib/account/appointment-context";
 import {
   buildPreorderDocumentHtml,
@@ -128,7 +135,7 @@ function AccountContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const welcome = searchParams.get("welcome") === "1";
-  const { user, profile, displayName, signOut, getAccessToken } = useCustomerAuth();
+  const { user, profile, displayName, signOut, getAccessToken, refreshProfile } = useCustomerAuth();
   const { loading } = useRequireCustomerAuth();
   const { formatPrice } = useCurrency();
   const { load: reloadNotifications } = useCustomerNotifications();
@@ -155,9 +162,23 @@ function AccountContent() {
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
   const [highlightConversationId, setHighlightConversationId] = useState<string | null>(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+  const [hasUploadedAvatar, setHasUploadedAvatar] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const threadEndRef = useRef<HTMLDivElement>(null);
   const replyInputRef = useRef<HTMLTextAreaElement>(null);
   const deepLinkFocusRef = useRef(false);
+
+  const overviewAvatarUrl = resolveCustomerAvatarUrl({
+    profileAvatarUrl: profile?.avatar_url,
+    userMetadata: (user?.user_metadata as Record<string, unknown> | undefined) ?? null,
+  });
+  const overviewHasUploadedAvatar = Boolean(profile?.avatar_url?.trim());
+
+  useEffect(() => {
+    setAvatarPreviewUrl(overviewAvatarUrl);
+    setHasUploadedAvatar(overviewHasUploadedAvatar);
+  }, [overviewAvatarUrl, overviewHasUploadedAvatar]);
 
   const selectedConversation = conversations.find((c) => c.id === selectedConversationId) ?? null;
 
@@ -445,6 +466,16 @@ function AccountContent() {
     phone: profile?.phone ?? null,
   };
 
+  const overviewInitials = (displayName || user?.email || "C")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("") || "C";
+  const memberSinceLabel = formatMemberSince(profile?.created_at);
+  const authProviderLabel = customerAuthProviderLabel(user);
+  const locationLabel = [profile?.city, profile?.country].filter(Boolean).join(", ");
+
   const appointmentContext = buildAccountAppointmentContext({
     displayName,
     email: user?.email ?? "",
@@ -520,27 +551,57 @@ function AccountContent() {
     <Container className="py-12 sm:py-16">
       <div className="mx-auto max-w-4xl space-y-10">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold sm:text-3xl">My Account</h1>
-            <p className="mt-2 text-muted-foreground">
-              Welcome back, <span className="font-medium text-foreground">{displayName}</span>
-            </p>
-            <p className="text-sm text-muted-foreground">{user.email}</p>
-            {profile?.registration_id && (
-              <div className="mt-4 inline-flex flex-col gap-1 rounded-lg border border-brand-purple/20 bg-brand-purple/5 px-4 py-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Your registration ID
-                </p>
-                <p className="font-mono text-lg font-semibold text-brand-purple">
-                  {profile.registration_id}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Use this ID when contacting us. Your account is private — only you can see your data.
-                </p>
-              </div>
-            )}
+          <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-start">
+            <ProfileAvatarViewer
+              avatarUrl={avatarPreviewUrl}
+              hasUploadedAvatar={hasUploadedAvatar}
+              initials={overviewInitials}
+              size="md"
+              getAccessToken={getAccessToken}
+              onAvatarChange={async (next) => {
+                setAvatarPreviewUrl(next.avatarUrl);
+                setHasUploadedAvatar(next.hasUploadedAvatar);
+                await refreshProfile();
+              }}
+            />
+            <div className="min-w-0">
+              <h1 className="text-2xl font-semibold sm:text-3xl">My Account</h1>
+              <p className="mt-2 text-muted-foreground">
+                Welcome back, <span className="font-medium text-foreground">{displayName}</span>
+              </p>
+              <p className="text-sm text-muted-foreground">{user.email}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {authProviderLabel}
+                {memberSinceLabel ? ` · Member since ${memberSinceLabel}` : null}
+                {locationLabel ? ` · ${locationLabel}` : null}
+                {profile?.phone ? ` · ${profile.phone}` : null}
+              </p>
+              {profile?.registration_id && (
+                <div className="mt-4 inline-flex flex-col gap-1 rounded-lg border border-brand-purple/20 bg-brand-purple/5 px-4 py-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Your registration ID
+                  </p>
+                  <p className="font-mono text-lg font-semibold text-brand-purple">
+                    {profile.registration_id}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Use this ID when contacting us. Your account is private — only you can see your data.
+                  </p>
+                </div>
+              )}
+              <Link
+                href="/account/settings"
+                className="mt-3 inline-flex min-h-10 items-center text-sm font-medium text-brand-purple hover:underline"
+              >
+                Edit profile details →
+              </Link>
+            </div>
           </div>
-          <Button variant="outline" onClick={handleSignOut} className="min-h-11">
+          <Button
+            variant="outline"
+            onClick={() => setLogoutConfirmOpen(true)}
+            className="min-h-11"
+          >
             Sign out
           </Button>
         </div>
@@ -1117,18 +1178,33 @@ function AccountContent() {
         <section className="rounded-lg border p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-lg font-semibold">Settings</h2>
+              <h2 className="text-lg font-semibold">Profile &amp; settings</h2>
               <p className="text-sm text-muted-foreground">
-                Privacy, security, and account deletion are managed in account settings.
+                Update your name and phone, or manage privacy and account deletion.
               </p>
             </div>
-            <Button variant="outline" className="min-h-11 gap-2" render={<Link href="/account/settings/privacy" />}>
-              <Settings className="size-4" />
-              Privacy &amp; Security
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" className="min-h-11 gap-2" render={<Link href="/account/settings" />}>
+                <Settings className="size-4" />
+                Edit profile
+              </Button>
+              <Button
+                variant="outline"
+                className="min-h-11 gap-2"
+                render={<Link href="/account/settings/privacy" />}
+              >
+                Privacy &amp; Security
+              </Button>
+            </div>
           </div>
         </section>
       </div>
+      <LogoutConfirmDialog
+        open={logoutConfirmOpen}
+        onOpenChange={setLogoutConfirmOpen}
+        onConfirm={handleSignOut}
+        confirmLabel="Sign out"
+      />
     </Container>
   );
 }

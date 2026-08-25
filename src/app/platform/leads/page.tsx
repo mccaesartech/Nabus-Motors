@@ -11,9 +11,11 @@ import {
 } from "@/components/platform/confirm-dialog";
 import { PaymentStatusBadge, StatusBadge } from "@/components/platform/status-badge";
 import { SafeVehicleImage } from "@/components/shared/safe-vehicle-image";
+import { usePlatformSession } from "@/components/platform/platform-shell";
 import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
 import { unifyLeads } from "@/lib/platform/data";
+import { canDirectMutate } from "@/lib/platform/mutation-approval";
 import type { InquiryData, UnifiedLead } from "@/lib/platform/types";
 import { LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS, ORDER_STATUS_OPTIONS, leadTypeLabel } from "@/lib/platform/types";
 import { CUSTOM_REQUEST_STATUS_OPTIONS } from "@/lib/platform/custom-request";
@@ -36,6 +38,8 @@ function rowKey(lead: UnifiedLead) {
 
 export default function LeadsPage() {
   const router = useRouter();
+  const session = usePlatformSession();
+  const canMutate = session ? canDirectMutate(session.role) : false;
   const searchParams = useSearchParams();
   const [inquiries, setInquiries] = useState<InquiryData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -391,7 +395,7 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {selectedIds.size > 0 && (
+      {selectedIds.size > 0 && canMutate && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[var(--platform-border)] bg-[var(--platform-surface)] px-4 py-3 text-sm">
           <span>
             <span className="font-medium">{selectedIds.size}</span> selected
@@ -658,6 +662,7 @@ export default function LeadsPage() {
                         )}
                       </td>
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        {canMutate ? (
                         <button
                           type="button"
                           onClick={() => setDeleteTarget(lead)}
@@ -666,6 +671,7 @@ export default function LeadsPage() {
                         >
                           <Trash2 className="size-4" />
                         </button>
+                        ) : null}
                         {lead.detailLink ? (
                           <div className="flex flex-col gap-1">
                             <Link

@@ -6,6 +6,7 @@ import {
   type ImageAdjustPreset,
   isImageAdjustPreset,
 } from "@/lib/ai/image-adjustments";
+import { buildVehicleAiLabel, logAiUsage } from "@/lib/ai/usage-log";
 import { enhanceListingImageTo4k } from "@/lib/images/enhance-upload";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 
@@ -83,7 +84,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: { url?: string; preset?: string };
+  let body: {
+    url?: string;
+    preset?: string;
+    vehicleId?: string;
+    vehicleSlug?: string;
+    vehicleLabel?: string;
+    make?: string;
+    model?: string;
+    year?: number | string;
+  };
   try {
     body = await req.json();
   } catch {
@@ -92,6 +102,22 @@ export async function POST(req: NextRequest) {
 
   const sourceUrl = body.url?.trim();
   const preset = body.preset?.trim();
+  const vehicleId =
+    typeof body.vehicleId === "string" && body.vehicleId.trim()
+      ? body.vehicleId.trim()
+      : null;
+  const vehicleSlug =
+    typeof body.vehicleSlug === "string" && body.vehicleSlug.trim()
+      ? body.vehicleSlug.trim()
+      : null;
+  const vehicleLabel =
+    (typeof body.vehicleLabel === "string" && body.vehicleLabel.trim()) ||
+    buildVehicleAiLabel({
+      year: body.year,
+      make: body.make,
+      model: body.model,
+    });
+  const usageAction = preset === "enhance" ? "enhance_image" : "edit_image";
 
   if (!sourceUrl) {
     return NextResponse.json({ ok: false, message: "Missing image url" }, { status: 400 });
@@ -169,6 +195,17 @@ export async function POST(req: NextRequest) {
   });
 
   if (error) {
+    void logAiUsage({
+      auth: auth.auth,
+      action: usageAction,
+      status: "error",
+      vehicleId,
+      vehicleSlug,
+      vehicleLabel,
+      previewSnippet: `${preset}: ${sourceUrl}`,
+      errorMessage: error.message,
+      metadata: { source: "edit-image", preset },
+    });
     return dbFailure(error, {
       module: "api.admin.vehicles.edit-image.POST",
       message: "The image could not be edited. Try again.",
@@ -177,6 +214,17 @@ export async function POST(req: NextRequest) {
   }
 
   const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(path);
+
+  void logAiUsage({
+    auth: auth.auth,
+    action: usageAction,
+    status: "success",
+    vehicleId,
+    vehicleSlug,
+    vehicleLabel,
+    previewSnippet: `${preset}: ${sourceUrl}`,
+    metadata: { source: "edit-image", preset },
+  });
 
   return NextResponse.json({
     ok: true,

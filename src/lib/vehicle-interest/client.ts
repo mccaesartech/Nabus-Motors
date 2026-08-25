@@ -1,6 +1,5 @@
 /** Client-side vehicle interest tracking — queues for guests, syncs on login. */
 
-import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
 import type { Vehicle } from "@/lib/types";
 import type { PendingVehicleInterest, VehicleInterestActivityType } from "./types";
 
@@ -78,10 +77,6 @@ export function trackVehicleInterest(
 
   void (async () => {
     let accessToken = options?.accessToken ?? null;
-    if (!accessToken && isSupabaseConfigured && supabase) {
-      const { data } = await supabase.auth.getSession();
-      accessToken = data.session?.access_token ?? null;
-    }
 
     if (!accessToken) {
       queuePending({

@@ -290,6 +290,8 @@ export function PlatformVehicleForm({
       credentials: "same-origin",
       body: JSON.stringify({
         images: listingImageUrls(payload).slice(0, 3),
+        vehicleId: initial?.id,
+        vehicleSlug: initial?.slug,
         vehicle: {
           make: payload.make,
           model: payload.model,
@@ -776,14 +778,15 @@ export function PlatformVehicleForm({
               </button>
             )}
             <p className="mt-1.5 text-xs text-[var(--platform-text-secondary)]">
-              Customer purchases do not change status automatically. When you mark the last
-              available unit sold, the listing moves to pre-order so more customers can
-              request it. Multiple pre-orders per vehicle are allowed.
+              Customer purchases do not change status automatically. Marking sold removes one
+              unit from Units in stock. When the last unit of this model sells, the listing
+              moves to pre-order so more customers can request it. Multiple pre-orders per
+              vehicle are allowed.
             </p>
           </Field>
           <Field
             label="Units in stock"
-            hint="How many identical cars this listing covers (same make, model, and year). Each year is its own listing — set the count for this year here. Availability counts and low-stock alerts add these up."
+            hint="How many identical cars this listing covers (same make, model, and year). Each year is its own listing. Marking sold (or completing a sale) reduces this by 1. When the last unit sells, status becomes sold or pre-order. Fleet and model low-stock alerts sum these units."
           >
             <input
               type="number"
@@ -977,10 +980,11 @@ export function PlatformVehicleForm({
         <div className="rounded-lg border border-[var(--platform-border)] bg-[var(--platform-bg)] p-4">
           <VehicleImageUpload
             label="Listing hero photo"
-            hint="Upload one high-quality exterior shot. This stays separate from the gallery below."
+            hint="Upload one high-quality exterior shot. This stays separate from the gallery below. Drop here to set or replace the primary only."
             urls={primaryImageUrl ? [primaryImageUrl] : []}
             onUrlsChange={updatePrimaryImage}
             maxImages={1}
+            zone="primary"
           />
         </div>
       </Section>
@@ -996,10 +1000,11 @@ export function PlatformVehicleForm({
         <div className="rounded-lg border border-[var(--platform-border)] bg-[var(--platform-bg)] p-4">
           <VehicleImageUpload
             label="Gallery photos"
-            hint="Unlimited additional images. Upload files or paste URLs."
+            hint="Unlimited additional images. Drop here to add to the gallery only — not the primary."
             urls={additionalImages}
             onUrlsChange={updateAdditionalImages}
             reorderable
+            zone="gallery"
           />
         </div>
       </Section>
@@ -1046,6 +1051,7 @@ export function PlatformVehicleForm({
           form={form}
           gallery={gallery}
           slug={initial?.slug}
+          vehicleId={initial?.id}
           onApplyFields={(fields) => {
             setForm((prev) => ({ ...prev, ...fields }));
             markImagesAcknowledged(false);

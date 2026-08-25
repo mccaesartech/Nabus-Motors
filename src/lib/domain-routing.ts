@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { PRODUCTION_PUBLIC_SITE_URL } from "@/lib/site-url";
 
 const DEFAULT_AUTO_DIVISION_HOSTS = [
   "truegoshenauto.com",
@@ -44,6 +45,37 @@ function shouldPassthrough(pathname: string): boolean {
   );
 }
 
+function emergencyKeepsVercelHost(hostname: string): boolean {
+  const raw = process.env.PUBLIC_SITE_URL_EMERGENCY_FALLBACK?.trim();
+  if (!raw?.startsWith("https://")) return false;
+  try {
+    return new URL(raw).hostname.toLowerCase() === hostname;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Send every production Vercel deployment host (aliases + *.vercel.app previews)
+ * to the paid custom domain so customer polls, OAuth, and SW traffic never stay
+ * on vercel.app. Includes API and `/serwist/sw.js` (cross-host 308 strips auth).
+ *
+ * Skips only `/_next/*` asset paths and an explicit emergency vercel fallback host.
+ */
+export function resolveLegacyVercelHostRedirect(
+  req: NextRequest
+): NextResponse | null {
+  const hostname = (req.headers.get("host") ?? "").toLowerCase().split(":")[0];
+  if (!hostname.endsWith(".vercel.app")) return null;
+  if (emergencyKeepsVercelHost(hostname)) return null;
+
+  const { pathname, search } = req.nextUrl;
+  if (pathname.startsWith("/_next/")) return null;
+
+  const dest = new URL(`${pathname}${search}`, PRODUCTION_PUBLIC_SITE_URL);
+  return NextResponse.redirect(dest, 308);
+}
+
 /**
  * On auto-division hosts, send visitors straight to the Auto marketplace:
  * `/` → `/auto`, `/inventory` → `/auto/inventory`, etc.
@@ -51,6 +83,9 @@ function shouldPassthrough(pathname: string): boolean {
 export function resolveAutoDivisionRedirect(req: NextRequest): NextResponse | null {
   const hostname = req.headers.get("host") ?? "";
   if (!isAutoDivisionHost(hostname)) return null;
+
+  // *.vercel.app auto hosts are already redirected to www above.
+  if (hostname.toLowerCase().split(":")[0].endsWith(".vercel.app")) return null;
 
   const { pathname, search } = req.nextUrl;
   if (shouldPassthrough(pathname) || pathname.includes(".")) return null;

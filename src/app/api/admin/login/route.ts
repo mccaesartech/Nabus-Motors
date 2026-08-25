@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   ADMIN_COOKIE,
   PLATFORM_USER_COOKIE,
-  adminTokenForPassword,
   adminDashboardPath,
+  adminTokenForPassword,
   expectedAdminToken,
   isAdminSessionSecretConfigured,
 } from "@/lib/admin/config";
@@ -12,15 +12,25 @@ import {
   buildPlatformSessionCookieValue,
   PLATFORM_SESSION_TTL_SEC,
 } from "@/lib/platform/session";
+import { platformForcedPasswordChangeRedirectUrl } from "@/lib/platform/paths";
 import { logPlatformActivity } from "@/lib/platform/activity";
-import { consumeRateLimit, requestIp } from "@/lib/security/rate-limit";
+import { enqueueAuditLog } from "@/lib/audit/write";
+import { consumeRateLimitDurable, requestIp } from "@/lib/security/rate-limit";
+import { assertSameOrigin, forbiddenOriginResponse } from "@/lib/security/csrf";
+import {
+  authSessionCookieOptions,
+  clearAuthSessionCookieOptions,
+} from "@/lib/security/session-cookie-options";
+import { schedulePlatformLoginAlert, schedulePlatformFailedLoginAlert } from "@/lib/notifications/platform-login-notify";
 
 export async function POST(req: NextRequest) {
+  if (!assertSameOrigin(req)) {
+    return forbiddenOriginResponse();
+  }
+
   const body = await req.json().catch(() => ({}));
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
   const password = typeof body.password === "string" ? body.password : "";
-  const confirmPassword =
-    typeof body.confirmPassword === "string" ? body.confirmPassword : undefined;
 
   if (!password) {
     return NextResponse.json({ ok: false, message: "Password is required." }, { status: 400 });
@@ -32,7 +42,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const rateLimit = consumeRateLimit(
+  const rateLimit = await consumeRateLimitDurable(
     "admin-password-login",
     `${requestIp(req.headers)}:${email || "owner"}`,
     { limit: 5, windowMs: 15 * 60_000 }
@@ -48,24 +58,40 @@ export async function POST(req: NextRequest) {
   }
 
   if (email) {
-    const result = await authenticatePlatformUser(email, password, confirmPassword);
-    if (result.status === "needs_password_setup") {
+    const result = await authenticatePlatformUser(email, password);
+    if (result.status === "invite_required") {
+      enqueueAuditLog({
+        action: "login_failed",
+        success: false,
+        actorName: email,
+        actorRole: "pending_invite",
+        targetType: "platform_user",
+        errorMessage: "invite_required",
+        request: req,
+      });
       return NextResponse.json(
         {
           ok: false,
-          needsPasswordSetup: true,
-          message: "No password is set for this account yet. Create one now by entering it twice.",
+          message:
+            "This account is not activated yet. Open the invitation link from your email or WhatsApp to set your password.",
         },
-        { status: 409 }
-      );
-    }
-    if (result.status === "password_setup_failed") {
-      return NextResponse.json(
-        { ok: false, needsPasswordSetup: true, message: result.message },
-        { status: 400 }
+        { status: 403 }
       );
     }
     if (result.status !== "success") {
+      enqueueAuditLog({
+        action: "login_failed",
+        success: false,
+        actorName: email,
+        targetType: "platform_user",
+        errorMessage: "invalid_credentials",
+        request: req,
+      });
+      schedulePlatformFailedLoginAlert({
+        email,
+        ip: requestIp(req.headers),
+        userAgent: req.headers.get("user-agent"),
+      });
       return NextResponse.json({ ok: false, message: "Invalid email or password." }, { status: 401 });
     }
 
@@ -77,22 +103,43 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const mustChangePassword = Boolean(auth.mustChangePassword);
     const sessionValue = await buildPlatformSessionCookieValue(
       auth.userId,
       auth.role,
-      auth.passwordHash
+      auth.passwordHash,
+      { mustChangePassword }
     );
-    const res = NextResponse.json({ ok: true, redirect: adminDashboardPath() });
-    res.cookies.set(PLATFORM_USER_COOKIE, sessionValue, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: PLATFORM_SESSION_TTL_SEC,
+    const res = NextResponse.json({
+      ok: true,
+      redirect: mustChangePassword
+        ? platformForcedPasswordChangeRedirectUrl()
+        : adminDashboardPath(),
+      mustChangePassword,
     });
-    res.cookies.set(ADMIN_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
+    res.cookies.set(
+      PLATFORM_USER_COOKIE,
+      sessionValue,
+      authSessionCookieOptions(PLATFORM_SESSION_TTL_SEC)
+    );
+    res.cookies.set(ADMIN_COOKIE, "", clearAuthSessionCookieOptions());
 
     await logPlatformActivity(auth, "login");
+    enqueueAuditLog({
+      action: "login",
+      success: true,
+      actor: auth,
+      targetType: "platform_session",
+      request: req,
+    });
+    schedulePlatformLoginAlert({
+      userId: auth.userId,
+      name: auth.name,
+      email: auth.email,
+      role: auth.role,
+      ip: requestIp(req.headers),
+      userAgent: req.headers.get("user-agent"),
+    });
     return res;
   }
 
@@ -106,6 +153,20 @@ export async function POST(req: NextRequest) {
 
   const submitted = await adminTokenForPassword(password);
   if (!submitted || submitted !== expected) {
+    enqueueAuditLog({
+      action: "login_failed",
+      success: false,
+      actorName: "Owner",
+      actorRole: "owner",
+      targetType: "platform_session",
+      errorMessage: "invalid_credentials",
+      request: req,
+    });
+    schedulePlatformFailedLoginAlert({
+      email: process.env.OWNER_EMAIL ?? "owner@truegoshenauto.com",
+      ip: requestIp(req.headers),
+      userAgent: req.headers.get("user-agent"),
+    });
     return NextResponse.json({ ok: false, message: "Invalid email or password." }, { status: 401 });
   }
 
@@ -117,15 +178,23 @@ export async function POST(req: NextRequest) {
   };
 
   const res = NextResponse.json({ ok: true, redirect: adminDashboardPath() });
-  res.cookies.set(ADMIN_COOKIE, expected, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 12,
-  });
-  res.cookies.set(PLATFORM_USER_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
+  res.cookies.set(ADMIN_COOKIE, expected, authSessionCookieOptions(60 * 60 * 12));
+  res.cookies.set(PLATFORM_USER_COOKIE, "", clearAuthSessionCookieOptions());
 
   await logPlatformActivity(ownerAuth, "login");
+  enqueueAuditLog({
+    action: "login",
+    success: true,
+    actor: ownerAuth,
+    targetType: "platform_session",
+    request: req,
+  });
+  schedulePlatformLoginAlert({
+    name: ownerAuth.name,
+    email: ownerAuth.email,
+    role: ownerAuth.role,
+    ip: requestIp(req.headers),
+    userAgent: req.headers.get("user-agent"),
+  });
   return res;
 }

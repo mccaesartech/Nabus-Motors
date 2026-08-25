@@ -1,12 +1,25 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Download, Printer } from "lucide-react";
 import { usePrintablePdf } from "@/hooks/use-printable-pdf";
 import {
+  beginPrintSession,
   downloadPrintableDocument,
   printPrintableDocument,
 } from "@/lib/print/document-shell";
+import {
+  fetchCustomerForPrint,
+  fetchOrderForPrint,
+  fetchPreorderForPrint,
+  getCachedCustomerForPrint,
+  getCachedOrderForPrint,
+  getCachedPreorderForPrint,
+  prewarmCustomerForPrint,
+  prewarmOrderForPrint,
+  prewarmPreorderForPrint,
+  seedCachedCustomer,
+} from "@/lib/print/pdf-cache";
 import {
   buildAdminOrderDocumentHtml,
   buildAdminPreorderDocumentHtml,
@@ -37,68 +50,99 @@ export function CustomerInvoicePrintButton({
   compact = false,
 }: CustomerInvoicePrintButtonProps) {
   const [resolvedCustomer, setResolvedCustomer] = useState<AdminCustomerDetail | null>(
-    customer ?? null
+    customer ?? getCachedCustomerForPrint(customerId)
   );
-  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (customer?.id === customerId) {
+      setResolvedCustomer(customer);
+      seedCachedCustomer(customer);
+    }
+  }, [customer, customerId]);
+
+  const activeCustomer =
+    resolvedCustomer?.id === customerId
+      ? resolvedCustomer
+      : customer?.id === customerId
+        ? customer
+        : getCachedCustomerForPrint(customerId);
+
   const getHtml = useCallback(() => {
-    if (!resolvedCustomer) {
+    if (!activeCustomer) {
       throw new Error("Customer not loaded");
     }
-    return buildCustomerInvoiceDocumentHtml(resolvedCustomer);
-  }, [resolvedCustomer]);
+    return buildCustomerInvoiceDocumentHtml(activeCustomer);
+  }, [activeCustomer]);
 
-  const downloadFilename = resolvedCustomer
-    ? invoiceFilename(resolvedCustomer)
+  const downloadFilename = activeCustomer
+    ? invoiceFilename(activeCustomer)
     : `invoice-${customerId.slice(0, 8)}.pdf`;
 
   const pdf = usePrintablePdf(getHtml, downloadFilename, { autoPrewarm: false });
 
   const ensureCustomer = useCallback(async (): Promise<AdminCustomerDetail> => {
-    if (resolvedCustomer && resolvedCustomer.id === customerId) {
-      return resolvedCustomer;
-    }
-    if (customer && customer.id === customerId) {
-      setResolvedCustomer(customer);
-      return customer;
-    }
+    if (activeCustomer) return activeCustomer;
 
-    setLoading(true);
+    setFetching(true);
     try {
-      const res = await fetch(`/api/admin/customers/${encodeURIComponent(customerId)}`);
-      const json = await res.json();
-      if (!res.ok || !json.customer) {
-        throw new Error(json.message ?? "Could not load customer");
-      }
-      setResolvedCustomer(json.customer as AdminCustomerDetail);
-      return json.customer as AdminCustomerDetail;
+      const detail = await fetchCustomerForPrint(customerId);
+      setResolvedCustomer(detail);
+      return detail;
     } finally {
-      setLoading(false);
+      setFetching(false);
     }
-  }, [customer, customerId, resolvedCustomer]);
+  }, [activeCustomer, customerId]);
 
-  async function handlePrint() {
+  function handlePrewarm() {
+    if (activeCustomer) return;
+    prewarmCustomerForPrint(customerId);
+  }
+
+  function handlePrint() {
     setActionError(null);
-    try {
-      const detail = await ensureCustomer();
-      const result = printPrintableDocument(buildCustomerInvoiceDocumentHtml(detail));
+
+    if (activeCustomer) {
+      const result = printPrintableDocument(
+        buildCustomerInvoiceDocumentHtml(activeCustomer)
+      );
       if (!result.ok) setActionError(result.error);
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Print failed. Allow popups or try Download.");
+      return;
     }
+
+    const session = beginPrintSession();
+    if (!session.ok) {
+      setActionError(session.error);
+      return;
+    }
+
+    setFetching(true);
+    void ensureCustomer()
+      .then((detail) => {
+        const result = session.complete(buildCustomerInvoiceDocumentHtml(detail));
+        if (!result.ok) setActionError(result.error);
+      })
+      .catch((error) => {
+        session.cancel();
+        setActionError(
+          error instanceof Error ? error.message : "Print failed. Allow popups or try Download."
+        );
+      })
+      .finally(() => setFetching(false));
   }
 
   async function handleDownload() {
     setActionError(null);
     try {
-      await ensureCustomer();
+      if (!activeCustomer) await ensureCustomer();
       const result = await pdf.download();
       if (!result.ok) setActionError(result.error);
     } catch (error) {
-      if (resolvedCustomer) {
+      const cached = activeCustomer ?? getCachedCustomerForPrint(customerId);
+      if (cached) {
         const result = await downloadPrintableDocument(
-          buildCustomerInvoiceDocumentHtml(resolvedCustomer),
+          buildCustomerInvoiceDocumentHtml(cached),
           downloadFilename
         );
         if (!result.ok) setActionError(result.error);
@@ -114,26 +158,30 @@ export function CustomerInvoicePrintButton({
         <button
           type="button"
           onClick={() => void handlePrint()}
-          disabled={loading}
+          onMouseEnter={handlePrewarm}
+          onFocus={handlePrewarm}
+          disabled={fetching}
           className={cn(
             "inline-flex items-center gap-2",
             compact ? "text-xs text-[var(--platform-accent)] hover:underline" : "platform-btn-ghost"
           )}
         >
           <Printer className={compact ? "size-3.5" : "size-4"} />
-          {loading ? "Loading…" : label}
+          {fetching ? "Loading…" : label}
         </button>
         {!compact ? (
           <button
             type="button"
             onClick={() => void handleDownload()}
             onMouseEnter={() => {
-              void ensureCustomer().then(() => pdf.prewarm());
+              handlePrewarm();
+              if (activeCustomer) pdf.prewarm();
             }}
             onFocus={() => {
-              void ensureCustomer().then(() => pdf.prewarm());
+              handlePrewarm();
+              if (activeCustomer) pdf.prewarm();
             }}
-            disabled={loading}
+            disabled={fetching}
             aria-busy={pdf.generating && !pdf.ready}
             className={cn(
               "platform-btn-ghost inline-flex items-center gap-2",
@@ -156,56 +204,78 @@ export function CustomerInvoicePrintButton({
 
 type OrderInvoicePrintButtonProps = {
   orderId: string;
+  order?: AdminOrderDetail | null;
   label?: string;
   className?: string;
 };
 
 export function OrderInvoicePrintButton({
   orderId,
+  order,
   label = "Print invoice",
   className,
 }: OrderInvoicePrintButtonProps) {
-  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  async function fetchOrder(): Promise<AdminOrderDetail> {
-    const res = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}`);
-    const json = await res.json();
-    if (!res.ok || !json.order) {
-      throw new Error(json.message ?? "Could not load order");
+  const cachedOrder =
+    order?.id === orderId ? order : getCachedOrderForPrint(orderId);
+
+  const ensureOrder = useCallback(async (): Promise<AdminOrderDetail> => {
+    if (cachedOrder) return cachedOrder;
+
+    setFetching(true);
+    try {
+      return await fetchOrderForPrint(orderId);
+    } finally {
+      setFetching(false);
     }
-    return json.order as AdminOrderDetail;
+  }, [cachedOrder, orderId]);
+
+  function handlePrewarm() {
+    if (!cachedOrder) prewarmOrderForPrint(orderId);
   }
 
-  async function handlePrint() {
+  function handlePrint() {
     setActionError(null);
-    setLoading(true);
-    try {
-      const order = await fetchOrder();
-      const result = printPrintableDocument(buildAdminOrderDocumentHtml(order));
+
+    if (cachedOrder) {
+      const result = printPrintableDocument(buildAdminOrderDocumentHtml(cachedOrder));
       if (!result.ok) setActionError(result.error);
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Print failed.");
-    } finally {
-      setLoading(false);
+      return;
     }
+
+    const session = beginPrintSession();
+    if (!session.ok) {
+      setActionError(session.error);
+      return;
+    }
+
+    setFetching(true);
+    void ensureOrder()
+      .then((detail) => {
+        const result = session.complete(buildAdminOrderDocumentHtml(detail));
+        if (!result.ok) setActionError(result.error);
+      })
+      .catch((error) => {
+        session.cancel();
+        setActionError(error instanceof Error ? error.message : "Print failed.");
+      })
+      .finally(() => setFetching(false));
   }
 
   async function handleDownload() {
     setActionError(null);
-    setLoading(true);
     try {
-      const order = await fetchOrder();
-      const ref = order.id.slice(0, 8).toUpperCase();
+      const detail = cachedOrder ?? (await ensureOrder());
+      const ref = detail.id.slice(0, 8).toUpperCase();
       const result = await downloadPrintableDocument(
-        buildAdminOrderDocumentHtml(order),
+        buildAdminOrderDocumentHtml(detail),
         `order-${ref}.pdf`
       );
       if (!result.ok) setActionError(result.error);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Download failed.");
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -215,16 +285,20 @@ export function OrderInvoicePrintButton({
         <button
           type="button"
           onClick={() => void handlePrint()}
-          disabled={loading}
+          onMouseEnter={handlePrewarm}
+          onFocus={handlePrewarm}
+          disabled={fetching}
           className="inline-flex items-center gap-1 text-xs text-[var(--platform-accent)] hover:underline"
         >
           <Printer className="size-3.5" />
-          {loading ? "Loading…" : label}
+          {fetching ? "Loading…" : label}
         </button>
         <button
           type="button"
           onClick={() => void handleDownload()}
-          disabled={loading}
+          onMouseEnter={handlePrewarm}
+          onFocus={handlePrewarm}
+          disabled={fetching}
           className="inline-flex items-center gap-1 text-xs text-[var(--platform-text-secondary)] hover:text-[var(--platform-text)]"
         >
           <Download className="size-3.5" />
@@ -242,46 +316,70 @@ export function OrderInvoicePrintButton({
 
 type PreorderInvoicePrintButtonProps = {
   preorderId: string;
+  preorder?: PreorderInquiryRow | null;
   label?: string;
   className?: string;
 };
 
 export function PreorderInvoicePrintButton({
   preorderId,
+  preorder,
   label = "Print invoice",
   className,
 }: PreorderInvoicePrintButtonProps) {
-  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  async function fetchPreorder(): Promise<PreorderInquiryRow> {
-    const res = await fetch(`/api/admin/inquiries/preorder/${encodeURIComponent(preorderId)}`);
-    const json = await res.json();
-    if (!res.ok || !json.inquiry) {
-      throw new Error(json.message ?? "Could not load pre-order");
+  const cachedPreorder =
+    preorder?.id === preorderId ? preorder : getCachedPreorderForPrint(preorderId);
+
+  const ensurePreorder = useCallback(async (): Promise<PreorderInquiryRow> => {
+    if (cachedPreorder) return cachedPreorder;
+
+    setFetching(true);
+    try {
+      return await fetchPreorderForPrint(preorderId);
+    } finally {
+      setFetching(false);
     }
-    return json.inquiry as PreorderInquiryRow;
+  }, [cachedPreorder, preorderId]);
+
+  function handlePrewarm() {
+    if (!cachedPreorder) prewarmPreorderForPrint(preorderId);
   }
 
-  async function handlePrint() {
+  function handlePrint() {
     setActionError(null);
-    setLoading(true);
-    try {
-      const inquiry = await fetchPreorder();
-      const result = printPrintableDocument(buildAdminPreorderDocumentHtml(inquiry));
+
+    if (cachedPreorder) {
+      const result = printPrintableDocument(buildAdminPreorderDocumentHtml(cachedPreorder));
       if (!result.ok) setActionError(result.error);
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Print failed.");
-    } finally {
-      setLoading(false);
+      return;
     }
+
+    const session = beginPrintSession();
+    if (!session.ok) {
+      setActionError(session.error);
+      return;
+    }
+
+    setFetching(true);
+    void ensurePreorder()
+      .then((detail) => {
+        const result = session.complete(buildAdminPreorderDocumentHtml(detail));
+        if (!result.ok) setActionError(result.error);
+      })
+      .catch((error) => {
+        session.cancel();
+        setActionError(error instanceof Error ? error.message : "Print failed.");
+      })
+      .finally(() => setFetching(false));
   }
 
   async function handleDownload() {
     setActionError(null);
-    setLoading(true);
     try {
-      const inquiry = await fetchPreorder();
+      const inquiry = cachedPreorder ?? (await ensurePreorder());
       const isCustom = inquiry.is_custom_request === true;
       const ref = inquiry.reference_code ?? inquiry.id.slice(0, 8).toUpperCase();
       const result = await downloadPrintableDocument(
@@ -291,8 +389,6 @@ export function PreorderInvoicePrintButton({
       if (!result.ok) setActionError(result.error);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Download failed.");
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -302,16 +398,20 @@ export function PreorderInvoicePrintButton({
         <button
           type="button"
           onClick={() => void handlePrint()}
-          disabled={loading}
+          onMouseEnter={handlePrewarm}
+          onFocus={handlePrewarm}
+          disabled={fetching}
           className="inline-flex items-center gap-1 text-xs text-[var(--platform-accent)] hover:underline"
         >
           <Printer className="size-3.5" />
-          {loading ? "Loading…" : label}
+          {fetching ? "Loading…" : label}
         </button>
         <button
           type="button"
           onClick={() => void handleDownload()}
-          disabled={loading}
+          onMouseEnter={handlePrewarm}
+          onFocus={handlePrewarm}
+          disabled={fetching}
           className="inline-flex items-center gap-1 text-xs text-[var(--platform-text-secondary)] hover:text-[var(--platform-text)]"
         >
           <Download className="size-3.5" />

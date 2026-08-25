@@ -13,6 +13,25 @@ import {
 } from "@/lib/customer/session-preference";
 import { supabase } from "@/lib/supabase/client";
 
+function reportAuthAudit(
+  event: "google_sign_in" | "google_sign_in_failed",
+  options?: { error?: string; accessToken?: string | null }
+) {
+  void fetch("/api/customer/auth/audit", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(options?.accessToken
+        ? { Authorization: `Bearer ${options.accessToken}` }
+        : {}),
+    },
+    body: JSON.stringify({
+      event,
+      ...(options?.error ? { error: options.error } : {}),
+    }),
+  }).catch(() => {});
+}
+
 function AuthCallbackContent() {
   const searchParams = useSearchParams();
   const [error, setError] = useState("");
@@ -29,11 +48,14 @@ function AuthCallbackContent() {
       const oauthError = searchParams.get("error");
       if (oauthError) {
         const description = searchParams.get("error_description");
+        const message =
+          description?.replace(/\+/g, " ") ||
+          "Google sign-in was cancelled or failed. Please try again.";
+        reportAuthAudit("google_sign_in_failed", {
+          error: description?.replace(/\+/g, " ") || oauthError,
+        });
         if (active) {
-          setError(
-            description?.replace(/\+/g, " ") ||
-              "Google sign-in was cancelled or failed. Please try again."
-          );
+          setError(message);
         }
         return;
       }
@@ -46,18 +68,34 @@ function AuthCallbackContent() {
           await supabase.auth.exchangeCodeForSession(code);
 
         if (exchangeError) {
+          reportAuthAudit("google_sign_in_failed", {
+            error: exchangeError.message,
+          });
           if (active) setError(exchangeError.message);
           return;
         }
       } else {
         const { data } = await supabase.auth.getSession();
         if (!data.session) {
+          reportAuthAudit("google_sign_in_failed", {
+            error: "missing_sign_in_code",
+          });
           if (active) {
             setError("Missing sign-in code. Please try signing in again.");
           }
           return;
         }
       }
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      try {
+        sessionStorage.setItem("tg_pending_login_method", "google");
+      } catch {
+        // ignore
+      }
+      reportAuthAudit("google_sign_in", {
+        accessToken: sessionData.session?.access_token ?? null,
+      });
 
       if (!hasChosenSessionPreference()) {
         markSessionPreferencePromptPending();

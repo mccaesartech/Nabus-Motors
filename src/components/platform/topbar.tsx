@@ -148,8 +148,9 @@ export function PlatformTopbar({
 
       {mobileBack && (
         <BackNav
-          href={mobileBack.href}
           label={mobileBack.label}
+          fallbackHref={mobileBack.href}
+          preferFallback={false}
           variant="platform"
           compact
           className="shrink-0 lg:hidden"

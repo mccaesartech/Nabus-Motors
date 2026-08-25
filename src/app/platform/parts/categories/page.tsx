@@ -9,8 +9,10 @@ import {
   DELETE_CONFIRM_PHRASE,
 } from "@/components/platform/confirm-dialog";
 import { PageHeader } from "@/components/platform/page-header";
+import { usePlatformSession } from "@/components/platform/platform-shell";
 import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
+import { canDirectMutate } from "@/lib/platform/mutation-approval";
 import { platformPath } from "@/lib/platform/paths";
 
 type PartCategory = {
@@ -24,6 +26,8 @@ type PartCategory = {
 
 export default function PartsCategoriesPage() {
   const router = useRouter();
+  const session = usePlatformSession();
+  const canMutate = session ? canDirectMutate(session.role) : false;
   const [categories, setCategories] = useState<PartCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
@@ -91,6 +95,7 @@ export default function PartsCategoriesPage() {
         }
       />
 
+      {canMutate ? (
       <form onSubmit={addCategory} className="platform-card grid gap-4 rounded-xl p-5 sm:grid-cols-3">
         <input
           className="platform-input"
@@ -110,9 +115,15 @@ export default function PartsCategoriesPage() {
           Add category
         </button>
       </form>
+      ) : (
+        <p className="text-sm text-[var(--platform-text-secondary)]">
+          Category changes require Owner or Super Admin approval.
+        </p>
+      )}
 
       <div className="platform-card overflow-hidden rounded-xl">
-        <table className="platform-table w-full text-left text-sm">
+        <div className="scroll-touch overflow-x-auto">
+        <table className="platform-table w-full min-w-[480px] text-left text-sm">
           <thead>
             <tr className="text-xs text-[var(--platform-text-secondary)]">
               <th className="px-4 py-3 font-medium">Name</th>
@@ -132,6 +143,7 @@ export default function PartsCategoriesPage() {
                 </td>
                 <td className="px-4 py-3 font-mono text-xs">{cat.slug}</td>
                 <td className="px-4 py-3">
+                  {canMutate ? (
                   <button
                     type="button"
                     className="platform-btn-ghost text-xs"
@@ -139,8 +151,12 @@ export default function PartsCategoriesPage() {
                   >
                     {cat.is_active ? "Active" : "Inactive"}
                   </button>
+                  ) : (
+                    <span className="text-xs">{cat.is_active ? "Active" : "Inactive"}</span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
+                  {canMutate ? (
                   <button
                     type="button"
                     className="platform-btn-ghost text-[var(--platform-error)]"
@@ -148,11 +164,13 @@ export default function PartsCategoriesPage() {
                   >
                     <Trash2 className="size-4" />
                   </button>
+                  ) : null}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       <ConfirmDialog

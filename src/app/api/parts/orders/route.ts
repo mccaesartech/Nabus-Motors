@@ -9,8 +9,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { fetchCheckoutVehiclesByIdentifiers } from "@/lib/supabase/vehicles";
 import { resolveVehicleCheckoutMode } from "@/lib/vehicles/availability";
 import {
-  notifyVehicleSaleToLeadsTeam,
-  vehicleOrderLeadsLink,
+  notifyCartOrderToStaff,
 } from "@/lib/platform/vehicle-sale-notifications";
 import { maybeNotifyVehicleStockAction, refreshFleetLowStockAlert } from "@/lib/platform/vehicle-stock-notifications";
 import { countAvailableSiblings } from "@/lib/vehicles/stock-automation";
@@ -303,19 +302,22 @@ export async function POST(req: NextRequest) {
     }
 
     const vehicleOrderItems = orderItems.filter((item) => item.item_type === "vehicle");
-    if (vehicleOrderItems.length > 0) {
-      await notifyVehicleSaleToLeadsTeam(supabase, {
-        kind: "buy",
-        customerName: name.trim(),
-        customerEmail: email.trim(),
-        customerPhone: phone?.trim() || null,
-        vehicleTitles: vehicleOrderItems.map((item) => item.part_name),
-        referenceId: order.id,
-        sourceTable: "parts_orders",
-        link: vehicleOrderLeadsLink(order.id),
-        totalUsd,
-      });
 
+    await notifyCartOrderToStaff(supabase, {
+      orderId: order.id,
+      customerName: name.trim(),
+      customerEmail: email.trim(),
+      customerPhone: phone?.trim() || null,
+      totalUsd,
+      items: orderItems.map((item) => ({
+        label: item.part_name,
+        itemType: item.item_type,
+        intent: item.item_intent,
+        quantity: item.quantity,
+      })),
+    });
+
+    if (vehicleOrderItems.length > 0) {
       for (const item of vehicleOrderItems) {
         if (!item.vehicle_id) continue;
         const vehicle = vehiclesMap.get(item.vehicle_id);

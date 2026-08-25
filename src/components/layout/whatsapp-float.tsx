@@ -1,6 +1,10 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { WHATSAPP_NUMBER, whatsappUrl } from "@/lib/constants";
+import { useCompare } from "@/hooks/use-compare";
+import { ROUTES, isAutoDivisionPath } from "@/lib/routes";
+import { cn } from "@/lib/utils";
 
 function WhatsAppIcon({ className }: { className?: string }) {
   return (
@@ -16,7 +20,14 @@ function WhatsAppIcon({ className }: { className?: string }) {
 }
 
 export function WhatsAppFloat({ whatsappNumber }: { whatsappNumber?: string }) {
+  const pathname = usePathname() ?? "";
+  const { compareCount } = useCompare();
   const number = whatsappNumber?.trim() || process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || WHATSAPP_NUMBER;
+
+  const compareBarVisible =
+    isAutoDivisionPath(pathname) &&
+    pathname !== ROUTES.auto.compare &&
+    compareCount > 0;
 
   return (
     <a
@@ -27,7 +38,12 @@ export function WhatsAppFloat({ whatsappNumber }: { whatsappNumber?: string }) {
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Chat on WhatsApp"
-      className="whatsapp-float group fixed bottom-4 right-4 z-50 flex size-12 items-center justify-center sm:bottom-6 sm:right-6 sm:size-14"
+      className={cn(
+        "whatsapp-float group fixed right-4 z-50 flex size-12 items-center justify-center sm:right-6 sm:size-14",
+        compareBarVisible
+          ? "bottom-[calc(var(--compare-bar-height,4.5rem)+1rem+env(safe-area-inset-bottom,0px))]"
+          : "bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))]"
+      )}
     >
       <span
         className="whatsapp-float-ring absolute inset-0 rounded-full bg-[#25D366]"

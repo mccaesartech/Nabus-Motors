@@ -19,13 +19,13 @@ export function InventoryMobileFilters() {
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger
         render={
-          <Button variant="outline" size="sm" className="lg:hidden">
+          <Button variant="outline" size="sm" className="min-h-11 lg:hidden">
             <SlidersHorizontal className="size-4" />
             Filters
           </Button>
         }
       />
-      <SheetContent side="left" className="w-[min(100vw-2rem,20rem)] overflow-y-auto p-0 sm:max-w-xs">
+      <SheetContent side="left" className="w-[min(100dvw-2rem,20rem)] overflow-y-auto p-0 sm:max-w-xs">
         <SheetHeader className="border-b border-border px-4 py-4">
           <SheetTitle>Filter inventory</SheetTitle>
         </SheetHeader>

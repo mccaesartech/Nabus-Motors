@@ -2,10 +2,18 @@ export const RELOAD_KEY = "tg-reload-attempts";
 export const BUILD_KEY = "tg-build-id";
 export const BUILD_RELOAD_KEY = "tg-build-reloaded-for";
 /** Bump when cleanup policy changes so one more pass runs after deploy. */
-export const SW_CLEANUP_KEY = "tg-sw-legacy-cleanup-v3";
+export const SW_CLEANUP_KEY = "tg-sw-legacy-cleanup-v4";
 const SERWIST_SCRIPT_MARKER = "/serwist/";
 const MAX_RELOAD_ATTEMPTS = 2;
 let reloadPending = false;
+
+/** True when the browser is still on a Vercel deployment hostname. */
+export function isVercelAppHostname(hostname?: string): boolean {
+  const host = (hostname ?? (typeof window !== "undefined" ? window.location.hostname : ""))
+    .toLowerCase()
+    .split(":")[0];
+  return host.endsWith(".vercel.app");
+}
 
 function registrationScriptUrl(
   registration: ServiceWorkerRegistration
@@ -147,43 +155,49 @@ export function checkBuildVersion(): boolean {
 }
 
 /**
- * Remove legacy (non-Serwist) service workers that can pin old bundles.
- * Never unregister `/serwist/sw.js` — that raced with PWA registration and
- * caused one reload flash per session after install.
+ * Remove stale service workers that can pin old bundles or keep polling on
+ * *.vercel.app after the custom-domain cutover.
+ *
+ * On vercel.app hosts: unregister *all* workers (including Serwist) so relative
+ * `/api/*` polls stop. On the canonical host: only remove non-Serwist workers.
  */
 export async function unregisterStaleServiceWorkers(): Promise<boolean> {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
     return false;
   }
 
+  const onVercelApp = isVercelAppHostname();
+
   try {
-    if (sessionStorage.getItem(SW_CLEANUP_KEY)) return false;
+    if (!onVercelApp && sessionStorage.getItem(SW_CLEANUP_KEY)) return false;
   } catch {
     // ignore
   }
 
   try {
     const registrations = await navigator.serviceWorker.getRegistrations();
-    const legacy = registrations.filter((reg) => !isSerwistRegistration(reg));
+    const targets = onVercelApp
+      ? registrations
+      : registrations.filter((reg) => !isSerwistRegistration(reg));
 
     try {
-      sessionStorage.setItem(SW_CLEANUP_KEY, "1");
+      if (!onVercelApp) sessionStorage.setItem(SW_CLEANUP_KEY, "1");
     } catch {
       // ignore
     }
 
-    if (legacy.length === 0) return false;
+    if (targets.length === 0) return false;
 
-    const controlledByLegacy = legacy.some(
+    const controlled = targets.some(
       (reg) =>
         navigator.serviceWorker.controller &&
         registrationScriptUrl(reg) ===
           navigator.serviceWorker.controller.scriptURL
     );
 
-    await Promise.all(legacy.map((reg) => reg.unregister()));
+    await Promise.all(targets.map((reg) => reg.unregister()));
 
-    if (controlledByLegacy) {
+    if (controlled) {
       return reloadForStaleCache();
     }
   } catch {

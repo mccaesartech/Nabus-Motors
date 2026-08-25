@@ -2,6 +2,7 @@ import { after, NextResponse } from "next/server";
 import { ADMIN_COOKIE, PLATFORM_USER_COOKIE, adminLoginPath } from "@/lib/admin/config";
 import { getPlatformAuth } from "@/lib/admin/auth";
 import { logPlatformActivity } from "@/lib/platform/activity";
+import { enqueueAuditLog, writeAuditLog } from "@/lib/audit/write";
 
 export function POST() {
   const res = NextResponse.json(
@@ -15,7 +16,15 @@ export function POST() {
   after(async () => {
     try {
       const auth = await getPlatformAuth();
-      if (auth) await logPlatformActivity(auth, "logout");
+      if (auth) {
+        await logPlatformActivity(auth, "logout");
+        await writeAuditLog({
+          action: "logout",
+          success: true,
+          actor: auth,
+          targetType: "platform_session",
+        });
+      }
     } catch (error) {
       console.error("Platform logout activity logging failed:", error);
     }

@@ -6,6 +6,7 @@ import {
   omitEmptyOptionalVehicleFields,
   optionalVehicleColumnWarning,
   stripOptionalVehicleColumns,
+  vehicleWriteWithOptionalFallback,
 } from "@/lib/admin/vehicle-columns";
 
 describe("isMissingVehicleColumnError", () => {
@@ -98,5 +99,38 @@ describe("optionalVehicleColumnWarning", () => {
     );
     expect(msg).toContain("065_vehicle_walkaround_video.sql");
     expect(msg).toContain("Saved without optional fields");
+  });
+});
+
+describe("vehicleWriteWithOptionalFallback", () => {
+  it("does not retry with an empty payload when only optional columns were written", async () => {
+    const missing =
+      'Could not find the "stock_quantity" column of "vehicles" in the schema cache';
+    const writes: Array<Record<string, unknown>> = [];
+    const result = await vehicleWriteWithOptionalFallback(async (_select, payload) => {
+      writes.push(payload);
+      return { data: null, error: { message: missing } };
+    }, { stock_quantity: 3 });
+
+    expect(writes).toHaveLength(1);
+    expect(result.result.error?.message).toContain("stock_quantity");
+    expect(result.warning).toContain("082_vehicle_stock_quantity.sql");
+  });
+
+  it("retries with stripped optional columns when core fields remain", async () => {
+    const missing =
+      'Could not find the "stock_quantity" column of "vehicles" in the schema cache';
+    const writes: Array<Record<string, unknown>> = [];
+    const result = await vehicleWriteWithOptionalFallback(async (_select, payload) => {
+      writes.push(payload);
+      if (payload.stock_quantity !== undefined) {
+        return { data: null, error: { message: missing } };
+      }
+      return { data: { id: "1", status: "sold" } as { id: string; status: string }, error: null };
+    }, { status: "sold", stock_quantity: 0 });
+
+    expect(writes).toHaveLength(2);
+    expect(writes[1]).toEqual({ status: "sold" });
+    expect(result.result.data).toEqual({ id: "1", status: "sold" });
   });
 });

@@ -3,11 +3,36 @@ import { setSessionPreference } from "@/lib/customer/session-preference";
 import { getPublicSiteUrl } from "@/lib/site-url";
 import { supabase } from "@/lib/supabase/client";
 
+/**
+ * Origin for Supabase OAuth `redirectTo` (app `/auth/callback`).
+ * Never use `window.location.origin` on *.vercel.app — that leaks the
+ * deployment host into Google/Supabase redirect_to. Localhost keeps the
+ * current origin for local auth testing.
+ */
+export function resolveOAuthRedirectOrigin(): string {
+  const canonical = getPublicSiteUrl();
+  if (typeof window === "undefined") return canonical;
+
+  try {
+    const { hostname, origin } = window.location;
+    if (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "[::1]"
+    ) {
+      return origin;
+    }
+    if (hostname.endsWith(".vercel.app")) {
+      return canonical;
+    }
+    return canonical;
+  } catch {
+    return canonical;
+  }
+}
+
 export function buildOAuthCallbackUrl(redirectPath: string): string {
-  const origin =
-    typeof window !== "undefined"
-      ? window.location.origin
-      : getPublicSiteUrl();
+  const origin = resolveOAuthRedirectOrigin();
   const safeRedirect = sanitizeAuthRedirect(redirectPath);
   const callback = new URL("/auth/callback", origin);
   callback.searchParams.set("redirect", safeRedirect);

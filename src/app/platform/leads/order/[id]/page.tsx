@@ -22,9 +22,7 @@ import {
 } from "@/components/platform/printable-record";
 import { buildAdminOrderDocumentHtml } from "@/lib/platform/printable-documents";
 import { useMarkNotificationsOnVisit } from "@/hooks/use-mark-notifications-read";
-import {
-  ContactWhatsAppAction,
-} from "@/components/platform/contact-actions";
+import { WhatsAppAssistAction } from "@/components/platform/whatsapp-assist-dialog";
 import { SafeVehicleImage } from "@/components/shared/safe-vehicle-image";
 import { StatusBadge } from "@/components/platform/status-badge";
 import { adminLoginPath } from "@/lib/admin/paths";
@@ -35,6 +33,7 @@ import {
   customerProfileIdForOrder,
   type AdminOrderDetail,
 } from "@/lib/platform/orders-admin";
+import { seedCachedOrder } from "@/lib/print/pdf-cache";
 import { formatPlatformDateTime } from "@/lib/platform/datetime";
 import type { NotificationFeedbackVariant } from "@/lib/notifications/notification-status";
 
@@ -68,6 +67,7 @@ export default function OrderDetailPage() {
     }
     const json = await res.json();
     const row = json.order as AdminOrderDetail;
+    seedCachedOrder(row);
     setOrder(row);
     setNotes(row.notes ?? "");
     setLoading(false);
@@ -117,7 +117,14 @@ export default function OrderDetailPage() {
         (json.notificationVariant as NotificationFeedbackVariant) ?? "success"
       );
     }
-    void load();
+    if (json.order) {
+      const row = json.order as AdminOrderDetail;
+      seedCachedOrder(row);
+      setOrder(row);
+      if (updates.notes !== undefined) setNotes(row.notes ?? "");
+    } else {
+      void load();
+    }
   }
 
   async function confirmOrder() {
@@ -136,7 +143,13 @@ export default function OrderDetailPage() {
         (json.notificationVariant as NotificationFeedbackVariant) ?? "success"
       );
     }
-    void load();
+    if (json.order) {
+      const row = json.order as AdminOrderDetail;
+      seedCachedOrder(row);
+      setOrder(row);
+    } else {
+      void load();
+    }
   }
 
   async function sendPasswordReset() {
@@ -206,10 +219,15 @@ export default function OrderDetailPage() {
             Message customer
           </Link>
           {order.phone ? (
-            <ContactWhatsAppAction
+            <WhatsAppAssistAction
               phone={order.phone}
               customerName={order.name}
-              message={`Hi ${order.name}, following up on your True Goshen cart order (${orderRef}).`}
+              context={{
+                type: "order",
+                id,
+                userId: order.userId ?? undefined,
+                email: order.email,
+              }}
               variant="button"
             />
           ) : null}

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { unstable_cache } from "next/cache";
+import { revalidateTag, unstable_cache } from "next/cache";
 import { cache } from "react";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { DEFAULT_SITE_SETTINGS } from "@/lib/platform/modules";
@@ -13,6 +13,7 @@ import {
 
 /** Time-based revalidation for operational settings (seconds). */
 export const SITE_SETTINGS_REVALIDATE_SECONDS = 120;
+export const SITE_SETTINGS_CACHE_TAG = "site-settings";
 
 async function fetchSiteSettingsFromDb(): Promise<OperationalSettings> {
   const supabase = createAdminSupabase();
@@ -32,8 +33,16 @@ async function fetchSiteSettingsFromDb(): Promise<OperationalSettings> {
 const getCachedSiteSettings = unstable_cache(
   fetchSiteSettingsFromDb,
   ["site-settings-v1"],
-  { revalidate: SITE_SETTINGS_REVALIDATE_SECONDS }
+  {
+    revalidate: SITE_SETTINGS_REVALIDATE_SECONDS,
+    tags: [SITE_SETTINGS_CACHE_TAG],
+  }
 );
 
 /** Operational settings — cached 120s (used by public shell on every page). */
 export const getSiteSettings = cache(getCachedSiteSettings);
+
+/** Bust cached public settings after admin saves (including maintenance toggle). */
+export function revalidateSiteSettings() {
+  revalidateTag(SITE_SETTINGS_CACHE_TAG, "max");
+}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requirePermission } from "@/lib/admin/auth";
+import { canViewFinance } from "@/lib/platform/permissions";
 import { apiFailure } from "@/lib/errors/api";
 import { logPlatformActivity } from "@/lib/platform/activity";
 import { createAdminSupabase } from "@/lib/supabase/admin";
@@ -137,6 +138,13 @@ export async function GET(req: NextRequest) {
       content = exportPreordersCsv(filtered);
       filename = `true-goshen-preorders-${date}.csv`;
     } else if (type === "sales") {
+      if (!canViewFinance(auth.auth.role)) {
+        return NextResponse.json(
+          { ok: false, message: "You do not have permission to export sales data." },
+          { status: 403 }
+        );
+      }
+
       const { data, error } = await supabase
         .from("sales")
         .select(

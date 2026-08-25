@@ -10,7 +10,8 @@ import { platformPath } from "@/lib/platform/paths";
 import type { ChartTimeRange } from "@/lib/platform/chart-time-range";
 import { CHART_TIME_RANGES } from "@/lib/platform/chart-time-range";
 import type { DbVehicle, PlatformStats } from "@/lib/platform/types";
-import type { PlatformPermission } from "@/lib/platform/permissions";
+import type { PlatformPermission, PlatformRole } from "@/lib/platform/permissions";
+import { canViewFinance } from "@/lib/platform/permissions";
 import { cn } from "@/lib/utils";
 
 const ChartSkeleton = () => (
@@ -61,6 +62,7 @@ const MonthlyPerformanceSummary = dynamic(
 type BusinessInsightsProps = {
   stats: PlatformStats | null;
   permissions: Record<PlatformPermission, boolean>;
+  role: PlatformRole;
   vehicles?: DbVehicle[];
   vehiclesLoading?: boolean;
   extras?: {
@@ -131,16 +133,18 @@ function InsightCard({
 export function BusinessInsights({
   stats,
   permissions,
+  role,
   vehicles = [],
   vehiclesLoading = false,
   extras,
 }: BusinessInsightsProps) {
   const [timeRange, setTimeRange] = useState<ChartTimeRange>("month");
 
+  const financeVisible = canViewFinance(role);
   const showInventory = permissions.inventory;
   const showLeads = permissions.leads;
   const showFreight = permissions.freight;
-  const showSales = permissions.sales || permissions.reports;
+  const showSales = permissions.sales || (permissions.reports && financeVisible);
 
   const soldVehicles = useMemo(
     () => vehicles.filter((v) => v.status === "sold"),
@@ -200,9 +204,9 @@ export function BusinessInsights({
 
   const row2Mode = useMemo(() => {
     if (showInventory && (hasVehicleData || inventorySegmentTotal > 0)) return "sales";
-    if (showFreight || showSales) return "revenue";
+    if (financeVisible && (showFreight || showSales)) return "revenue";
     return null;
-  }, [showInventory, hasVehicleData, inventorySegmentTotal, showFreight, showSales]);
+  }, [showInventory, hasVehicleData, inventorySegmentTotal, showFreight, showSales, financeVisible]);
 
   const row3Mode = useMemo(() => {
     if (hasSalesData || vehicles.some((v) => v.status === "reserved")) return "orders";
@@ -346,7 +350,7 @@ export function BusinessInsights({
         {row3Mode === "orders" && (
           <>
             <InsightCard title="Recent orders" description="Latest reserved & sold vehicles">
-              <RecentOrdersList vehicles={vehicles} />
+              <RecentOrdersList vehicles={vehicles} showPrices={financeVisible} />
             </InsightCard>
             <InsightCard title="Top selling vehicles" description="Best performers by make & model">
               {hasSalesData ? (
@@ -368,7 +372,7 @@ export function BusinessInsights({
             description="Key metrics at a glance"
             className="lg:col-span-2"
           >
-            <MonthlyPerformanceSummary stats={stats} extras={extras} />
+            <MonthlyPerformanceSummary stats={stats} extras={extras} showFinance={financeVisible} />
           </InsightCard>
         )}
       </div>

@@ -1,14 +1,17 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { ChevronDown, User } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ChevronDown, KeyRound, User } from "lucide-react";
 import { PlatformLogoutAction } from "@/components/platform/platform-logout-action";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ROLE_LABELS, type PlatformRole } from "@/lib/platform/permissions";
+import { platformPath } from "@/lib/platform/paths";
 import { cn } from "@/lib/utils";
 
 type PlatformAccountMenuProps = {
@@ -28,6 +31,7 @@ export function PlatformAccountMenu({
   className,
 }: PlatformAccountMenuProps) {
   const [open, setOpen] = useState(false);
+  const router = useRouter();
   const roleLabel = ROLE_LABELS[userRole];
   const dashboard = variant === "dashboard";
 
@@ -75,6 +79,16 @@ export function PlatformAccountMenu({
         className="platform-account-menu-content min-w-56 shadow-xl ring-0"
         aria-label={`${userName} account actions`}
       >
+        <DropdownMenuItem
+          onClick={() => {
+            setOpen(false);
+            router.push(platformPath("account/security"));
+          }}
+          className="min-h-11 cursor-pointer gap-2 px-3 py-2 text-[var(--platform-text-secondary)] focus:bg-[rgba(76,29,149,0.06)] focus:text-[var(--platform-text)]"
+        >
+          <KeyRound className="size-4" aria-hidden />
+          Change password
+        </DropdownMenuItem>
         {menuActions}
         <PlatformLogoutAction variant="menu" />
       </DropdownMenuContent>

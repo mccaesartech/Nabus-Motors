@@ -271,10 +271,29 @@ export async function notifyCustomer(
   }
 
   if (email && !params.skipEmail) {
+    let subject = content.subject;
+    let text = content.emailText;
+    let html: string | undefined;
+
+    if (params.template === "password_reset") {
+      const resetUrl = params.data?.passwordResetUrl?.trim();
+      if (resetUrl) {
+        const { passwordResetEmail } = await import("@/lib/email/branded-templates");
+        const branded = passwordResetEmail(
+          params.customerName ?? params.data?.customerName ?? "",
+          resetUrl
+        );
+        subject = branded.subject;
+        text = branded.text;
+        html = branded.html;
+      }
+    }
+
     const mail = await sendCustomerNotificationEmail({
       to: email,
-      subject: content.subject,
-      text: content.emailText,
+      subject,
+      text,
+      html,
     });
     if (mail.emailSent) {
       result.emailSent = true;

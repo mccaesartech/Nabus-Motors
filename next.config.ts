@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { withSerwist } from "@serwist/turbopack";
+import { BASE_SECURITY_HEADERS } from "./src/lib/security/http-headers";
 
 const buildId =
   process.env.VERCEL_GIT_COMMIT_SHA ??
@@ -41,7 +42,6 @@ const nextConfig: NextConfig = {
       { source: "/platform", destination: "/admin/platform", permanent: false },
       { source: "/platform/:path*", destination: "/admin/platform/:path*", permanent: false },
       // Admin / platform — common mistaken URLs (login lives at /admin)
-      { source: "/dashboard", destination: "/admin/platform/dashboard", permanent: false },
       { source: "/admin/login", destination: "/admin", permanent: false },
       { source: "/platform/login", destination: "/admin", permanent: false },
       { source: "/freight", destination: "/freight-forwarding", permanent: true },
@@ -93,17 +93,10 @@ const nextConfig: NextConfig = {
       {
         source: "/:path*",
         headers: [
-          { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "X-Frame-Options", value: "DENY" },
-          {
-            key: "Strict-Transport-Security",
-            value: "max-age=63072000; includeSubDomains",
-          },
-          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          {
-            key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=()",
-          },
+          // Content-Security-Policy is set per-request in `src/proxy.ts`
+          // (nonce-based script-src). Do not set a second static CSP here —
+          // browsers enforce multiple CSP headers as an intersection.
+          ...BASE_SECURITY_HEADERS,
         ],
       },
       {

@@ -8,6 +8,7 @@ import {
 import { isWebAuthnEnabled } from "@/lib/admin/webauthn";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { hashToken } from "@/lib/platform/password";
+import { schedulePlatformFailedLoginAlert } from "@/lib/notifications/platform-login-notify";
 
 export async function POST(req: NextRequest) {
   if (!isWebAuthnEnabled()) {
@@ -41,11 +42,18 @@ export async function POST(req: NextRequest) {
 
   const { data: user } = await supabase
     .from("platform_users")
-    .select("id, name, email, role, status, password_hash")
+    .select("id, name, email, role, status, password_hash, phone")
     .eq("email", email)
     .maybeSingle();
 
   if (!user || user.status !== "active" || !user.password_hash) {
+    if (email) {
+      schedulePlatformFailedLoginAlert({
+        email,
+        ip: clientIp(req),
+        userAgent: req.headers.get("user-agent"),
+      });
+    }
     return NextResponse.json({ ok: false, message: "Invalid email or backup code." }, { status: 401 });
   }
 
@@ -59,6 +67,11 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   if (!backupRow) {
+    schedulePlatformFailedLoginAlert({
+      email,
+      ip: clientIp(req),
+      userAgent: req.headers.get("user-agent"),
+    });
     return NextResponse.json({ ok: false, message: "Invalid email or backup code." }, { status: 401 });
   }
 

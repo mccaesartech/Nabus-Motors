@@ -14,7 +14,10 @@ import {
 import { isValidImageUrl } from "@/lib/data/vehicle-images";
 import { SafeVehicleImage } from "@/components/shared/safe-vehicle-image";
 import { mapWithConcurrency } from "@/lib/images/prepare-client-upload";
-import { uploadVehicleImageFile } from "@/lib/images/upload-vehicle-image-client";
+import {
+  NON_VEHICLE_IMAGE_CODE,
+  uploadVehicleImageFile,
+} from "@/lib/images/upload-vehicle-image-client";
 
 const UPLOAD_CONCURRENCY = 3;
 
@@ -25,6 +28,13 @@ type VehicleImageUploadProps = {
   onUrlsChange: (urls: string[]) => void;
   maxImages?: number;
   reorderable?: boolean;
+  /** Distinguishes primary vs gallery for drop targeting / a11y. */
+  zone?: "primary" | "gallery";
+};
+
+type PendingNonVehicle = {
+  file: File;
+  message: string;
 };
 
 export function VehicleImageUpload({
@@ -34,6 +44,7 @@ export function VehicleImageUpload({
   onUrlsChange,
   maxImages,
   reorderable = false,
+  zone = "gallery",
 }: VehicleImageUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -44,11 +55,15 @@ export function VehicleImageUpload({
   const [uploadError, setUploadError] = useState("");
   const [urlInput, setUrlInput] = useState("");
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [pendingNonVehicle, setPendingNonVehicle] = useState<PendingNonVehicle | null>(null);
 
   const previewUrls = urls.filter(isValidImageUrl);
   const atLimit = maxImages !== undefined && previewUrls.length >= maxImages;
   const isPrimarySlot = maxImages === 1;
   const primaryPreviewUrl = isPrimarySlot ? previewUrls[0] ?? null : null;
+  /** Primary can always accept a replace drop even when "at limit". */
+  const canAcceptDrop = isPrimarySlot ? !uploading : !uploading && !atLimit;
+  const showEmptyDropZone = !atLimit || (isPrimarySlot && !primaryPreviewUrl);
 
   const appendUrl = useCallback(
     (url: string) => {
@@ -82,20 +97,21 @@ export function VehicleImageUpload({
     [previewUrls, onUrlsChange]
   );
 
-  async function uploadFiles(files: FileList | File[]) {
+  async function uploadFiles(files: FileList | File[], options?: { confirmNonVehicle?: boolean }) {
     const list = Array.from(files).filter((f) => f.type.startsWith("image/"));
-    if (list.length === 0 || atLimit) return;
+    if (list.length === 0) return;
+    if (!isPrimarySlot && atLimit) return;
 
-    const room =
-      maxImages === undefined
+    const room = isPrimarySlot
+      ? 1
+      : maxImages === undefined
         ? list.length
-        : maxImages === 1
-          ? 1
-          : Math.max(0, maxImages - previewUrls.length);
+        : Math.max(0, maxImages - previewUrls.length);
     const batch = list.slice(0, room);
     if (batch.length === 0) return;
 
     setUploadError("");
+    setPendingNonVehicle(null);
     setUploading(true);
     setUploadProgress({ done: 0, total: batch.length });
 
@@ -106,15 +122,30 @@ export function VehicleImageUpload({
     const commit = () => onUrlsChange([...nextUrls]);
 
     await mapWithConcurrency(batch, UPLOAD_CONCURRENCY, async (file) => {
-      if (maxImages !== undefined && maxImages !== 1 && nextUrls.length >= maxImages) {
+      if (!isPrimarySlot && maxImages !== undefined && nextUrls.length >= maxImages) {
         return;
       }
 
-      const result = await uploadVehicleImageFile(file);
+      const result = await uploadVehicleImageFile(file, {
+        confirmNonVehicle: options?.confirmNonVehicle,
+      });
       done += 1;
       setUploadProgress({ done, total: batch.length });
 
       if (!result.ok) {
+        if (
+          result.requiresConfirmation ||
+          result.code === NON_VEHICLE_IMAGE_CODE
+        ) {
+          setPendingNonVehicle({
+            file,
+            message:
+              result.reason ||
+              result.message ||
+              "This does not look like a vehicle photo.",
+          });
+          return;
+        }
         if (!firstError) firstError = result.message;
         return;
       }
@@ -122,7 +153,7 @@ export function VehicleImageUpload({
       const url = result.url;
       if (!isValidImageUrl(url)) return;
 
-      if (maxImages === 1) {
+      if (isPrimarySlot) {
         nextUrls = [url];
       } else if (!nextUrls.includes(url)) {
         if (maxImages !== undefined && nextUrls.length >= maxImages) return;
@@ -141,7 +172,7 @@ export function VehicleImageUpload({
     e.preventDefault();
     e.stopPropagation();
     setDragOver(false);
-    if (uploading || atLimit) return;
+    if (!canAcceptDrop) return;
     const files = e.dataTransfer.files;
     if (files.length > 0) void uploadFiles(files);
   }
@@ -149,12 +180,16 @@ export function VehicleImageUpload({
   function handleDragOver(e: React.DragEvent) {
     e.preventDefault();
     e.stopPropagation();
-    if (!atLimit) setDragOver(true);
+    if (!canAcceptDrop) return;
+    e.dataTransfer.dropEffect = "copy";
+    setDragOver(true);
   }
 
   function handleDragLeave(e: React.DragEvent) {
     e.preventDefault();
     e.stopPropagation();
+    // Only clear when leaving the zone itself (not child elements).
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
     setDragOver(false);
   }
 
@@ -170,8 +205,20 @@ export function VehicleImageUpload({
       ? `Uploading ${uploadProgress.done} of ${uploadProgress.total}…`
       : "Uploading…";
 
+  const dropZoneLabel = isPrimarySlot
+    ? primaryPreviewUrl
+      ? "Drop to replace primary photo"
+      : "Drag & drop or click to upload primary photo"
+    : "Drag & drop or click to upload";
+
   return (
-    <div className="space-y-3">
+    <div
+      className="space-y-3"
+      data-vehicle-image-zone={zone}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       {label && (
         <div>
           <p className="text-sm font-medium text-[var(--platform-text)]">{label}</p>
@@ -181,90 +228,125 @@ export function VehicleImageUpload({
         </div>
       )}
 
-      {!atLimit && (
-        <>
-          <div
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            className={[
-              "relative flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-6 text-center transition-colors",
-              dragOver
-                ? "border-[var(--platform-accent)] bg-[rgba(139,92,246,0.08)]"
-                : "border-[var(--platform-border)] bg-[var(--platform-bg)]",
-              uploading ? "pointer-events-none opacity-70" : "cursor-pointer",
-            ].join(" ")}
-            onClick={() => !uploading && inputRef.current?.click()}
-            role="button"
-            tabIndex={0}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        multiple={maxImages !== 1}
+        className="sr-only"
+        onChange={(e) => {
+          if (e.target.files?.length) void uploadFiles(e.target.files);
+        }}
+      />
+
+      {showEmptyDropZone && (
+        <div
+          className={[
+            "relative flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-6 text-center transition-colors",
+            dragOver
+              ? "border-[var(--platform-accent)] bg-[rgba(139,92,246,0.08)]"
+              : "border-[var(--platform-border)] bg-[var(--platform-bg)]",
+            uploading ? "pointer-events-none opacity-70" : "cursor-pointer",
+          ].join(" ")}
+          onClick={() => !uploading && inputRef.current?.click()}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              inputRef.current?.click();
+            }
+          }}
+        >
+          {uploading ? (
+            <Loader2 className="size-6 animate-spin text-[var(--platform-accent)]" />
+          ) : (
+            <ImagePlus className="size-6 text-[var(--platform-accent)]" />
+          )}
+          <div>
+            <p className="text-sm font-medium text-[var(--platform-text)]">
+              {uploading ? uploadingLabel : dropZoneLabel}
+            </p>
+            <p className="mt-0.5 text-xs text-[var(--platform-text-secondary)]">
+              JPEG, PNG, or WebP · max 5MB each · large photos are compressed before upload
+              {maxImages === 1 ? " · 1 image only" : ""}
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={(e) => {
+              e.stopPropagation();
+              inputRef.current?.click();
+            }}
+            className="platform-btn-ghost inline-flex items-center gap-2 text-sm"
+          >
+            <Upload className="size-4" />
+            Upload
+          </button>
+        </div>
+      )}
+
+      {showEmptyDropZone && (
+        <div className="flex gap-2">
+          <input
+            type="url"
+            value={urlInput}
+            onChange={(e) => setUrlInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
+              if (e.key === "Enter") {
                 e.preventDefault();
-                inputRef.current?.click();
+                addUrlFromInput();
               }
             }}
+            placeholder="Or paste image URL"
+            className="platform-input flex-1 text-sm"
+          />
+          <button
+            type="button"
+            onClick={addUrlFromInput}
+            className="platform-btn-ghost shrink-0 text-sm"
           >
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              multiple={maxImages !== 1}
-              className="sr-only"
-              onChange={(e) => {
-                if (e.target.files?.length) void uploadFiles(e.target.files);
-              }}
-            />
-            {uploading ? (
-              <Loader2 className="size-6 animate-spin text-[var(--platform-accent)]" />
-            ) : (
-              <ImagePlus className="size-6 text-[var(--platform-accent)]" />
-            )}
-            <div>
-              <p className="text-sm font-medium text-[var(--platform-text)]">
-                {uploading ? uploadingLabel : "Drag & drop or click to upload"}
-              </p>
-              <p className="mt-0.5 text-xs text-[var(--platform-text-secondary)]">
-                JPEG, PNG, or WebP · max 5MB each · large photos are compressed before upload
-                {maxImages === 1 ? " · 1 image only" : ""}
-              </p>
-            </div>
+            Add URL
+          </button>
+        </div>
+      )}
+
+      {pendingNonVehicle && (
+        <div
+          role="alertdialog"
+          aria-label="Non-vehicle image warning"
+          className="space-y-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-3"
+        >
+          <p className="text-sm font-medium text-[var(--platform-text)]">
+            This doesn&apos;t look like a vehicle photo
+          </p>
+          <p className="text-xs text-[var(--platform-text-secondary)]">
+            {pendingNonVehicle.message} Upload anyway only if this is intentional.
+          </p>
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               disabled={uploading}
-              onClick={(e) => {
-                e.stopPropagation();
-                inputRef.current?.click();
+              onClick={() => {
+                const file = pendingNonVehicle.file;
+                setPendingNonVehicle(null);
+                void uploadFiles([file], { confirmNonVehicle: true });
               }}
-              className="platform-btn-ghost inline-flex items-center gap-2 text-sm"
+              className="platform-btn-primary text-sm"
             >
-              <Upload className="size-4" />
-              Upload
+              This is intentional — upload anyway
             </button>
-          </div>
-
-          <div className="flex gap-2">
-            <input
-              type="url"
-              value={urlInput}
-              onChange={(e) => setUrlInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addUrlFromInput();
-                }
-              }}
-              placeholder="Or paste image URL"
-              className="platform-input flex-1 text-sm"
-            />
             <button
               type="button"
-              onClick={addUrlFromInput}
-              className="platform-btn-ghost shrink-0 text-sm"
+              disabled={uploading}
+              onClick={() => setPendingNonVehicle(null)}
+              className="platform-btn-ghost text-sm"
             >
-              Add URL
+              Cancel
             </button>
           </div>
-        </>
+        </div>
       )}
 
       {uploadError && (
@@ -278,7 +360,21 @@ export function VehicleImageUpload({
 
       {primaryPreviewUrl ? (
         <div className="space-y-2">
-          <div className="group relative overflow-hidden rounded-md border border-[var(--platform-border)] bg-[var(--platform-bg)]">
+          <div
+            className={[
+              "group relative overflow-hidden rounded-md border bg-[var(--platform-bg)] transition-colors",
+              dragOver
+                ? "border-[var(--platform-accent)] ring-2 ring-[var(--platform-accent)]/40"
+                : "border-[var(--platform-border)]",
+            ].join(" ")}
+          >
+            {dragOver && (
+              <div className="pointer-events-none absolute inset-0 z-[2] flex items-center justify-center bg-[rgba(139,92,246,0.18)]">
+                <span className="rounded bg-black/70 px-3 py-1.5 text-xs font-medium text-white">
+                  Drop to replace primary
+                </span>
+              </div>
+            )}
             <button
               type="button"
               onClick={() => setLightboxUrl(primaryPreviewUrl)}
@@ -305,14 +401,25 @@ export function VehicleImageUpload({
               <X className="size-4" />
             </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setLightboxUrl(primaryPreviewUrl)}
-            className="platform-btn-ghost inline-flex items-center gap-2 text-sm"
-          >
-            <Expand className="size-4" />
-            View primary
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setLightboxUrl(primaryPreviewUrl)}
+              className="platform-btn-ghost inline-flex items-center gap-2 text-sm"
+            >
+              <Expand className="size-4" />
+              View primary
+            </button>
+            <button
+              type="button"
+              disabled={uploading}
+              onClick={() => inputRef.current?.click()}
+              className="platform-btn-ghost inline-flex items-center gap-2 text-sm"
+            >
+              <Upload className="size-4" />
+              {uploading ? uploadingLabel : "Replace primary"}
+            </button>
+          </div>
         </div>
       ) : previewUrls.length > 0 ? (
         <div className="flex flex-wrap gap-3">

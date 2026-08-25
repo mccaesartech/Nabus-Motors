@@ -1,6 +1,6 @@
 /**
- * Shared types and formatting for the admin Error Log screen.
- * Safe to import from both the route handler and the client page.
+ * Shared types and formatting for the owner-only error-log API
+ * (`/api/admin/error-log`). The Platform UI was removed in favor of Sentry.
  */
 
 import type { AppErrorKind, ErrorSeverity } from "./kinds";

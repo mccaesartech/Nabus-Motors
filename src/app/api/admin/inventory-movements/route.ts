@@ -13,6 +13,13 @@ import type {
 } from "@/lib/platform/inventory-movements/types";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { reportSchemaIssue } from "@/lib/observability/schema-issue";
+import {
+  SCHEMA_CAPS,
+  isSchemaMissing,
+  markSchemaMissing,
+  markSchemaPresent,
+} from "@/lib/observability/schema-capability";
+import { assertSameOrigin, forbiddenOriginResponse } from "@/lib/security/csrf";
 
 const PERIODS: MovementPeriod[] = ["day", "week", "month", "year", "range"];
 
@@ -56,13 +63,24 @@ export async function GET(req: NextRequest) {
   const anchor = anchorInput ? new Date(anchorInput) : new Date();
   const assetType = params.get("asset_type") as MovementAssetType | "all" | null;
   const direction = params.get("direction") as MovementDirection | "all" | null;
-  const shouldBackfill = params.get("backfill") === "1";
-
-  if (shouldBackfill && hasPermission(auth.auth.role, "inventory")) {
-    await backfillInventoryMovements(supabase);
-  }
 
   const range = resolvePeriodRange(period, anchor, from, to);
+
+  if (isSchemaMissing(SCHEMA_CAPS.inventoryMovements)) {
+    return NextResponse.json({
+      ok: true,
+      configured: false,
+      migrationRequired: true,
+      movements: [],
+      summary: summarizeMovements([]),
+      buckets: [],
+      period,
+      range: {
+        from: range.from.toISOString(),
+        to: range.to.toISOString(),
+      },
+    });
+  }
 
   let query = supabase
     .from("inventory_movements")
@@ -85,10 +103,11 @@ export async function GET(req: NextRequest) {
     if (isMovementsTableMissing(error.message)) {
       reportSchemaIssue({
         table: "inventory_movements",
-        migration: "076_inventory_movements.sql",
+        migration: "076_inventory_movements.sql / 086_postgres_error_clearance.sql",
         source: "api.admin.inventory-movements",
         message: error.message,
       });
+      markSchemaMissing(SCHEMA_CAPS.inventoryMovements);
       return NextResponse.json({
         ok: true,
         configured: false,
@@ -109,6 +128,8 @@ export async function GET(req: NextRequest) {
       request: req,
     });
   }
+
+  markSchemaPresent(SCHEMA_CAPS.inventoryMovements);
 
   const movements = (data ?? []) as InventoryMovementRow[];
   const summary = summarizeMovements(movements);
@@ -133,4 +154,40 @@ export async function GET(req: NextRequest) {
     totalRecords: totalCount ?? movements.length,
     needsBackfill: (totalCount ?? 0) === 0,
   });
+}
+
+/** State-changing backfill — POST + same-origin only (never GET). */
+export async function POST(req: NextRequest) {
+  if (!assertSameOrigin(req)) {
+    return forbiddenOriginResponse();
+  }
+
+  const auth = await requireAdmin();
+  if (!auth.ok) {
+    return NextResponse.json({ ok: false, message: auth.message }, { status: auth.status });
+  }
+
+  if (!hasPermission(auth.auth.role, "inventory")) {
+    return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
+  }
+
+  const supabase = createAdminSupabase();
+  if (!supabase) {
+    return NextResponse.json({ ok: false, message: "Server not configured." }, { status: 503 });
+  }
+
+  try {
+    await backfillInventoryMovements(supabase);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "backfill failed";
+    return dbFailure(
+      { message },
+      {
+        module: "api.admin.inventory-movements.POST",
+        message: "Could not import movement history. Try again.",
+        request: req,
+      }
+    );
+  }
 }

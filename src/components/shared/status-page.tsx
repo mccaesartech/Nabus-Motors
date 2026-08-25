@@ -67,15 +67,24 @@ export function StatusPage({
 
       {actions?.length || children ? (
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          {actions?.map((action) => (
-            <Button
-              key={action.href + action.label}
-              variant={action.variant ?? "default"}
-              render={<Link href={action.href} />}
-            >
-              {action.label}
-            </Button>
-          ))}
+          {actions?.map((action) => {
+            const external = /^https?:\/\//i.test(action.href);
+            return (
+              <Button
+                key={action.href + action.label}
+                variant={action.variant ?? "default"}
+                render={
+                  external ? (
+                    <a href={action.href} target="_blank" rel="noopener noreferrer" />
+                  ) : (
+                    <Link href={action.href} />
+                  )
+                }
+              >
+                {action.label}
+              </Button>
+            );
+          })}
           {children}
         </div>
       ) : null}

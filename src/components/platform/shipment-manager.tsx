@@ -12,8 +12,10 @@ import { PageHeader } from "@/components/platform/page-header";
 import { StatusBadge } from "@/components/platform/status-badge";
 import { CustomerVisibleNoteField } from "@/components/platform/customer-visible-note-field";
 import { VisualShipmentTimeline } from "@/components/shared/visual-shipment-timeline";
+import { usePlatformSession } from "@/components/platform/platform-shell";
 import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
+import { canDirectMutate } from "@/lib/platform/mutation-approval";
 import { platformPath } from "@/lib/platform/paths";
 import { canUseCustomerNoteAi, type PlatformRole } from "@/lib/platform/permissions";
 import { ShipmentStatusSelect } from "@/components/platform/shipment-timeline-guide";
@@ -54,6 +56,8 @@ export function ShipmentManager({
 }: ShipmentManagerProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const session = usePlatformSession();
+  const canMutate = session ? canDirectMutate(session.role) : false;
   const [shipments, setShipments] = useState<ShipmentTrackingRow[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ShipmentWithEvents | null>(null);
@@ -487,6 +491,7 @@ export function ShipmentManager({
                           >
                             Manage
                           </button>
+                          {canMutate ? (
                           <button
                             type="button"
                             className="platform-btn-ghost text-xs text-[var(--platform-error)]"
@@ -494,6 +499,7 @@ export function ShipmentManager({
                           >
                             <Trash2 className="size-3.5" />
                           </button>
+                          ) : null}
                         </div>
                       </td>
                     </tr>
@@ -718,6 +724,7 @@ export function ShipmentManager({
                             {!event.is_customer_visible && " · Hidden from customer"}
                           </p>
                         </div>
+                        {canMutate ? (
                         <button
                           type="button"
                           className="platform-btn-ghost text-[var(--platform-error)]"
@@ -725,6 +732,7 @@ export function ShipmentManager({
                         >
                           <Trash2 className="size-3.5" />
                         </button>
+                        ) : null}
                       </div>
                     </li>
                   ))}

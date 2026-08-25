@@ -1,9 +1,31 @@
+import { PRODUCTION_PUBLIC_SITE_URL } from "@/lib/site-url";
+
 /**
  * Self-contained recovery script injected in <head> before any Next.js bundles load.
- * Only handles failed /_next/static/ script tags — no fetch patching or build-ID reloads.
- * Must stay plain JS — no imports, no TypeScript syntax.
+ * - Migrates browsers still on *.vercel.app to the canonical www origin and unregisters SWs
+ * - Handles failed /_next/static/ script tags
+ * Must stay plain JS — no imports inside the IIFE string.
  */
-export const CACHE_RECOVERY_INLINE_SCRIPT = `(function(){
+export function buildCacheRecoveryInlineScript(
+  canonicalOrigin: string = PRODUCTION_PUBLIC_SITE_URL
+): string {
+  const canon = JSON.stringify(canonicalOrigin);
+  return `(function(){
+var CANON=${canon};
+try{
+  var h=(location.hostname||"").toLowerCase();
+  if(h.slice(-11)===".vercel.app"){
+    try{
+      if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations){
+        navigator.serviceWorker.getRegistrations().then(function(regs){
+          return Promise.all((regs||[]).map(function(r){return r.unregister();}));
+        }).catch(function(){});
+      }
+    }catch(e){}
+    location.replace(CANON+location.pathname+location.search+location.hash);
+    return;
+  }
+}catch(e){}
 var RELOAD_KEY="tg-reload-attempts",MAX=2;
 function reload(){
   try{
@@ -21,3 +43,7 @@ window.addEventListener("error",function(e){
   }
 },true);
 })();`;
+}
+
+/** @deprecated Prefer buildCacheRecoveryInlineScript() so the canonical origin is injected. */
+export const CACHE_RECOVERY_INLINE_SCRIPT = buildCacheRecoveryInlineScript();

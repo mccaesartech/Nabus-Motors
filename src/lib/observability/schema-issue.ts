@@ -1,6 +1,10 @@
-import "server-only";
+/**
+ * Report missing-column / schema-cache issues to Sentry (and console).
+ * Shared by server routes and client notification helpers — not "server-only".
+ */
 
 import * as Sentry from "@sentry/nextjs";
+import { markSchemaMissing } from "@/lib/observability/schema-capability";
 
 export type SchemaIssueContext = {
   table: string;
@@ -10,15 +14,25 @@ export type SchemaIssueContext = {
   message?: string;
 };
 
+/** Dedup: one console/Sentry report per table.column per process lifetime. */
+const reported = new Set<string>();
+
 /**
  * Report a missing-column / schema-cache issue to Sentry (and console).
  * No-ops capture when DSN is unset; never throws into request handlers.
+ * Also marks the capability missing so hot paths stop re-querying it.
  */
 export function reportSchemaIssue(issue: SchemaIssueContext): void {
   const column = issue.column ?? "unknown";
   const migration = issue.migration ?? "unknown";
   const detail = issue.message?.slice(0, 500) ?? "schema issue";
   const title = `Schema issue: ${issue.table}.${column} (migration ${migration})`;
+  const capKey = column === "unknown" ? issue.table : `${issue.table}.${column}`;
+  markSchemaMissing(capKey);
+
+  const dedupeKey = `${capKey}:${issue.source}`;
+  if (reported.has(dedupeKey)) return;
+  reported.add(dedupeKey);
 
   console.warn(
     JSON.stringify({

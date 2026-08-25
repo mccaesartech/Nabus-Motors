@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePermission } from "@/lib/admin/auth";
+import {
+  isPlatformOwnerActor,
+  requireAdmin,
+} from "@/lib/admin/auth";
 import { dbFailure } from "@/lib/errors/api";
 import { ERROR_LOG_TABLE } from "@/lib/errors/logger";
 import { isErrorId, normalizeErrorId } from "@/lib/errors/error-id";
@@ -14,6 +17,21 @@ export const dynamic = "force-dynamic";
 
 const MAX_LIMIT = 500;
 
+/** Owner-only support API — UI removed; developers use Sentry. */
+async function requireOwnerErrorLogAccess() {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth;
+  if (!isPlatformOwnerActor(auth.auth)) {
+    return {
+      ok: false as const,
+      status: 403,
+      message: "You do not have permission to perform this action.",
+      auth: auth.auth,
+    };
+  }
+  return auth;
+}
+
 function isTableMissing(error: { code?: string | null; message?: string | null }): boolean {
   const message = error.message?.toLowerCase() ?? "";
   return (
@@ -25,8 +43,7 @@ function isTableMissing(error: { code?: string | null; message?: string | null }
 }
 
 export async function GET(req: NextRequest) {
-  // `activity` is the existing owner + super_admin audit permission.
-  const auth = await requirePermission("activity");
+  const auth = await requireOwnerErrorLogAccess();
   if (!auth.ok) {
     return NextResponse.json({ ok: false, message: auth.message }, { status: auth.status });
   }
@@ -116,7 +133,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const auth = await requirePermission("activity");
+  const auth = await requireOwnerErrorLogAccess();
   if (!auth.ok) {
     return NextResponse.json({ ok: false, message: auth.message }, { status: auth.status });
   }

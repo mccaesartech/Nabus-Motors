@@ -1,7 +1,24 @@
-export const PRODUCTION_PUBLIC_SITE_URL = "https://truegoshen.vercel.app";
-const PRODUCTION_AUTO_SITE_URL = "https://truegoshen.vercel.app";
+/**
+ * Canonical public origin for production (invites, emails, metadata).
+ * Prefer NEXT_PUBLIC_SITE_URL in Vercel; this is only the unset/invalid fallback.
+ * Requires healthy Namecheap DNS — see LAUNCH_DOMAIN_CUTOVER.md (and docs/domain-cutover.md).
+ *
+ * Emergency only: set PUBLIC_SITE_URL_EMERGENCY_FALLBACK=https://truegoshen.vercel.app
+ * while custom DNS is broken. Do not leave that set for launch.
+ */
+export const PRODUCTION_PUBLIC_SITE_URL = "https://www.truegoshengh.com";
+const PRODUCTION_AUTO_SITE_URL = "https://www.truegoshengh.com";
 const DEV_LOCALHOST_URL = "http://localhost:3000";
-const LEGACY_AUTO_DEPLOYMENT_HOSTS = new Set(["truegoshenauto.vercel.app"]);
+/** Known legacy / temporary Vercel hostnames — normalize to the canonical custom domain. */
+const NON_CANONICAL_PUBLIC_HOSTS = new Set([
+  "truegoshen.vercel.app",
+  "truegoshenauto.vercel.app",
+]);
+
+function isNonCanonicalPublicHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return NON_CANONICAL_PUBLIC_HOSTS.has(host) || host.endsWith(".vercel.app");
+}
 
 function isLocalhostHostname(hostname: string): boolean {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
@@ -17,6 +34,18 @@ function isLocalhostUrl(raw: string): boolean {
 
 function isDevelopment(): boolean {
   return process.env.NODE_ENV === "development" && !process.env.VERCEL;
+}
+
+function emergencyPublicSiteUrl(): string | null {
+  const raw = process.env.PUBLIC_SITE_URL_EMERGENCY_FALLBACK?.trim();
+  if (!raw?.startsWith("https://")) return null;
+  try {
+    const origin = new URL(raw).origin;
+    if (isLocalhostUrl(origin)) return null;
+    return origin;
+  } catch {
+    return null;
+  }
 }
 
 function normalizeOrigin(
@@ -51,11 +80,18 @@ export function resolvePublicSiteUrl(
   configuredUrl: string | undefined,
   development = false
 ): string {
-  const fallback = development ? DEV_LOCALHOST_URL : PRODUCTION_PUBLIC_SITE_URL;
+  const emergency = !development ? emergencyPublicSiteUrl() : null;
+  const fallback = development
+    ? DEV_LOCALHOST_URL
+    : emergency ?? PRODUCTION_PUBLIC_SITE_URL;
   const origin = normalizeOrigin(configuredUrl, fallback, development);
 
-  if (!development && LEGACY_AUTO_DEPLOYMENT_HOSTS.has(new URL(origin).hostname)) {
-    return PRODUCTION_PUBLIC_SITE_URL;
+  if (!development) {
+    if (emergency) return emergency;
+    const hostname = new URL(origin).hostname;
+    if (isNonCanonicalPublicHost(hostname)) {
+      return PRODUCTION_PUBLIC_SITE_URL;
+    }
   }
 
   return origin;
@@ -66,7 +102,7 @@ export function getPublicSiteUrl(): string {
 }
 
 /**
- * Direct Auto Division entry URL (truegoshen.vercel.app and custom domains).
+ * Direct Auto Division entry URL (custom domain; never prefer *.vercel.app for public links).
  * Never returns localhost outside local development.
  */
 export function getAutoSiteUrl(): string {
@@ -78,19 +114,17 @@ export function getAutoSiteUrl(): string {
     return DEV_LOCALHOST_URL;
   }
 
+  const emergency = emergencyPublicSiteUrl();
+  if (emergency) return emergency;
+
   const explicit = process.env.NEXT_PUBLIC_AUTO_SITE_URL?.trim();
   if (explicit && !isLocalhostUrl(explicit)) {
-    return normalizeOrigin(explicit, PRODUCTION_AUTO_SITE_URL);
-  }
-
-  const vercelProduction = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
-  if (vercelProduction) {
-    return normalizeOrigin(`https://${vercelProduction}`, PRODUCTION_AUTO_SITE_URL);
-  }
-
-  const vercelUrl = process.env.VERCEL_URL?.trim();
-  if (vercelUrl) {
-    return normalizeOrigin(`https://${vercelUrl}`, PRODUCTION_AUTO_SITE_URL);
+    const origin = normalizeOrigin(explicit, PRODUCTION_AUTO_SITE_URL);
+    const hostname = new URL(origin).hostname;
+    if (isNonCanonicalPublicHost(hostname)) {
+      return PRODUCTION_AUTO_SITE_URL;
+    }
+    return origin;
   }
 
   return PRODUCTION_AUTO_SITE_URL;
@@ -98,3 +132,24 @@ export function getAutoSiteUrl(): string {
 
 /** Alias for getAutoSiteUrl — used by auth/email helpers. */
 export const getSiteUrl = getAutoSiteUrl;
+
+/**
+ * Browser API URL for customer fetches. Localhost keeps relative paths;
+ * production always uses the canonical www origin so polls never depend on a
+ * cross-host 308 from *.vercel.app (which strips Authorization → 401).
+ */
+export function resolveCustomerApiUrl(path: string): string {
+  const normalized = path.startsWith("/") ? path : `/${path}`;
+  if (typeof window === "undefined") return normalized;
+
+  const hostname = window.location.hostname.toLowerCase();
+  if (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "[::1]"
+  ) {
+    return normalized;
+  }
+
+  return `${getPublicSiteUrl()}${normalized}`;
+}

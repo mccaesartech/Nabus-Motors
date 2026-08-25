@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUp, Check, Copy, ImagePlus, Loader2, RotateCcw, Sparkles, X } from "lucide-react";
+import Link from "next/link";
+import { ArrowUp, Check, Copy, Eraser, History, ImagePlus, Loader2, RotateCcw, Sparkles, X } from "lucide-react";
 import type { VehicleInput } from "@/lib/admin/vehicle-fields";
 import {
   applyVehicleAiChanges,
@@ -39,7 +40,8 @@ import { PLACEHOLDER_IMAGE } from "@/lib/data/vehicle-images";
 import { describeApiFailure, friendlyErrorMessage } from "@/lib/errors/client";
 import { SafeVehicleImage } from "@/components/shared/safe-vehicle-image";
 import { mapWithConcurrency } from "@/lib/images/prepare-client-upload";
-import { uploadVehicleImageFile } from "@/lib/images/upload-vehicle-image-client";
+import { uploadVehicleImageFile, NON_VEHICLE_IMAGE_CODE } from "@/lib/images/upload-vehicle-image-client";
+import { platformPath } from "@/lib/platform/paths";
 import { cn } from "@/lib/utils";
 
 const STOCK_PHOTOS_FAILED_MESSAGE = "Stock photo suggestions are unavailable right now. Try again.";
@@ -102,6 +104,7 @@ type VehicleAiChatProps = {
   form: VehicleInput;
   gallery: VehicleGalleryData;
   slug?: string;
+  vehicleId?: string;
   onApplyFields: (fields: Partial<VehicleInput>) => void;
   onApplyGallery: (gallery: VehicleGalleryData) => void;
 };
@@ -389,6 +392,7 @@ export function VehicleAiChat({
   form,
   gallery,
   slug,
+  vehicleId,
   onApplyFields,
   onApplyGallery,
 }: VehicleAiChatProps) {
@@ -399,6 +403,10 @@ export function VehicleAiChat({
   const [notConfigured, setNotConfigured] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [pendingNonVehicle, setPendingNonVehicle] = useState<{
+    file: File;
+    message: string;
+  } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const chatPanelRef = useRef<HTMLElement>(null);
@@ -420,9 +428,22 @@ export function VehicleAiChat({
     slug,
   };
 
-  async function uploadImageFile(file: File): Promise<string | null> {
-    const result = await uploadVehicleImageFile(file);
+  async function uploadImageFile(
+    file: File,
+    options?: { confirmNonVehicle?: boolean }
+  ): Promise<string | null> {
+    const result = await uploadVehicleImageFile(file, options);
     if (!result.ok) {
+      if (result.requiresConfirmation || result.code === NON_VEHICLE_IMAGE_CODE) {
+        setPendingNonVehicle({
+          file,
+          message:
+            result.reason ||
+            result.message ||
+            "This does not look like a vehicle photo.",
+        });
+        return null;
+      }
       throw new Error(result.message);
     }
     return result.url;
@@ -437,16 +458,20 @@ export function VehicleAiChat({
     lastPastedImageUrlRef.current = url;
   }
 
-  async function handlePastedOrDroppedFiles(files: FileList | File[]) {
+  async function handlePastedOrDroppedFiles(
+    files: FileList | File[],
+    options?: { confirmNonVehicle?: boolean }
+  ) {
     const list = Array.from(files).filter((f) => f.type.startsWith("image/"));
     if (!list.length) return;
 
     setError("");
+    setPendingNonVehicle(null);
     setUploadingImage(true);
 
     try {
       await mapWithConcurrency(list, 3, async (file) => {
-        const url = await uploadImageFile(file);
+        const url = await uploadImageFile(file, options);
         if (!url) return;
 
         addImageToGallery(url, "exterior");
@@ -525,7 +550,15 @@ export function VehicleAiChat({
       const res = await fetch("/api/admin/vehicles/edit-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: targetUrl, preset }),
+        body: JSON.stringify({
+          url: targetUrl,
+          preset,
+          vehicleId: vehicleId ?? undefined,
+          vehicleSlug: slug,
+          make: form.make,
+          model: form.model,
+          year: form.year,
+        }),
       });
       const json = await res.json();
       if (!res.ok || !json.ok) {
@@ -630,7 +663,7 @@ export function VehicleAiChat({
       const res = await fetch("/api/admin/vehicles/suggest-photos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vehicle: form }),
+        body: JSON.stringify({ vehicle: form, vehicleId: vehicleId ?? undefined }),
       });
       const json = await res.json();
 
@@ -757,6 +790,7 @@ export function VehicleAiChat({
         body: JSON.stringify({
           messages: apiMessages,
           currentVehicle,
+          vehicleId: vehicleId ?? undefined,
         }),
       });
       const json = await res.json();
@@ -1011,27 +1045,43 @@ export function VehicleAiChat({
   return (
     <aside
       ref={chatPanelRef}
-      className={`platform-ai-chat${dragOver ? " platform-ai-chat--drag-over" : ""}`}
-      onDragOver={(e) => {
-        e.preventDefault();
-        setDragOver(true);
-      }}
-      onDragLeave={(e) => {
-        e.preventDefault();
-        if (e.currentTarget === e.target) setDragOver(false);
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDragOver(false);
-        if (e.dataTransfer.files.length) {
-          void handlePastedOrDroppedFiles(e.dataTransfer.files);
-        }
-      }}
+      className="platform-ai-chat"
+      data-vehicle-image-zone="ai"
     >
       <header className="platform-ai-chat-header">
-        <Sparkles className="size-4 text-[var(--platform-ai-accent)]" />
-        <div>
-          <h3 className="text-sm font-semibold text-[var(--platform-ai-text)]">AI Editor</h3>
+        <Sparkles className="size-4 shrink-0 text-[var(--platform-ai-accent)]" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="text-sm font-semibold text-[var(--platform-ai-text)]">AI Editor</h3>
+            <div className="flex shrink-0 items-center gap-1">
+              <Link
+                href={
+                  vehicleId
+                    ? `${platformPath("inventory/ai-usage")}?vehicleId=${encodeURIComponent(vehicleId)}`
+                    : platformPath("inventory/ai-usage")
+                }
+                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-[var(--platform-ai-text-secondary)] hover:bg-[var(--platform-ai-border)]/40 hover:text-[var(--platform-ai-text)]"
+                title="AI usage history"
+              >
+                <History className="size-3" />
+                History
+              </Link>
+              {messages.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMessages([]);
+                    setError("");
+                  }}
+                  className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-[var(--platform-ai-text-secondary)] hover:bg-[var(--platform-ai-border)]/40 hover:text-[var(--platform-ai-text)]"
+                  title="Clear this chat session (does not delete saved usage history)"
+                >
+                  <Eraser className="size-3" />
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
           <p className="text-xs text-[var(--platform-ai-text-secondary)]">
             Expert vision + structured listing edits
           </p>
@@ -1043,20 +1093,13 @@ export function VehicleAiChat({
         </div>
       </header>
 
-      {dragOver && (
-        <div className="platform-ai-drop-overlay">
-          <ImagePlus className="size-6" />
-          <span>Drop image to add to gallery</span>
-        </div>
-      )}
-
       <div ref={scrollRef} className="platform-ai-chat-messages platform-scrollbar">
         {messages.length === 0 && !loading && (
           <div className="platform-ai-chat-empty">
             <p className="text-xs text-[var(--platform-ai-text-secondary)]">
               {galleryPhotoCount > 0
-                ? "Photos are ready. Use “Fill listing from photos” for a full vision pass (identity, description, inspection cues, paint) — then Apply what looks right."
-                : "Paste (Ctrl+V) or drag photos here, then use “Fill listing from photos” to detect make, model, year, and color — even if the form is empty. Color filters work without a Gemini key."}
+                ? 'Photos are ready. Use "Fill listing from photos" for a full vision pass (identity, description, inspection cues, paint) — then Apply what looks right.'
+                : "Use the AI photo drop zone below (or Ctrl+V while this panel is focused), then run Fill listing from photos. Primary and gallery drops belong in those form sections, not here."}
             </p>
           </div>
         )}
@@ -1251,6 +1294,39 @@ export function VehicleAiChat({
         <p className="platform-ai-chat-error">{error}</p>
       )}
 
+      {pendingNonVehicle && (
+        <div className="mx-3 mb-2 space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+          <p className="text-xs font-medium text-[var(--platform-ai-text)]">
+            This doesn&apos;t look like a vehicle photo
+          </p>
+          <p className="text-[10px] text-[var(--platform-ai-text-secondary)]">
+            {pendingNonVehicle.message}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={uploadingImage}
+              className="platform-ai-apply-btn text-xs"
+              onClick={() => {
+                const file = pendingNonVehicle.file;
+                setPendingNonVehicle(null);
+                void handlePastedOrDroppedFiles([file], { confirmNonVehicle: true });
+              }}
+            >
+              This is intentional — upload anyway
+            </button>
+            <button
+              type="button"
+              disabled={uploadingImage}
+              className="platform-ai-undo-btn"
+              onClick={() => setPendingNonVehicle(null)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {hasPendingChanges && (
         <button type="button" onClick={applyAllPending} className="platform-ai-apply-btn mx-3 mb-2 w-[calc(100%-1.5rem)]">
           Apply all pending changes
@@ -1296,6 +1372,40 @@ export function VehicleAiChat({
         ))}
       </div>
 
+      <div
+        className={`platform-ai-photo-drop${dragOver ? " platform-ai-photo-drop--active" : ""}`}
+        data-vehicle-image-zone="ai-drop"
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          e.dataTransfer.dropEffect = "copy";
+          setDragOver(true);
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+          setDragOver(false);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setDragOver(false);
+          if (e.dataTransfer.files.length) {
+            void handlePastedOrDroppedFiles(e.dataTransfer.files);
+          }
+        }}
+      >
+        <ImagePlus className="size-4 shrink-0" aria-hidden />
+        <span>
+          {uploadingImage
+            ? "Uploading for AI…"
+            : dragOver
+              ? "Drop for AI analysis"
+              : "Drop photos here for AI only (not primary)"}
+        </span>
+      </div>
+
       <div className="platform-ai-chat-input-wrap">
         <textarea
           ref={textareaRef}
@@ -1323,7 +1433,7 @@ export function VehicleAiChat({
         </button>
       </div>
       <p className="platform-ai-chat-hint">
-        Enter to send · Shift+Enter for new line · Ctrl+V to paste images
+        Enter to send · Shift+Enter for new line · Ctrl+V pastes into AI only when this panel is focused
       </p>
     </aside>
   );

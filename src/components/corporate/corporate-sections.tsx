@@ -1,4 +1,4 @@
-import Image, { getImageProps } from "next/image";
+import Image from "next/image";
 import Link from "next/link";
 import { CorporateStatValue } from "@/components/corporate/corporate-stat-value";
 import { Container } from "@/components/shared/container";
@@ -23,31 +23,20 @@ export function CorporateHero({ content }: CorporateHeroProps) {
   const videoUrl = normalizeMediaUrl(content.heroVideoUrl) || CORPORATE_HERO_VIDEO_URL;
   const posterUrl = normalizeMediaUrl(content.heroPosterUrl) || CORPORATE_HERO_POSTER_URL;
   const video = { type: "file" as const, url: videoUrl };
-  const { props: posterPreload } = getImageProps({
-    src: posterUrl,
-    alt: "",
-    fill: true,
-    priority: true,
-    sizes: "100vw",
-  });
 
   return (
     <section className="relative min-h-[calc(100dvh-var(--header-height))] w-full overflow-hidden bg-brand-charcoal-dark">
-      <link
-        rel="preload"
-        as="image"
-        href={posterPreload.src}
-        imageSrcSet={posterPreload.srcSet}
-        imageSizes={posterPreload.sizes}
-        fetchPriority="high"
-      />
       <div className="absolute inset-0 z-0 overflow-hidden">
+        {/*
+          Next/Image `priority` already emits a single preload for the LCP poster.
+          Do not add a second manual <link rel="preload"> — it duplicates work.
+        */}
         <Image
           src={posterUrl}
           alt=""
           aria-hidden
           fill
-          priority
+          preload
           sizes="100vw"
           decoding="async"
           className="object-cover object-center"

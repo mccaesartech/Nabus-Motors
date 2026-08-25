@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { canViewInviteLinks, requirePermission } from "@/lib/admin/auth";
+import { canViewInviteLinks, isPlatformOwnerActor, requirePermission } from "@/lib/admin/auth";
+import { roleAssignmentDenial } from "@/lib/security/role-guards";
 import { apiFailure, dbFailure } from "@/lib/errors/api";
 import { mapDatabaseError } from "@/lib/errors/db-errors";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { INVITABLE_ROLES, ROLE_LABELS, normalizeRole } from "@/lib/platform/permissions";
-import { generateToken, hashPassword, hashToken } from "@/lib/platform/password";
+import { generateToken, hashToken } from "@/lib/platform/password";
+import {
+  prepareAdminSetPassword,
+  validatePlatformPasswordPolicy,
+} from "@/lib/platform/password-change";
 import { buildPlatformInviteUrl } from "@/lib/platform/invite-url";
 import { logPlatformActivity } from "@/lib/platform/activity";
-import { sendPlatformInviteEmail, getPlatformEmailConfig } from "@/lib/email/platform-invite";
+import { enqueueAuditLog } from "@/lib/audit/write";
+import {
+  sendPlatformInviteEmail,
+  sendPlatformRoleChangedEmail,
+  getPlatformEmailConfig,
+} from "@/lib/email/platform-invite";
 import { validateEmailForSignup } from "@/lib/email/validate-email-server";
 import type { PlatformUserInviteInfo } from "@/lib/platform/modules";
 import {
@@ -19,8 +29,10 @@ import {
   notifyTeamPasswordSetWhatsApp,
   notifyTeamRoleChangedWhatsApp,
   formatTeamNotifyLabel,
+  buildPlatformAdminLoginUrl,
   type TeamNotifyResult,
 } from "@/lib/notifications/platform-team-whatsapp";
+import { getPublicSiteUrl } from "@/lib/site-url";
 import { getArkeselConfig, shouldPreferArkeselSms } from "@/lib/notifications/arkesel-config";
 import {
   notDeletedFilter,
@@ -29,9 +41,21 @@ import {
 } from "@/lib/platform/trash";
 import { assertPlatformUserDeletable } from "@/lib/platform/platform-user-delete";
 import {
+  isSchemaMissing,
+  SCHEMA_CAPS,
+} from "@/lib/observability/schema-capability";
+import {
   isMissingColumnError,
   reportSchemaIssue,
 } from "@/lib/observability/schema-issue";
+
+function platformPasswordAssignUpdates(passwordHash: string): Record<string, unknown> {
+  const updates: Record<string, unknown> = { password_hash: passwordHash };
+  if (!isSchemaMissing(SCHEMA_CAPS.platformUsersMustChangePassword)) {
+    updates.must_change_password = true;
+  }
+  return updates;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -68,13 +92,28 @@ function withSchemaMigrationHint(message: string): string {
   return mapDatabaseError({ message }, "Could not complete that action. Please try again.").message;
 }
 
+type InviteEmailResult = Awaited<ReturnType<typeof sendPlatformInviteEmail>>;
+
+/**
+ * Owner UI gets a short sentence plus an optional safe `emailHint`
+ * (domain / wrong-team rewrite). Raw Resend text stays in `provider_error`,
+ * activity metadata, and Sentry — never in this JSON.
+ */
+function emailFailurePayload(result: InviteEmailResult) {
+  if (result.emailSent) return {};
+  return {
+    emailError: "The email could not be sent.",
+    ...(result.emailHint ? { emailHint: result.emailHint } : {}),
+  };
+}
+
 function notifyPayload(result: TeamNotifyResult) {
   return {
     notify: {
       channel: result.channel,
       status: result.status,
       label: formatTeamNotifyLabel(result),
-      detail: result.detail,
+      // Provider detail stays in notification_log / Sentry, not the Owner UI payload.
     },
   };
 }
@@ -144,19 +183,25 @@ async function refreshInviteForUser(
   const tokenHash = await hashToken(plainToken);
   const expiresAt = computePlatformInviteExpiresAt();
 
-  const { error } = await supabase.from("platform_user_invites").insert({
-    user_id: userId,
-    token_hash: tokenHash,
-    token_plain: plainToken,
-    expires_at: expiresAt,
-  });
+  const { data: invite, error } = await supabase
+    .from("platform_user_invites")
+    .insert({
+      user_id: userId,
+      token_hash: tokenHash,
+      token_plain: plainToken,
+      expires_at: expiresAt,
+    })
+    .select("id")
+    .single();
 
-  if (error) {
-    throw new Error(error.message);
+  if (error || !invite) {
+    throw new Error(error?.message ?? "Could not create invitation.");
   }
 
-  return { link: buildPlatformInviteUrl(plainToken), expiresAt };
+  return { link: buildPlatformInviteUrl(plainToken), expiresAt, inviteId: invite.id };
 }
+
+type InviteEmailStatus = "PENDING" | "SENT" | "FAILED";
 
 type InviteRecord = {
   user_id: string;
@@ -164,21 +209,39 @@ type InviteRecord = {
   accepted_at: string | null;
   token_plain: string | null;
   created_at: string;
+  email_status?: InviteEmailStatus | null;
 };
+
+function inviteEmailStatus(
+  invite: InviteRecord
+): InviteEmailStatus | undefined {
+  const status = invite.email_status;
+  if (status === "PENDING" || status === "SENT" || status === "FAILED") {
+    return status;
+  }
+  return undefined;
+}
 
 function buildInviteInfo(invite: InviteRecord | undefined): PlatformUserInviteInfo {
   if (!invite) return { status: "none" };
+
+  const emailStatus = inviteEmailStatus(invite);
 
   if (invite.accepted_at) {
     return {
       status: "accepted",
       acceptedAt: invite.accepted_at,
+      ...(emailStatus ? { emailStatus } : {}),
     };
   }
 
   const expired = isPlatformInviteExpired(invite.expires_at);
   if (expired) {
-    return { status: "expired", expiresAt: invite.expires_at };
+    return {
+      status: "expired",
+      expiresAt: invite.expires_at,
+      ...(emailStatus ? { emailStatus } : {}),
+    };
   }
 
   if (invite.token_plain) {
@@ -186,6 +249,7 @@ function buildInviteInfo(invite: InviteRecord | undefined): PlatformUserInviteIn
       status: "active",
       inviteUrl: buildPlatformInviteUrl(invite.token_plain),
       expiresAt: invite.expires_at,
+      ...(emailStatus ? { emailStatus } : {}),
     };
   }
 
@@ -193,6 +257,7 @@ function buildInviteInfo(invite: InviteRecord | undefined): PlatformUserInviteIn
     status: "active",
     expiresAt: invite.expires_at,
     needsRegenerate: true,
+    ...(emailStatus ? { emailStatus } : {}),
   };
 }
 
@@ -204,7 +269,7 @@ async function getOrRefreshInviteForUser(
   if (!forceRefresh) {
     const { data: existing } = await supabase
       .from("platform_user_invites")
-      .select("token_plain, expires_at, accepted_at")
+      .select("id, token_plain, expires_at, accepted_at")
       .eq("user_id", userId)
       .is("accepted_at", null)
       .gt("expires_at", new Date().toISOString())
@@ -216,6 +281,7 @@ async function getOrRefreshInviteForUser(
       return {
         link: buildPlatformInviteUrl(existing.token_plain),
         expiresAt: existing.expires_at,
+        inviteId: existing.id,
       };
     }
   }
@@ -225,6 +291,72 @@ async function getOrRefreshInviteForUser(
 
 function ownerInvitePayload(link: string, expiresAt: string) {
   return { inviteLink: link, inviteUrl: link, expiresAt };
+}
+
+/**
+ * After an active-account password reset, pending invite tokens must not remain
+ * usable. First-time onboarding (pending + temp password) keeps the invite so
+ * email/SMS CTA matches Platform Users Copy link.
+ */
+async function consumePendingInvites(
+  supabase: NonNullable<ReturnType<typeof createAdminSupabase>>,
+  userId: string
+): Promise<void> {
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from("platform_user_invites")
+    .update({ accepted_at: now })
+    .eq("user_id", userId)
+    .is("accepted_at", null);
+  if (error) {
+    console.error("[platform-users] consume pending invites failed:", error.message);
+  }
+}
+
+async function recordInviteEmailDelivery(
+  supabase: NonNullable<ReturnType<typeof createAdminSupabase>>,
+  inviteId: string,
+  result: Awaited<ReturnType<typeof sendPlatformInviteEmail>>
+): Promise<void> {
+  const delivery = result.emailSent
+    ? {
+        email_status: "SENT",
+        sent_at: new Date().toISOString(),
+        provider_message_id: result.messageId,
+        provider_error: null,
+      }
+    : {
+        email_status: "FAILED",
+        sent_at: null,
+        provider_message_id: null,
+        provider_error: result.emailError.slice(0, 1000),
+      };
+
+  const { error } = await supabase
+    .from("platform_user_invites")
+    .update(delivery)
+    .eq("id", inviteId);
+
+  if (error) {
+    console.error("[platform-invite] email delivery status update failed:", error.message);
+    if (
+      isMissingColumnError(error.message, "email_status") ||
+      isMissingColumnError(error.message, "provider_error") ||
+      isMissingColumnError(error.message, "provider_message_id") ||
+      isMissingColumnError(error.message, "sent_at") ||
+      /email_status|provider_error|provider_message_id|sent_at|schema cache/i.test(
+        error.message
+      )
+    ) {
+      reportSchemaIssue({
+        table: "platform_user_invites",
+        column: "email_status",
+        migration: "089_invitation_email_delivery.sql",
+        source: "platform-users.recordInviteEmailDelivery",
+        message: error.message,
+      });
+    }
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -294,20 +426,54 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  const INVITE_SELECT_WITH_EMAIL =
+    "id, user_id, expires_at, accepted_at, created_at, token_plain, email_status";
+  const INVITE_SELECT_BASE =
+    "id, user_id, expires_at, accepted_at, created_at, token_plain";
+  const inviteEmailStatusMissing = isSchemaMissing(
+    SCHEMA_CAPS.platformUserInvitesEmailStatus
+  );
+  const inviteSelect = inviteEmailStatusMissing
+    ? INVITE_SELECT_BASE
+    : INVITE_SELECT_WITH_EMAIL;
+
+  type InviteListRow = InviteRecord & { id?: string };
+
   const [usersResult, invitesResult] = await Promise.all([
     listActivePlatformUsers(supabase),
     isOwner
       ? supabase
           .from("platform_user_invites")
-          .select("id, user_id, expires_at, accepted_at, created_at, token_plain")
+          .select(inviteSelect)
           .order("created_at", { ascending: false })
-      : Promise.resolve({ data: [], error: null }),
+      : Promise.resolve({ data: [] as InviteListRow[], error: null }),
   ]);
 
   const { users } = usersResult;
   const usersError = usersResult.error;
-  const invites = invitesResult.data;
-  const invitesError = invitesResult.error;
+  let invites: InviteListRow[] | null = (invitesResult.data ?? null) as InviteListRow[] | null;
+  let invitesError = invitesResult.error;
+
+  if (
+    invitesError &&
+    !inviteEmailStatusMissing &&
+    (isMissingColumnError(invitesError.message, "email_status") ||
+      /email_status|schema cache/i.test(invitesError.message))
+  ) {
+    reportSchemaIssue({
+      table: "platform_user_invites",
+      column: "email_status",
+      migration: "089_invitation_email_delivery.sql",
+      source: "platform-users.GET",
+      message: invitesError.message,
+    });
+    const fallback = await supabase
+      .from("platform_user_invites")
+      .select(INVITE_SELECT_BASE)
+      .order("created_at", { ascending: false });
+    invites = (fallback.data ?? null) as InviteListRow[] | null;
+    invitesError = fallback.error;
+  }
 
   if (usersError) {
     console.error("platform_users fetch failed:", usersError.message);
@@ -404,6 +570,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "Invalid role for invitation" }, { status: 400 });
   }
 
+  // Only the platform owner may create/invite another super_admin.
+  if (role === "super_admin" && !isPlatformOwnerActor(auth.auth)) {
+    return NextResponse.json(
+      { ok: false, message: "Only the owner can invite a Super Admin." },
+      { status: 403 }
+    );
+  }
+
   const preferSms = await shouldPreferArkeselSms();
   if (preferSms && !phone) {
     return NextResponse.json(
@@ -417,14 +591,12 @@ export async function POST(req: NextRequest) {
   }
 
   if (password) {
-    if (password.length < 8) {
-      return NextResponse.json(
-        { ok: false, message: "Password must be at least 8 characters." },
-        { status: 400 }
-      );
-    }
     if (password !== confirmPassword) {
       return NextResponse.json({ ok: false, message: "Passwords do not match." }, { status: 400 });
+    }
+    const policy = validatePlatformPasswordPolicy(password);
+    if (!policy.ok) {
+      return NextResponse.json({ ok: false, message: policy.message }, { status: 400 });
     }
   }
 
@@ -435,9 +607,17 @@ export async function POST(req: NextRequest) {
 
   const now = new Date().toISOString();
 
-  // With a password the account is active immediately — no invite link needed.
+  // Admin-assigned password on create: keep pending + invite token so email/SMS
+  // CTA matches Platform Users Copy link. Account activates on invite accept
+  // (password verified against this hash — not replaced).
   if (password) {
-    const passwordHash = await hashPassword(password);
+    const prepared = await prepareAdminSetPassword(password);
+    if (!prepared.ok) {
+      return NextResponse.json(
+        { ok: false, message: prepared.message },
+        { status: prepared.status }
+      );
+    }
     const { data: user, error: userError } = await supabase
       .from("platform_users")
       .insert({
@@ -445,10 +625,9 @@ export async function POST(req: NextRequest) {
         email,
         role,
         phone,
-        status: "active",
+        status: "pending",
         invited_at: now,
-        activated_at: now,
-        password_hash: passwordHash,
+        ...platformPasswordAssignUpdates(prepared.passwordHash),
       })
       .select()
       .single();
@@ -466,23 +645,81 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    let inviteLink: string;
+    let inviteExpiresAt: string;
+    let inviteId: string;
+    try {
+      ({
+        link: inviteLink,
+        expiresAt: inviteExpiresAt,
+        inviteId,
+      } = await refreshInviteForUser(supabase, user.id));
+    } catch (error) {
+      await supabase.from("platform_users").delete().eq("id", user.id);
+      const raw = error instanceof Error ? error.message : "Could not create invitation.";
+      return NextResponse.json(
+        { ok: false, message: withSchemaMigrationHint(raw) },
+        { status: 500 }
+      );
+    }
+
     await logPlatformActivity(auth.auth, "user_password_set", email, {
       user_id: user.id,
       role,
       created_with_password: true,
+      // Never store plaintext password in activity metadata.
     });
+    enqueueAuditLog({
+      action: "user_created",
+      success: true,
+      actor: auth.auth,
+      targetType: "platform_user",
+      targetId: user.id,
+      targetName: email,
+      metadata: { role, created_with_password: true, status: "pending" },
+      request: req,
+    });
+    enqueueAuditLog({
+      action: "invitation_created",
+      success: true,
+      actor: auth.auth,
+      targetType: "platform_invite",
+      targetId: inviteId,
+      targetName: email,
+      metadata: { role, user_id: user.id, created_with_password: true },
+      request: req,
+    });
+
+    // Plaintext only for this send — hashed above; not written to DB or logs.
+    const emailResult = await sendPlatformInviteEmail({
+      to: email,
+      name,
+      role,
+      inviteUrl: inviteLink,
+      temporaryPassword: password,
+      linkKind: "invite",
+    });
+    await recordInviteEmailDelivery(supabase, inviteId, emailResult);
     const notify = await notifyTeamPasswordSetWhatsApp({
       phone: user.phone ?? phone,
       name: user.name ?? name,
+      role,
       userId: user.id,
+      temporaryPassword: password,
+      actionUrl: inviteLink,
+      linkKind: "invite",
     });
 
     return NextResponse.json({
       ok: true,
       passwordSet: true,
-      user: { ...user, password_hash: undefined, role, status: "active" },
-      emailSent: false,
+      user: { ...user, password_hash: undefined, role, status: "pending" },
+      ...(canViewInviteLinks(auth.auth)
+        ? ownerInvitePayload(inviteLink, inviteExpiresAt)
+        : {}),
+      emailSent: emailResult.emailSent,
       emailConfigured: getPlatformEmailConfig().configured,
+      ...(emailResult.emailSent ? {} : emailFailurePayload(emailResult)),
       ...notifyPayload(notify),
     });
   }
@@ -517,17 +754,26 @@ export async function POST(req: NextRequest) {
   const tokenHash = await hashToken(plainToken);
   const expiresAt = computePlatformInviteExpiresAt();
 
-  const { error: inviteError } = await supabase.from("platform_user_invites").insert({
-    user_id: user.id,
-    token_hash: tokenHash,
-    token_plain: plainToken,
-    expires_at: expiresAt,
-  });
+  const { data: invite, error: inviteError } = await supabase
+    .from("platform_user_invites")
+    .insert({
+      user_id: user.id,
+      token_hash: tokenHash,
+      token_plain: plainToken,
+      expires_at: expiresAt,
+    })
+    .select("id")
+    .single();
 
-  if (inviteError) {
+  if (inviteError || !invite) {
     await supabase.from("platform_users").delete().eq("id", user.id);
     return NextResponse.json(
-      { ok: false, message: withSchemaMigrationHint(inviteError.message) },
+      {
+        ok: false,
+        message: withSchemaMigrationHint(
+          inviteError?.message ?? "Could not create invitation."
+        ),
+      },
       { status: 500 }
     );
   }
@@ -539,11 +785,34 @@ export async function POST(req: NextRequest) {
     role,
     inviteUrl: link,
   });
+  await recordInviteEmailDelivery(supabase, invite.id, emailResult);
   await logPlatformActivity(auth.auth, "invite_sent", email, {
     role,
     user_id: user.id,
     email_sent: emailResult.emailSent,
-    ...(emailResult.emailSent ? {} : { email_error: emailResult.emailError }),
+    ...(emailResult.emailSent
+      ? { provider_message_id: emailResult.messageId }
+      : { email_error: emailResult.emailError }),
+  });
+  enqueueAuditLog({
+    action: "user_created",
+    success: true,
+    actor: auth.auth,
+    targetType: "platform_user",
+    targetId: user.id,
+    targetName: email,
+    metadata: { role, status: "pending" },
+    request: req,
+  });
+  enqueueAuditLog({
+    action: "invitation_created",
+    success: true,
+    actor: auth.auth,
+    targetType: "platform_invite",
+    targetId: invite.id,
+    targetName: email,
+    metadata: { role, user_id: user.id, email_sent: emailResult.emailSent },
+    request: req,
   });
   const notify = await notifyTeamInviteWhatsApp({
     phone: user.phone ?? phone,
@@ -564,7 +833,7 @@ export async function POST(req: NextRequest) {
     ...(canViewInviteLinks(auth.auth) ? ownerInvitePayload(link, expiresAt) : {}),
     emailSent: emailResult.emailSent,
     emailConfigured: getPlatformEmailConfig().configured,
-    ...(emailResult.emailSent ? {} : { emailError: emailResult.emailError }),
+    ...(emailResult.emailSent ? {} : emailFailurePayload(emailResult)),
     ...notifyPayload(notify),
   });
 }
@@ -590,18 +859,16 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (password) {
-    if (password.length < 8) {
-      return NextResponse.json(
-        { ok: false, message: "Password must be at least 8 characters." },
-        { status: 400 }
-      );
-    }
     if (password !== confirmPassword) {
       return NextResponse.json({ ok: false, message: "Passwords do not match." }, { status: 400 });
     }
+    const policy = validatePlatformPasswordPolicy(password);
+    if (!policy.ok) {
+      return NextResponse.json({ ok: false, message: policy.message }, { status: 400 });
+    }
   }
 
-  if (role && !INVITABLE_ROLES.includes(role) && role !== "owner" && role !== "super_admin") {
+  if (role && !INVITABLE_ROLES.includes(role) && role !== "owner") {
     return NextResponse.json({ ok: false, message: "Invalid role" }, { status: 400 });
   }
 
@@ -614,16 +881,17 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "Supabase not configured" }, { status: 503 });
   }
 
-  // Privilege-escalation guard: only an owner may grant the owner role or
+  // Privilege-escalation guard: only an owner may grant owner/super_admin or
   // modify an existing owner account. `users` permission is held by both owner
   // and super_admin, so without this a super_admin could self-escalate to owner
-  // or disable/demote the real owner.
-  const actorIsOwner = canViewInviteLinks(auth.auth);
-  if (role === "owner" && !actorIsOwner) {
-    return NextResponse.json(
-      { ok: false, message: "Only the owner can assign the owner role." },
-      { status: 403 }
-    );
+  // or proliferate peer super_admins.
+  const actorIsOwner = isPlatformOwnerActor(auth.auth);
+  const earlyRoleDenial = roleAssignmentDenial({
+    actorIsOwner,
+    requestedRole: role,
+  });
+  if (earlyRoleDenial) {
+    return NextResponse.json({ ok: false, message: earlyRoleDenial }, { status: 403 });
   }
   if (!actorIsOwner && (role || status || name)) {
     const { data: targetRow } = await supabase
@@ -631,16 +899,19 @@ export async function PATCH(req: NextRequest) {
       .select("role")
       .eq("id", id)
       .maybeSingle();
-    if (targetRow && normalizeRole(targetRow.role) === "owner") {
-      return NextResponse.json(
-        { ok: false, message: "Only the owner can modify an owner account." },
-        { status: 403 }
-      );
+    const targetDenial = roleAssignmentDenial({
+      actorIsOwner,
+      targetRole: targetRow ? normalizeRole(targetRow.role) : null,
+      modifyingIdentityFields: true,
+    });
+    if (targetDenial) {
+      return NextResponse.json({ ok: false, message: targetDenial }, { status: 403 });
     }
   }
 
   let lastNotify: TeamNotifyResult | null = null;
   let updatedRole: string | undefined;
+  let passwordEmailResult: InviteEmailResult | null = null;
 
   if (password) {
     const { data: target } = await supabase
@@ -653,39 +924,119 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ ok: false, message: "User not found." }, { status: 404 });
     }
 
-    if (normalizeRole(target.role) === "owner" && !canViewInviteLinks(auth.auth)) {
+    if (normalizeRole(target.role) === "owner" && !isPlatformOwnerActor(auth.auth)) {
       return NextResponse.json(
         { ok: false, message: "Only the owner can set an owner account's password." },
         { status: 403 }
       );
     }
 
-    const passwordHash = await hashPassword(password);
-    const passwordUpdates: Record<string, string> = { password_hash: passwordHash };
-    // A user with a password no longer needs the invite flow to activate.
-    if (target.status === "pending") {
-      passwordUpdates.status = "active";
-      passwordUpdates.activated_at = new Date().toISOString();
+    const prepared = await prepareAdminSetPassword(password);
+    if (!prepared.ok) {
+      return NextResponse.json(
+        { ok: false, message: prepared.message },
+        { status: prepared.status }
+      );
     }
-
-    const { error: passwordError } = await supabase
+    const wasPending = target.status === "pending";
+    // Pending + temp password: keep pending and invite token so CTA matches Copy link.
+    // Already-active: password reset — activate stays active; credentials use /admin.
+    const passwordUpdates = platformPasswordAssignUpdates(prepared.passwordHash);
+    const { data: passwordUpdated, error: passwordError } = await supabase
       .from("platform_users")
       .update(passwordUpdates)
-      .eq("id", id);
+      .eq("id", id)
+      .select("id")
+      .maybeSingle();
 
-    if (passwordError) {
+    if (passwordError || !passwordUpdated?.id) {
       return NextResponse.json(
-        { ok: false, message: withSchemaMigrationHint(passwordError.message) },
+        {
+          ok: false,
+          message: withSchemaMigrationHint(
+            passwordError?.message ?? "Could not save the new password."
+          ),
+        },
         { status: 500 }
       );
     }
 
+    let actionUrl: string;
+    let linkKind: "invite" | "login";
+    let inviteExpiresAt: string | null = null;
+    let inviteIdForDelivery: string | null = null;
+
+    if (wasPending) {
+      try {
+        const refreshed = await getOrRefreshInviteForUser(supabase, id, true);
+        actionUrl = refreshed.link;
+        inviteExpiresAt = refreshed.expiresAt;
+        inviteIdForDelivery = refreshed.inviteId;
+        linkKind = "invite";
+      } catch (error) {
+        const raw = error instanceof Error ? error.message : "Could not refresh invite.";
+        return NextResponse.json(
+          { ok: false, message: withSchemaMigrationHint(raw) },
+          { status: 500 }
+        );
+      }
+    } else {
+      // Active account password reset — no onboarding invite; login URL only.
+      await consumePendingInvites(supabase, id);
+      actionUrl = buildPlatformAdminLoginUrl(getPublicSiteUrl());
+      linkKind = "login";
+    }
+
     await logPlatformActivity(auth.auth, "user_password_set", target.email, { user_id: id });
+    enqueueAuditLog({
+      action: "password_changed",
+      success: true,
+      actor: auth.auth,
+      targetType: "platform_user",
+      targetId: id,
+      targetName: target.email,
+      request: req,
+    });
+
+    const targetRole = normalizeRole(target.role);
+    // Plaintext only for this send — hashed above; not written to DB or logs.
+    passwordEmailResult = await sendPlatformInviteEmail({
+      to: target.email,
+      name: target.name,
+      role: targetRole,
+      inviteUrl: actionUrl,
+      temporaryPassword: password,
+      linkKind,
+    });
+    if (inviteIdForDelivery) {
+      await recordInviteEmailDelivery(supabase, inviteIdForDelivery, passwordEmailResult);
+    }
     lastNotify = await notifyTeamPasswordSetWhatsApp({
       phone: target.phone,
       name: target.name,
+      role: targetRole,
       userId: id,
+      temporaryPassword: password,
+      actionUrl,
+      linkKind,
     });
+
+    // Prefer returning password-set delivery outcome before role/name updates.
+    if (!role && !name && !status && !resendInvite && !getInviteLink) {
+      return NextResponse.json({
+        ok: true,
+        passwordSet: true,
+        emailSent: passwordEmailResult.emailSent,
+        emailConfigured: getPlatformEmailConfig().configured,
+        ...(passwordEmailResult.emailSent
+          ? {}
+          : emailFailurePayload(passwordEmailResult)),
+        ...(wasPending && inviteExpiresAt && canViewInviteLinks(auth.auth)
+          ? ownerInvitePayload(actionUrl, inviteExpiresAt)
+          : {}),
+        ...notifyPayload(lastNotify),
+      });
+    }
   }
 
   const updates: Record<string, string> = {};
@@ -697,7 +1048,7 @@ export async function PATCH(req: NextRequest) {
     const { data: before } = role
       ? await supabase
           .from("platform_users")
-          .select("id, name, phone, role")
+          .select("id, name, email, phone, role")
           .eq("id", id)
           .maybeSingle()
       : { data: null };
@@ -714,12 +1065,37 @@ export async function PATCH(req: NextRequest) {
     if (role) {
       updatedRole = role;
       if (before && normalizeRole(before.role) !== role) {
+        enqueueAuditLog({
+          action: "role_assigned",
+          success: true,
+          actor: auth.auth,
+          targetType: "platform_user",
+          targetId: id,
+          targetName: name ?? before.name,
+          metadata: {
+            oldRole: normalizeRole(before.role),
+            newRole: role,
+          },
+          request: req,
+        });
         lastNotify = await notifyTeamRoleChangedWhatsApp({
           phone: before.phone,
           name: name ?? before.name,
           role,
           userId: id,
         });
+        if (before.email?.trim()) {
+          void sendPlatformRoleChangedEmail({
+            to: before.email.trim(),
+            name: name ?? before.name,
+            role,
+          }).catch((err) => {
+            console.warn(
+              "[platform-users] role-changed email failed (non-blocking):",
+              err instanceof Error ? err.message : err
+            );
+          });
+        }
       }
     }
   }
@@ -741,8 +1117,13 @@ export async function PATCH(req: NextRequest) {
 
     let link: string;
     let expiresAt: string;
+    let inviteId: string;
     try {
-      ({ link, expiresAt } = await getOrRefreshInviteForUser(supabase, id, resendInvite));
+      ({ link, expiresAt, inviteId } = await getOrRefreshInviteForUser(
+        supabase,
+        id,
+        resendInvite
+      ));
     } catch (error) {
       const raw = error instanceof Error ? error.message : "Could not refresh invite.";
       return NextResponse.json({ ok: false, message: withSchemaMigrationHint(raw) }, { status: 500 });
@@ -762,10 +1143,13 @@ export async function PATCH(req: NextRequest) {
       role: normalizeRole(user.role),
       inviteUrl: link,
     });
+    await recordInviteEmailDelivery(supabase, inviteId, emailResult);
     await logPlatformActivity(auth.auth, "invite_sent", user.email, {
       resent: resendInvite,
       email_sent: emailResult.emailSent,
-      ...(emailResult.emailSent ? {} : { email_error: emailResult.emailError }),
+      ...(emailResult.emailSent
+        ? { provider_message_id: emailResult.messageId }
+        : { email_error: emailResult.emailError }),
     });
     const notify = await notifyTeamInviteWhatsApp({
       phone: user.phone,
@@ -780,7 +1164,7 @@ export async function PATCH(req: NextRequest) {
       ok: true,
       ...ownerInvitePayload(link, expiresAt),
       emailSent: emailResult.emailSent,
-      ...(emailResult.emailSent ? {} : { emailError: emailResult.emailError }),
+      ...(emailResult.emailSent ? {} : emailFailurePayload(emailResult)),
       user: { id: user.id, email: user.email, name: user.name },
       ...notifyPayload(notify),
     });
@@ -789,6 +1173,16 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     ...(updatedRole ? { role: updatedRole } : {}),
+    ...(passwordEmailResult
+      ? {
+          passwordSet: true,
+          emailSent: passwordEmailResult.emailSent,
+          emailConfigured: getPlatformEmailConfig().configured,
+          ...(passwordEmailResult.emailSent
+            ? {}
+            : emailFailurePayload(passwordEmailResult)),
+        }
+      : {}),
     ...(lastNotify ? notifyPayload(lastNotify) : {}),
   });
 }
@@ -935,6 +1329,16 @@ export async function DELETE(req: NextRequest) {
         status_disabled_fallback: true,
         trashId: trash.ok ? trash.id : null,
       });
+      enqueueAuditLog({
+        action: "user_deleted",
+        success: true,
+        actor: auth.auth,
+        targetType: "platform_user",
+        targetId: id,
+        targetName: user.email ?? user.name ?? id,
+        metadata: { soft_delete: false, status_disabled_fallback: true },
+        request: req,
+      });
 
       if (!trash.ok) {
         return NextResponse.json({
@@ -966,6 +1370,16 @@ export async function DELETE(req: NextRequest) {
     user_id: id,
     trashId: result.trashId,
     soft_delete: true,
+  });
+  enqueueAuditLog({
+    action: "user_deleted",
+    success: true,
+    actor: auth.auth,
+    targetType: "platform_user",
+    targetId: id,
+    targetName: user.email ?? user.name ?? id,
+    metadata: { soft_delete: true, trashId: result.trashId },
+    request: req,
   });
 
   return NextResponse.json({

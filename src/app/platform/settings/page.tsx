@@ -29,6 +29,7 @@ import {
   redirectToAdminLogin,
 } from "@/lib/admin/client";
 import { DEFAULT_SITE_SETTINGS, type SiteSettingKey } from "@/lib/platform/modules";
+import { formatPlatformDateTime } from "@/lib/platform/datetime";
 
 type SettingsMeta = {
   publicSiteUrl: string;
@@ -553,23 +554,47 @@ export default function SettingsPage() {
         <SettingsSection
           icon={Wrench}
           title="System"
-          description="Maintenance mode and division visibility on public navigation."
+          description="Maintenance mode locks the public site for customers while platform admins keep access."
         >
           <div className="space-y-4">
             <Toggle
               label="Maintenance mode"
-              description="Shows a site-wide banner when enabled."
+              description="Redirects visitors and customer APIs to a branded maintenance page. Owner, Super Admin, and other signed-in platform admins bypass automatically."
               checked={isOn("maintenance_mode")}
               onChange={(v) => updateBool("maintenance_mode", v)}
             />
-            {isOn("maintenance_mode") ? (
-              <Field label="Maintenance message">
-                <textarea
-                  className="platform-input min-h-[4rem] w-full resize-y"
-                  value={settings.maintenance_message}
-                  onChange={(e) => update("maintenance_message", e.target.value)}
-                />
-              </Field>
+            <Field
+              label="Maintenance message"
+              hint="Shown on /maintenance and in the public site banner for admins browsing while mode is on."
+            >
+              <textarea
+                className="platform-input min-h-[4rem] w-full resize-y"
+                value={settings.maintenance_message}
+                onChange={(e) => update("maintenance_message", e.target.value)}
+              />
+            </Field>
+            {settings.maintenance_updated_at || settings.maintenance_enabled_at ? (
+              <p className="text-xs text-[var(--platform-text-secondary)]">
+                {isOn("maintenance_mode")
+                  ? `Enabled ${formatPlatformDateTime(
+                      settings.maintenance_enabled_at || settings.maintenance_updated_at
+                    )}${
+                      settings.maintenance_enabled_by
+                        ? ` by ${settings.maintenance_enabled_by}`
+                        : ""
+                    }.`
+                  : settings.maintenance_disabled_at
+                    ? `Last disabled ${formatPlatformDateTime(settings.maintenance_disabled_at)}${
+                        settings.maintenance_disabled_by
+                          ? ` by ${settings.maintenance_disabled_by}`
+                          : ""
+                      }.`
+                    : `Last updated ${formatPlatformDateTime(settings.maintenance_updated_at)}${
+                        settings.maintenance_updated_by
+                          ? ` by ${settings.maintenance_updated_by}`
+                          : ""
+                      }.`}
+              </p>
             ) : null}
             <div className="space-y-3 border-t border-[var(--platform-border)] pt-4">
               <p className="text-xs font-medium uppercase tracking-wide text-[var(--platform-text-secondary)]">

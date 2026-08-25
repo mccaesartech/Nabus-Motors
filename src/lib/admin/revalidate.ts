@@ -1,11 +1,15 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { ROUTES } from "@/lib/routes";
-import { SITE_CONTENT_CACHE_TAG } from "@/lib/site-content";
-import { PUBLIC_VEHICLES_CACHE_TAG } from "@/lib/supabase/vehicles";
+
+/** Must match PUBLIC_VEHICLES_CACHE_TAG in @/lib/supabase/vehicles */
+const PUBLIC_VEHICLES_CACHE_TAG = "public-vehicles";
+/** Must match SITE_CONTENT_CACHE_TAG in @/lib/site-content */
+const SITE_CONTENT_CACHE_TAG = "site-content";
 
 /** Bust cached public pages after admin inventory changes. */
 export function revalidatePublicSite(slug?: string) {
-  revalidateTag(PUBLIC_VEHICLES_CACHE_TAG, "max");
+  // expire: 0 drops tagged caches immediately so trashed vehicles are not SWR-served.
+  revalidateTag(PUBLIC_VEHICLES_CACHE_TAG, { expire: 0 });
   revalidatePath("/");
   revalidatePath(ROUTES.auto.home);
   revalidatePath(ROUTES.auto.inventory);
@@ -19,7 +23,7 @@ export function revalidatePublicSite(slug?: string) {
 
 /** Bust public pages after site content CMS changes. */
 export function revalidateSiteContent() {
-  revalidateTag(SITE_CONTENT_CACHE_TAG, "max");
+  revalidateTag(SITE_CONTENT_CACHE_TAG, { expire: 0 });
   revalidatePath("/");
   revalidatePath("/about");
   revalidatePath("/contact");

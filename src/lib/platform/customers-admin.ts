@@ -400,14 +400,6 @@ export async function deleteAdminCustomer(
       return { ok: false, message: profileError.message };
     }
 
-    const { error: authError } = await supabase.auth.admin.updateUserById(customer.userId, {
-      ban_duration: "876000h",
-      user_metadata: { account_deleted: true },
-    });
-
-    if (authError && !/not found|User not found/i.test(authError.message)) {
-      return { ok: false, message: authError.message };
-    }
   }
 
   const { error: deletedEmailError } = await supabase.from("deleted_customer_emails").upsert(

@@ -2,6 +2,8 @@ import { performance } from "node:perf_hooks";
 
 const DEFAULT_BASE_URL = "http://localhost:3000";
 const PRODUCTION_HOSTS = new Set([
+  "www.truegoshengh.com",
+  "truegoshengh.com",
   "truegoshen.vercel.app",
   "truegoshen.com",
   "www.truegoshen.com",

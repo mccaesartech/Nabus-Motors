@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/admin/auth";
+import { checkVehicleImageContent } from "@/lib/ai/vehicle-image-content";
 import { externalFailure } from "@/lib/errors/api";
 import { enhanceUploadImage } from "@/lib/images/enhance-upload";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { mediaBytesMatchMime } from "@/lib/security/media-signature";
+
+/** Soft-gate code when Gemini says the upload is not primarily a vehicle photo. */
+export const NON_VEHICLE_IMAGE_CODE = "NON_VEHICLE_IMAGE";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const BUCKET = "vehicle-images";
@@ -84,6 +88,28 @@ export async function POST(req: NextRequest) {
       { ok: false, message: "File content does not match the declared image type." },
       { status: 400 }
     );
+  }
+
+  const confirmNonVehicle =
+    formData.get("confirmNonVehicle") === "1" ||
+    formData.get("confirmNonVehicle") === "true";
+
+  if (!confirmNonVehicle) {
+    const contentCheck = await checkVehicleImageContent(buffer, mime);
+    if (contentCheck.requiresConfirmation) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: NON_VEHICLE_IMAGE_CODE,
+          requiresConfirmation: true,
+          message:
+            contentCheck.reason ||
+            "This does not look like a vehicle photo. Confirm if uploading it is intentional.",
+          reason: contentCheck.reason,
+        },
+        { status: 422 }
+      );
+    }
   }
 
   // Client-side prepare sets this so we skip expensive sharpen/contrast.

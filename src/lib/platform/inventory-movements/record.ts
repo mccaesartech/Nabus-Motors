@@ -1,6 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PlatformAuthContext } from "@/lib/admin/auth";
+import { enqueueAuditLog } from "@/lib/audit/write";
 import type { RecordMovementInput } from "./types";
+import {
+  SCHEMA_CAPS,
+  isMissingRelationError,
+  isSchemaMissing,
+  markSchemaMissing,
+  markSchemaPresent,
+} from "@/lib/observability/schema-capability";
+import { reportSchemaIssue } from "@/lib/observability/schema-issue";
 
 function toIso(value: string | Date | undefined): string {
   if (!value) return new Date().toISOString();
@@ -12,18 +21,33 @@ export async function recordInventoryMovement(
   supabase: SupabaseClient,
   input: RecordMovementInput
 ): Promise<{ ok: boolean; id?: string; skipped?: boolean; error?: string }> {
+  if (isSchemaMissing(SCHEMA_CAPS.inventoryMovements)) {
+    return { ok: false, skipped: true, error: "inventory_movements table missing — apply migration 086" };
+  }
+
   const referenceId = input.referenceId ?? null;
   const referenceType = input.referenceType ?? null;
   const movementType = input.movementType;
 
   if (referenceId && referenceType) {
-    const { data: existing } = await supabase
+    const { data: existing, error: existingError } = await supabase
       .from("inventory_movements")
       .select("id")
       .eq("movement_type", movementType)
       .eq("reference_type", referenceType)
       .eq("reference_id", referenceId)
       .maybeSingle();
+
+    if (existingError && isMissingRelationError(existingError.message, "inventory_movements")) {
+      reportSchemaIssue({
+        table: "inventory_movements",
+        migration: "076_inventory_movements.sql / 086_postgres_error_clearance.sql",
+        source: "recordInventoryMovement.exists",
+        message: existingError.message,
+      });
+      markSchemaMissing(SCHEMA_CAPS.inventoryMovements);
+      return { ok: false, skipped: true, error: "inventory_movements table missing — apply migration 086" };
+    }
 
     if (existing?.id) {
       return { ok: true, id: existing.id, skipped: true };
@@ -54,8 +78,15 @@ export async function recordInventoryMovement(
     .single();
 
   if (error) {
-    if (error.message.includes("inventory_movements") && error.message.includes("does not exist")) {
-      return { ok: false, error: "inventory_movements table missing — apply migration 076" };
+    if (isMissingRelationError(error.message, "inventory_movements")) {
+      reportSchemaIssue({
+        table: "inventory_movements",
+        migration: "076_inventory_movements.sql / 086_postgres_error_clearance.sql",
+        source: "recordInventoryMovement.insert",
+        message: error.message,
+      });
+      markSchemaMissing(SCHEMA_CAPS.inventoryMovements);
+      return { ok: false, skipped: true, error: "inventory_movements table missing — apply migration 086" };
     }
     if (error.code === "23505") {
       return { ok: true, skipped: true };
@@ -64,6 +95,20 @@ export async function recordInventoryMovement(
     return { ok: false, error: error.message };
   }
 
+  markSchemaPresent(SCHEMA_CAPS.inventoryMovements);
+  enqueueAuditLog({
+    action: "inventory_movement",
+    success: true,
+    actorUserId: input.auth?.userId ?? null,
+    actorName: input.auth?.name ?? null,
+    targetType: input.assetType,
+    targetId: input.assetId ?? input.referenceId ?? null,
+    targetName: input.description?.slice(0, 300) ?? null,
+    metadata: {
+      movement_type: movementType,
+      direction: input.direction,
+    },
+  });
   return { ok: true, id: data.id as string };
 }
 
@@ -85,21 +130,32 @@ export async function recordVehicleReceived(
     price?: number | null;
     created_at?: string | null;
   },
-  auth?: PlatformAuthContext | null
+  auth?: PlatformAuthContext | null,
+  options?: {
+    quantity?: number;
+    /** When set, allows multiple receive movements for the same listing (stock top-ups). */
+    referenceId?: string | null;
+    description?: string;
+  }
 ) {
   const label = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
+  const quantity = Math.max(1, Math.round(Number(options?.quantity ?? 1)));
   return recordInventoryMovement(supabase, {
     occurredAt: vehicle.created_at ?? undefined,
     direction: "in",
     assetType: "vehicle",
     movementType: "vehicle_received",
-    description: `Vehicle added to inventory — ${label}`,
-    quantity: 1,
+    description:
+      options?.description ??
+      (quantity > 1
+        ? `Vehicles added to inventory — ${label} ×${quantity}`
+        : `Vehicle added to inventory — ${label}`),
+    quantity,
     amountUsd: Number(vehicle.price) || 0,
     assetId: vehicle.id,
     referenceType: "vehicles",
-    referenceId: vehicle.id,
-    metadata: { label },
+    referenceId: options?.referenceId ?? vehicle.id,
+    metadata: { label, units: quantity },
     auth: authFromContext(auth),
   });
 }
@@ -119,12 +175,19 @@ export async function recordVehicleSold(
     occurredAt?: string;
     auth?: PlatformAuthContext | null;
     movementType?: "vehicle_sold" | "sale_completed";
+    quantity?: number;
+    /**
+     * Override dedupe key. Multi-unit listings need a unique id per unit sold
+     * so each decrement is recorded (default vehicle.id would skip repeats).
+     */
+    referenceId?: string | null;
   }
 ) {
   const label = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
   const amount = Number(options?.salePrice ?? vehicle.price) || 0;
   const movementType = options?.movementType ?? "vehicle_sold";
   const isSale = movementType === "sale_completed";
+  const quantity = Math.max(1, Math.round(Number(options?.quantity ?? 1)));
 
   return recordInventoryMovement(supabase, {
     occurredAt: options?.occurredAt,
@@ -134,12 +197,12 @@ export async function recordVehicleSold(
     description: isSale
       ? `Sale completed — ${label} ($${amount.toLocaleString()})`
       : `Vehicle sold / dispatched — ${label}`,
-    quantity: 1,
+    quantity,
     amountUsd: amount,
     assetId: vehicle.id,
     referenceType: options?.saleId ? "sales" : "vehicles",
-    referenceId: options?.saleId ?? vehicle.id,
-    metadata: { label, vehicle_id: vehicle.id },
+    referenceId: options?.referenceId ?? options?.saleId ?? vehicle.id,
+    metadata: { label, vehicle_id: vehicle.id, units: quantity },
     auth: authFromContext(options?.auth),
   });
 }

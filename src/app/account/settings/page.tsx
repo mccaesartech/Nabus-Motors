@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Container } from "@/components/shared/container";
 import { AccountSettingsShell } from "@/components/account/account-settings-nav";
+import { ProfileSettingsSection } from "@/components/account/profile-settings-section";
 import { useRequireCustomerAuth } from "@/hooks/use-require-customer-auth";
 
 export default function AccountSettingsPage() {
@@ -21,9 +22,10 @@ export default function AccountSettingsPage() {
       <div className="mx-auto max-w-3xl">
         <AccountSettingsShell
           title="Account settings"
-          description="Manage your account preferences and security."
+          description="View and update your profile, then manage privacy and security."
         >
-          <div className="space-y-4 rounded-lg border p-5">
+          <ProfileSettingsSection />
+          <div className="mt-6 space-y-4 rounded-lg border p-5">
             <h2 className="text-lg font-semibold">Privacy &amp; security</h2>
             <p className="text-sm text-muted-foreground">
               Control how your data is handled, including account deletion and recovery options.

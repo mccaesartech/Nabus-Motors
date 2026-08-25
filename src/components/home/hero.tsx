@@ -33,7 +33,8 @@ export function Hero({ content }: HeroProps) {
             src={backgroundSrc}
             alt="Premium luxury vehicle"
             priority
-            className="object-cover hero-media-reveal"
+            sizes="100vw"
+            className="object-cover"
           />
         )}
       </div>
@@ -52,19 +53,19 @@ export function Hero({ content }: HeroProps) {
 
       <Container className="relative z-10 flex min-h-[calc(100dvh-var(--header-height))] w-full items-center justify-center py-12 sm:py-20">
         <div className="relative z-20 mx-auto flex w-full max-w-4xl flex-col items-center text-center">
-          <p className="hero-fade-in hero-fade-in-delay-1 text-xs font-semibold uppercase tracking-[0.26em] text-brand-cta-gold drop-shadow-[0_1px_8px_rgba(0,0,0,0.65)] sm:text-sm">
+          <p className="hero-fade-in-subtle hero-fade-in-delay-1 text-xs font-semibold uppercase tracking-[0.26em] text-brand-cta-gold drop-shadow-[0_1px_8px_rgba(0,0,0,0.65)] sm:text-sm">
             {content.eyebrow}
           </p>
 
-          <h1 className="hero-fade-in hero-fade-in-delay-2 mt-4 text-3xl font-bold drop-shadow-[0_2px_24px_rgba(0,0,0,0.85)] leading-[1.06] tracking-tight text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.55)] sm:mt-5 sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl">
+          <h1 className="mt-4 text-balance text-3xl font-bold leading-[1.06] tracking-tight text-white drop-shadow-[0_2px_24px_rgba(0,0,0,0.85)] sm:mt-5 sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl">
             {content.title}
           </h1>
 
-          <p className="hero-fade-in hero-fade-in-delay-3 mt-5 max-w-2xl text-base leading-relaxed text-white drop-shadow-[0_2px_16px_rgba(0,0,0,0.75)] drop-shadow-[0_1px_10px_rgba(0,0,0,0.5)] sm:mt-6 sm:text-lg md:text-xl">
+          <p className="hero-fade-in-subtle hero-fade-in-delay-2 mt-5 max-w-2xl text-base leading-relaxed text-white drop-shadow-[0_2px_16px_rgba(0,0,0,0.75)] sm:mt-6 sm:text-lg md:text-xl">
             {content.subtitle}
           </p>
 
-          <div className="hero-fade-in hero-fade-in-delay-4 relative z-20 mt-8 flex w-full min-w-0 flex-col items-center justify-center gap-3 sm:mt-10 sm:flex-row sm:flex-wrap sm:gap-4">
+          <div className="hero-fade-in-subtle hero-fade-in-delay-3 relative z-20 mt-8 flex w-full min-w-0 flex-col items-center justify-center gap-3 sm:mt-10 sm:flex-row sm:flex-wrap sm:gap-4">
             <Button
               size="lg"
               className="min-h-12 w-auto max-w-fit justify-center rounded-xl border-2 border-brand-cta-gold/90 bg-brand-cta-gold px-6 py-3 text-center text-sm font-bold uppercase tracking-[0.12em] text-white shadow-[0_4px_24px_rgba(201,162,39,0.45),0_2px_8px_rgba(0,0,0,0.35)] transition-all hover:border-brand-cta-gold-hover hover:bg-brand-cta-gold-hover hover:shadow-[0_6px_28px_rgba(201,162,39,0.55),0_2px_10px_rgba(0,0,0,0.4)]"

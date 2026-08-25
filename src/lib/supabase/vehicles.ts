@@ -499,6 +499,7 @@ function logMissingVehicleIds(identifiers: string[], found: Map<string, Vehicle>
 type AdminVehicleRow = VehicleRow & {
   approval_status: string | null;
   pending_changes: unknown;
+  deleted_at?: string | null;
 };
 
 const ADMIN_VEHICLE_LOOKUP_SELECT = "*";
@@ -513,15 +514,24 @@ async function selectAdminVehicles(
   const primary = await admin
     .from("vehicles")
     .select(ADMIN_VEHICLE_LOOKUP_SELECT)
-    .in(column, values);
+    .in(column, values)
+    .is("deleted_at", null);
   if (!primary.error || !isPendingChangesSchemaError(primary.error.message)) {
+    if (primary.error && /deleted_at/i.test(primary.error.message)) {
+      const legacy = await admin
+        .from("vehicles")
+        .select(ADMIN_VEHICLE_LOOKUP_SELECT)
+        .in(column, values);
+      return (legacy.data as AdminVehicleRow[] | null)?.filter((row) => !row.deleted_at) ?? null;
+    }
     return primary.data as AdminVehicleRow[] | null;
   }
 
   const fallback = await admin
     .from("vehicles")
     .select("*")
-    .in(column, values);
+    .in(column, values)
+    .is("deleted_at", null);
   if (fallback.error) {
     console.error(`Admin vehicles by ${column} failed:`, fallback.error.message);
     return null;
@@ -672,6 +682,8 @@ async function queryAdminVehiclesByIdentifiers(
 
   const addRows = (rows: AdminVehicleRow[] | null) => {
     for (const row of rows ?? []) {
+      // Soft-deleted vehicles must not resurface via the admin cart/garage fallback.
+      if (row.deleted_at) continue;
       const vehicle = mapRow(row);
       const state = catalogStateForRow(row, "admin");
       byKey.set(vehicle.id, vehicle);

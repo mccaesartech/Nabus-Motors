@@ -14,6 +14,7 @@ export const EMAIL_TEMPLATE_LABELS: Record<string, string> = {
   appointment_request_received: "Showroom visit request",
   cart_order: "Cart order",
   cart_order_confirmed: "Cart order confirmed",
+  staff_new_order: "Staff new order alert",
   admin_notification: "Admin notification",
 };
 

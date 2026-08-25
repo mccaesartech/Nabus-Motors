@@ -139,7 +139,8 @@ export default function FreightDocumentsPage() {
       </form>
 
       <div className="platform-card overflow-hidden rounded-xl">
-        <table className="platform-table w-full text-left text-sm">
+        <div className="scroll-touch overflow-x-auto">
+        <table className="platform-table w-full min-w-[560px] text-left text-sm">
           <thead>
             <tr className="text-xs text-[var(--platform-text-secondary)]">
               <th className="px-4 py-3 font-medium">Title</th>
@@ -190,6 +191,7 @@ export default function FreightDocumentsPage() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

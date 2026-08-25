@@ -33,6 +33,34 @@ describe("buildAvailableStockCounts / model stock", () => {
     expect(counts.get(stockGroupKey("Ford", "Ranger", 2022)) ?? 0).toBe(0);
   });
 
+  it("sums stock_quantity on multi-unit listings", () => {
+    const multi = [
+      {
+        make: "Toyota",
+        model: "Camry",
+        year: 2024,
+        status: "available",
+        stock_quantity: 4,
+      },
+      {
+        make: "Toyota",
+        model: "Camry",
+        year: 2024,
+        status: "available",
+        stock_quantity: 2,
+      },
+      {
+        make: "Toyota",
+        model: "Camry",
+        year: 2024,
+        status: "sold",
+        stock_quantity: 9,
+      },
+    ];
+    const counts = buildAvailableStockCounts(multi);
+    expect(counts.get(stockGroupKey("Toyota", "Camry", 2024))).toBe(6);
+  });
+
   it("flags last unit as low and zero as out", () => {
     expect(modelStockLevel(2)).toBe("ok");
     expect(modelStockLevel(1)).toBe("low");

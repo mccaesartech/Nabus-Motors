@@ -1,23 +1,42 @@
 import type { Metadata } from "next";
 import { Wrench } from "lucide-react";
 import { StatusPage } from "@/components/shared/status-page";
+import { getSiteSettings } from "@/lib/platform/site-settings-server";
+import { DEFAULT_MAINTENANCE_MESSAGE } from "@/lib/maintenance/rules";
+import { SITE_NAME, WHATSAPP_NUMBER, whatsappUrl } from "@/lib/constants";
 
 export const metadata: Metadata = {
-  title: "Scheduled maintenance",
+  title: `Scheduled maintenance | ${SITE_NAME}`,
+  description: "True Goshen is briefly offline for scheduled maintenance.",
   robots: { index: false, follow: false },
 };
 
-export default function MaintenancePage() {
+export const dynamic = "force-dynamic";
+
+export default async function MaintenancePage() {
+  const settings = await getSiteSettings();
+  const message =
+    (settings.maintenance_message || "").trim() || DEFAULT_MAINTENANCE_MESSAGE;
+  const inMaintenance = settings.maintenanceMode;
+  const waNumber = (settings.whatsapp_number || "").trim() || WHATSAPP_NUMBER;
+  const waHref = whatsappUrl(
+    "Hello True Goshen — I need help while the site is under maintenance.",
+    waNumber
+  );
+
   return (
     <StatusPage
-      code={503}
       icon={Wrench}
-      title="We are carrying out scheduled maintenance"
-      description="True Goshen is briefly offline while we make an update. Nothing you saved has been lost. Please check back shortly — or reach us on WhatsApp if it is urgent."
-      actions={[
-        { label: "Try again", href: "/" },
-        { label: "Contact us", href: "/contact", variant: "outline" },
-      ]}
+      title={`${SITE_NAME} is under maintenance`}
+      description={message}
+      actions={
+        inMaintenance
+          ? [{ label: "Message us on WhatsApp", href: waHref, variant: "default" }]
+          : [
+              { label: "Back to home", href: "/" },
+              { label: "Contact us", href: "/contact", variant: "outline" },
+            ]
+      }
     />
   );
 }

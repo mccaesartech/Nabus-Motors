@@ -12,7 +12,6 @@ import { WhatsAppOptIn } from "@/components/forms/whatsapp-opt-in";
 import { CustomerDataTrustNote } from "@/components/forms/customer-data-trust-note";
 import { formatCheckoutPrice } from "@/lib/currency/checkout";
 import { useCustomerAuth } from "@/context/customer-auth-context";
-import { supabase } from "@/lib/supabase/client";
 import {
   downPaymentUsd,
   PREORDER_DOWN_PAYMENT_RATE,
@@ -206,16 +205,6 @@ export function CartPreorderPanel({
           text: json.message ?? "Could not submit pre-order. Please try again.",
         });
         return;
-      }
-
-      if (isGuest && supabase) {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
-        if (!signInError) {
-          await refreshProfile();
-        }
       }
 
       onSuccess(line.vehicleId, {

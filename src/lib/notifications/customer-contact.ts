@@ -19,11 +19,7 @@ export async function resolveCustomerContactByUserId(
     .eq("id", userId)
     .maybeSingle();
 
-  let email = profile?.email?.trim() ?? "";
-  if (!email) {
-    const { data: authUser } = await supabase.auth.admin.getUserById(userId);
-    email = authUser?.user?.email?.trim() ?? "";
-  }
+  const email = profile?.email?.trim() ?? "";
 
   const phone = profile?.phone?.trim() || null;
   const whatsappPreferred =

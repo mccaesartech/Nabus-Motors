@@ -54,12 +54,14 @@ export async function GET(req: NextRequest) {
   const deletedBy = req.nextUrl.searchParams.get("deletedBy") ?? undefined;
   const dateFrom = req.nextUrl.searchParams.get("dateFrom") ?? undefined;
   const dateTo = req.nextUrl.searchParams.get("dateTo") ?? undefined;
+  const q = req.nextUrl.searchParams.get("q") ?? undefined;
 
   const { items, total } = await listTrashEntries(supabase, {
     entityType,
     deletedBy,
     dateFrom,
     dateTo,
+    q,
     page: Number.isFinite(page) ? page : 1,
     limit: Number.isFinite(limit) ? limit : 50,
   });

@@ -15,6 +15,7 @@ type InviteInfo = {
   name: string;
   email: string;
   role: string;
+  hasTemporaryPassword?: boolean;
 };
 
 export default function AcceptInvitePage() {
@@ -84,6 +85,12 @@ export default function AcceptInvitePage() {
     window.location.replace(json.redirect ?? adminDashboardPath());
   }
 
+  const roleLabel =
+    invite != null
+      ? ROLE_LABELS[invite.role as keyof typeof ROLE_LABELS] ?? invite.role
+      : "";
+  const hasTempPassword = Boolean(invite?.hasTemporaryPassword);
+
   return (
     <AdminAuthShell>
       <div className="w-full rounded-xl border border-[var(--platform-border)] bg-[var(--platform-card)] p-5 shadow-lg sm:p-8">
@@ -109,8 +116,10 @@ export default function AcceptInvitePage() {
         {!loading && invite && (
           <>
             <p className="mt-2 text-center text-sm text-[var(--platform-text-secondary)]">
-              Welcome, {invite.name}. Set your password to activate your{" "}
-              {ROLE_LABELS[invite.role as keyof typeof ROLE_LABELS] ?? invite.role} account.
+              Welcome, {invite.name}.{" "}
+              {hasTempPassword
+                ? `Enter the temporary password from your email to activate your ${roleLabel} account.`
+                : `Set your password to activate your ${roleLabel} account.`}
             </p>
             <p className="mt-1 text-center text-xs text-[var(--platform-text-secondary)]">
               {invite.email}
@@ -126,7 +135,9 @@ export default function AcceptInvitePage() {
             ) : (
               <form onSubmit={handleSubmit} className="mt-6 space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="invite-password">Password</Label>
+                  <Label htmlFor="invite-password">
+                    {hasTempPassword ? "Temporary password" : "Password"}
+                  </Label>
                   <PasswordInput
                     id="invite-password"
                     value={password}
@@ -137,7 +148,9 @@ export default function AcceptInvitePage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="invite-confirm">Confirm password</Label>
+                  <Label htmlFor="invite-confirm">
+                    {hasTempPassword ? "Confirm temporary password" : "Confirm password"}
+                  </Label>
                   <PasswordInput
                     id="invite-confirm"
                     value={confirm}

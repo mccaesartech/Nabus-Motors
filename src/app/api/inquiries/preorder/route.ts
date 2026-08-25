@@ -7,6 +7,7 @@ import { getCustomerFromAuthHeader } from "@/lib/customer/auth";
 import { resolvePreorderAccount, linkCustomerPreordersByEmail, waitForCustomerProfile } from "@/lib/customer/preorder-account";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { downPaymentUsd } from "@/lib/vehicles/availability";
+import { notDeletedFilter } from "@/lib/platform/trash-types";
 import {
   notifyCustomer,
   resolveWhatsAppPreferred,
@@ -74,11 +75,12 @@ export async function POST(req: NextRequest) {
         "id, slug, year, make, model, trim, price" as const;
 
       if (resolvedVehicleId) {
-        const { data: vehicle } = await supabase
-          .from("vehicles")
-          .select(vehicleSelect)
-          .eq("id", resolvedVehicleId)
-          .maybeSingle();
+        const { data: vehicle } = await notDeletedFilter(
+          supabase
+            .from("vehicles")
+            .select(vehicleSelect)
+            .eq("id", resolvedVehicleId)
+        ).maybeSingle();
 
         if (vehicle) {
           slug = vehicle.slug;
@@ -90,11 +92,12 @@ export async function POST(req: NextRequest) {
       }
 
       if (!resolvedVehicleId && slug) {
-        const { data: vehicle } = await supabase
-          .from("vehicles")
-          .select(vehicleSelect)
-          .eq("slug", slug)
-          .maybeSingle();
+        const { data: vehicle } = await notDeletedFilter(
+          supabase
+            .from("vehicles")
+            .select(vehicleSelect)
+            .eq("slug", slug)
+        ).maybeSingle();
 
         if (vehicle) {
           resolvedVehicleId = vehicle.id;

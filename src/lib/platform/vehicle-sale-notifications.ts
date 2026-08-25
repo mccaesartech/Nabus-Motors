@@ -1,31 +1,112 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatPlatformPrice } from "@/lib/currency";
-import { hasPermission, normalizeRole } from "@/lib/platform/permissions";
 import { platformPath } from "@/lib/platform/paths";
-import { notifyAdminOutbound } from "@/lib/notifications/admin-notify";
 import { getSiteSettings } from "@/lib/platform/site-settings-server";
+import { notifyStaffNewOrder } from "@/lib/platform/staff-order-notify";
 
-type LeadsRecipient = {
-  user_id: string | null;
-  is_owner: boolean;
+export type CartOrderStaffItem = {
+  label: string;
+  itemType: "part" | "vehicle";
+  intent?: "buy" | "pre_order" | null;
+  quantity: number;
 };
 
-async function leadsRecipients(supabase: SupabaseClient): Promise<LeadsRecipient[]> {
-  const recipients: LeadsRecipient[] = [{ user_id: null, is_owner: true }];
+export type CartOrderStaffInput = {
+  orderId: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone?: string | null;
+  items: CartOrderStaffItem[];
+  totalUsd: number;
+};
 
-  const { data } = await supabase
-    .from("platform_users")
-    .select("id, role, status")
-    .eq("status", "active");
+export function buildCartOrderStaffContent(input: CartOrderStaffInput): {
+  notificationType: string;
+  title: string;
+  message: string;
+} {
+  const vehicleItems = input.items.filter((item) => item.itemType === "vehicle");
+  const partItems = input.items.filter((item) => item.itemType === "part");
+  const summary = input.items
+    .map((item) => {
+      if (item.itemType === "vehicle") {
+        const intent = item.intent === "pre_order" ? "Pre-order" : "Buy";
+        return `${item.label} (${intent})`;
+      }
+      return `${item.label} × ${item.quantity}`;
+    })
+    .join(", ");
+  const ref = input.orderId.slice(0, 8).toUpperCase();
+  const total = formatPlatformPrice(input.totalUsd);
+  const contact = [input.customerName, input.customerEmail, input.customerPhone?.trim()]
+    .filter(Boolean)
+    .join(" · ");
 
-  for (const user of data ?? []) {
-    const role = normalizeRole(user.role);
-    if (hasPermission(role, "leads")) {
-      recipients.push({ user_id: user.id, is_owner: false });
-    }
+  if (vehicleItems.length > 0 && partItems.length === 0) {
+    const allPreOrder = vehicleItems.every((item) => item.intent === "pre_order");
+    const notificationType = allPreOrder ? "preorder" : "vehicle_order";
+    const kindLabel = allPreOrder ? "Vehicle pre-order" : "Vehicle purchase";
+    const vehicleLabel = vehicleItems[0]?.label ?? "vehicle";
+    const title =
+      vehicleItems.length > 1
+        ? `${kindLabel} — ${vehicleItems.length} vehicles`
+        : `${kindLabel}: ${vehicleLabel}`;
+    return {
+      notificationType,
+      title,
+      message: `${summary} — ${contact} (ref ${ref}) · ${total}. Please attend to this customer promptly.`,
+    };
   }
 
-  return recipients;
+  const title =
+    partItems.length > 0 && vehicleItems.length === 0
+      ? `New parts order — ${partItems.length} item(s)`
+      : `New cart order — ${input.items.length} item(s)`;
+
+  return {
+    notificationType: "order",
+    title,
+    message: `${summary} — ${contact} (ref ${ref}) · ${total}. Please attend to this order promptly.`,
+  };
+}
+
+/** Notify staff for any cart checkout (parts, vehicles, or mixed). One alert per order. */
+export async function notifyCartOrderToStaff(
+  supabase: SupabaseClient,
+  input: CartOrderStaffInput
+): Promise<void> {
+  const { notificationType, title, message } = buildCartOrderStaffContent(input);
+  const settings = await getSiteSettings();
+  const hasPreOrderVehicle = input.items.some(
+    (item) => item.itemType === "vehicle" && item.intent === "pre_order"
+  );
+  const outboundEnabled =
+    settings.notifyEmailEnabled &&
+    (!hasPreOrderVehicle || settings.notifyPreordersEnabled);
+
+  await notifyStaffNewOrder(supabase, {
+    notificationType,
+    title,
+    message,
+    link: vehicleOrderLeadsLink(input.orderId),
+    sourceTable: "parts_orders",
+    sourceId: input.orderId,
+    permission: "leads",
+    outboundEnabled,
+    customerName: input.customerName,
+    customerEmail: input.customerEmail,
+    customerPhone: input.customerPhone,
+    metadata: {
+      item_count: input.items.length,
+      total_usd: input.totalUsd,
+      items: input.items.map((item) => ({
+        label: item.label,
+        type: item.itemType,
+        intent: item.intent ?? null,
+        quantity: item.quantity,
+      })),
+    },
+  });
 }
 
 export type VehicleSaleNotificationInput = {
@@ -54,7 +135,7 @@ function buildSaleMessage(input: VehicleSaleNotificationInput): string {
     input.totalUsd != null && input.totalUsd > 0
       ? ` · ${formatPlatformPrice(input.totalUsd)}`
       : "";
-  return `${kindLabel}: ${vehicles} — ${contact} (ref ${ref})${total}`;
+  return `${kindLabel}: ${vehicles} — ${contact} (ref ${ref})${total}. Please attend to this customer promptly.`;
 }
 
 function buildSaleTitle(input: VehicleSaleNotificationInput): string {
@@ -65,67 +146,39 @@ function buildSaleTitle(input: VehicleSaleNotificationInput): string {
     : `${kindLabel}: ${vehicle}`;
 }
 
-/** Target owner + leads-enabled team (managers, staff with leads access) in the bell. */
+/** Target owner + leads-enabled team in the bell, email, and SMS. */
 export async function notifyVehicleSaleToLeadsTeam(
   supabase: SupabaseClient,
   input: VehicleSaleNotificationInput
 ): Promise<void> {
   const title = buildSaleTitle(input);
   const message = buildSaleMessage(input);
-  const type = input.kind === "buy" ? "vehicle_order" : "preorder";
-  const metadata = {
-    kind: input.kind,
-    customer: {
-      name: input.customerName,
-      email: input.customerEmail,
-      phone: input.customerPhone ?? null,
-    },
-    vehicles: input.vehicleTitles,
-    reference_id: input.referenceId,
-    registration_id: input.registrationId ?? null,
-    total_usd: input.totalUsd ?? null,
-  };
+  const notificationType = input.kind === "buy" ? "vehicle_order" : "preorder";
 
-  await supabase
-    .from("admin_notifications")
-    .delete()
-    .eq("source_table", input.sourceTable)
-    .eq("source_id", input.referenceId);
+  const settings = await getSiteSettings();
+  const outboundEnabled =
+    settings.notifyEmailEnabled &&
+    (input.kind === "pre_order" ? settings.notifyPreordersEnabled : true);
 
-  const recipients = await leadsRecipients(supabase);
-  const rows = recipients.map((recipient) => ({
-    type,
+  await notifyStaffNewOrder(supabase, {
+    notificationType,
     title,
     message,
     link: input.link,
-    source_table: input.sourceTable,
-    source_id: input.referenceId,
-    recipient_user_id: recipient.is_owner ? null : recipient.user_id,
-    recipient_is_owner: recipient.is_owner,
-    metadata,
-  }));
-
-  const { error } = await supabase.from("admin_notifications").insert(rows);
-  if (error && !/duplicate|unique/i.test(error.message)) {
-    console.error("[vehicle-sale] admin notification insert failed:", error.message);
-  }
-
-  try {
-    const settings = await getSiteSettings();
-    const emailEnabled =
-      settings.notifyEmailEnabled &&
-      (input.kind === "pre_order" ? settings.notifyPreordersEnabled : true);
-
-    if (emailEnabled) {
-      await notifyAdminOutbound({
-        subject: title,
-        message: `${message}\n\nReview in platform: ${input.link}`,
-        settings,
-      });
-    }
-  } catch (notifyError) {
-    console.error("[vehicle-sale] outbound admin notify failed:", notifyError);
-  }
+    sourceTable: input.sourceTable,
+    sourceId: input.referenceId,
+    permission: "leads",
+    outboundEnabled,
+    customerName: input.customerName,
+    customerEmail: input.customerEmail,
+    customerPhone: input.customerPhone,
+    metadata: {
+      kind: input.kind,
+      vehicles: input.vehicleTitles,
+      registration_id: input.registrationId ?? null,
+      total_usd: input.totalUsd ?? null,
+    },
+  });
 }
 
 export function vehicleOrderLeadsLink(orderId: string): string {

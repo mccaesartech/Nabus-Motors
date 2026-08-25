@@ -146,6 +146,146 @@ describe("arkesel payload + send", () => {
     });
   });
 
+  it("reads the message id from the Arkesel v2 array response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            status: "success",
+            data: [
+              { recipient: "233244876784", id: "9b752841-7ee7-4d40-b4fe-768bfb1da4f0" },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      )
+    );
+
+    const result = await sendArkeselSms("0244876784", "Test SMS", {
+      apiKey: "test-key",
+      senderId: "TrueGoshen",
+      baseUrl: "https://sms.arkesel.com",
+      enabled: true,
+      configured: true,
+      smsReady: true,
+      source: "env",
+    });
+
+    expect(result).toEqual({
+      sent: true,
+      provider: "arkesel",
+      channel: "sms",
+      messageId: "9b752841-7ee7-4d40-b4fe-768bfb1da4f0",
+    });
+  });
+
+  it("does not report success without a message id", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ status: "success", data: [{ recipient: "233244876784" }] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      )
+    );
+
+    const result = await sendArkeselSms("0244876784", "Test SMS", {
+      apiKey: "test-key",
+      senderId: "TrueGoshen",
+      baseUrl: "https://sms.arkesel.com",
+      enabled: true,
+      configured: true,
+      smsReady: true,
+      source: "env",
+    });
+
+    expect(result.sent).toBe(false);
+    if (!result.sent) {
+      expect(result.reason).toMatch(/message id/i);
+    }
+  });
+
+  it("does not report success when Arkesel rejects the recipient", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            status: "success",
+            data: [{ "invalid numbers": ["233244876784"] }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      )
+    );
+
+    const result = await sendArkeselSms("0244876784", "Test SMS", {
+      apiKey: "test-key",
+      senderId: "TrueGoshen",
+      baseUrl: "https://sms.arkesel.com",
+      enabled: true,
+      configured: true,
+      smsReady: true,
+      source: "env",
+    });
+
+    expect(result.sent).toBe(false);
+    if (!result.sent) {
+      expect(result.reason).toContain("233244876784");
+      expect(result.reason).toMatch(/invalid number/i);
+    }
+  });
+
+  it("explains an out-of-credit account", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ message: "Insufficient balance" }), { status: 402 })
+      )
+    );
+
+    const result = await sendArkeselSms("0244876784", "Test SMS", {
+      apiKey: "test-key",
+      senderId: "TrueGoshen",
+      baseUrl: "https://sms.arkesel.com",
+      enabled: true,
+      configured: true,
+      smsReady: true,
+      source: "env",
+    });
+
+    expect(result.sent).toBe(false);
+    if (!result.sent) {
+      expect(result.reason).toMatch(/out of SMS credit/i);
+    }
+  });
+
+  it("explains an inactive gateway / unapproved sender ID", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ message: "Inactive Gateway" }), { status: 403 })
+      )
+    );
+
+    const result = await sendArkeselSms("0244876784", "Test SMS", {
+      apiKey: "test-key",
+      senderId: "TrueGoshen",
+      baseUrl: "https://sms.arkesel.com",
+      enabled: true,
+      configured: true,
+      smsReady: true,
+      source: "env",
+    });
+
+    expect(result.sent).toBe(false);
+    if (!result.sent) {
+      expect(result.reason).toMatch(/sender ID is approved/i);
+    }
+  });
+
   it("returns failure on HTTP error without throwing", async () => {
     vi.stubGlobal(
       "fetch",

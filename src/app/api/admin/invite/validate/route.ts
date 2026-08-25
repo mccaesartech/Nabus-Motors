@@ -35,12 +35,19 @@ export async function GET(req: NextRequest) {
 
   const { data: user } = await supabase
     .from("platform_users")
-    .select("name, email, role, status")
+    .select("name, email, role, status, password_hash")
     .eq("id", invite.user_id)
     .maybeSingle();
 
-  if (!user || user.status === "active") {
-    return NextResponse.json({ ok: false, message: "This account is already active." }, { status: 410 });
+  if (!user || user.status === "disabled") {
+    return NextResponse.json({ ok: false, message: "Invalid or expired invitation." }, { status: 404 });
+  }
+
+  if (user.status === "active") {
+    return NextResponse.json(
+      { ok: false, message: "This account is already active." },
+      { status: 410 }
+    );
   }
 
   return NextResponse.json({
@@ -49,6 +56,7 @@ export async function GET(req: NextRequest) {
       name: user.name,
       email: user.email,
       role: user.role,
+      hasTemporaryPassword: Boolean(user.password_hash),
     },
   });
 }

@@ -16,6 +16,7 @@ import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
 import { platformPath } from "@/lib/platform/paths";
 import type { AdminCustomerDetail, AdminCustomerListItem } from "@/lib/platform/customers-admin";
+import { seedCachedCustomer } from "@/lib/print/pdf-cache";
 import { PlatformDateTime } from "@/components/platform/platform-datetime";
 
 export default function CustomersPage() {
@@ -75,7 +76,9 @@ export default function CustomersPage() {
       const res = await fetch(`/api/admin/customers/${encodeURIComponent(id)}`);
       const json = await res.json();
       if (res.ok && json.customer) {
-        setDetailById((prev) => ({ ...prev, [id]: json.customer }));
+        const detail = json.customer as AdminCustomerDetail;
+        seedCachedCustomer(detail);
+        setDetailById((prev) => ({ ...prev, [id]: detail }));
       }
     } finally {
       setDetailLoadingId(null);

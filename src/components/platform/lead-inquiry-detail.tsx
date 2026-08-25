@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ExternalLink, Mail, MessageSquare, Phone, Trash2, User } from "lucide-react";
-import { ContactWhatsAppAction } from "@/components/platform/contact-actions";
+import { WhatsAppAssistAction } from "@/components/platform/whatsapp-assist-dialog";
 import {
   ConfirmDialog,
   DELETE_CONFIRM_PHRASE,
@@ -195,10 +195,16 @@ export function LeadInquiryDetail({ type, id }: LeadInquiryDetailProps) {
               </Link>
             )}
             {phone ? (
-              <ContactWhatsAppAction
+              <WhatsAppAssistAction
                 phone={phone}
                 customerName={name}
-                message={followUpIntro}
+                context={{
+                  type: "inquiry",
+                  id,
+                  inquiryType: type,
+                  userId: userId ?? undefined,
+                  email: email || undefined,
+                }}
                 variant="button"
               />
             ) : null}

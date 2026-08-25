@@ -2,6 +2,7 @@
 
 import { CHINESE_MAKES } from "@/lib/vehicles/chinese-makes";
 import type { Vehicle, VehicleFilters } from "@/lib/types";
+import { resolveCustomerApiUrl } from "@/lib/site-url";
 
 export const VEHICLE_PREFERENCES_KEY = "true-goshen-vehicle-preferences";
 export const VEHICLE_PREFERENCES_EVENT = "true-goshen-vehicle-preferences-change";
@@ -373,7 +374,7 @@ export async function syncVehiclePreferencesToProfile(
   if (!store.events.length) return;
 
   try {
-    await fetch("/api/customer/sync-account", {
+    await fetch(resolveCustomerApiUrl("/api/customer/sync-account"), {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,

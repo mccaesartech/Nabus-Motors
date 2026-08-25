@@ -1,0 +1,83 @@
+/**
+ * Stable audit action codes. Prefer these over free-form strings.
+ * Keep in sync with the Audit Log UI filter list.
+ */
+export const AUDIT_ACTIONS = [
+  "login",
+  "logout",
+  "login_failed",
+  "google_sign_in",
+  "google_sign_in_failed",
+  "password_reset_request",
+  "password_changed",
+  "email_verified",
+  "mfa_enabled",
+  "mfa_disabled",
+  "invitation_created",
+  "invitation_accepted",
+  "role_assigned",
+  "role_removed",
+  "user_created",
+  "user_updated",
+  "user_deleted",
+  "vehicle_created",
+  "vehicle_updated",
+  "vehicle_deleted",
+  "inventory_movement",
+  "payment",
+  "file_upload",
+  "file_delete",
+  "sms_sent",
+  "sms_failed",
+  "email_sent",
+  "email_failed",
+  "api_key_changed",
+  "settings_changed",
+  "audit_export",
+  "api_unauthorized",
+  "api_forbidden",
+  "api_server_error",
+] as const;
+
+export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+
+export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
+  login: "Login",
+  logout: "Logout",
+  login_failed: "Login failed",
+  google_sign_in: "Google sign-in",
+  google_sign_in_failed: "Google sign-in failed",
+  password_reset_request: "Password reset request",
+  password_changed: "Password changed",
+  email_verified: "Email verified",
+  mfa_enabled: "MFA enabled",
+  mfa_disabled: "MFA disabled",
+  invitation_created: "Invitation created",
+  invitation_accepted: "Invitation accepted",
+  role_assigned: "Role assigned",
+  role_removed: "Role removed",
+  user_created: "User created",
+  user_updated: "User updated",
+  user_deleted: "User deleted",
+  vehicle_created: "Vehicle created",
+  vehicle_updated: "Vehicle updated",
+  vehicle_deleted: "Vehicle deleted",
+  inventory_movement: "Inventory movement",
+  payment: "Payment",
+  file_upload: "File upload",
+  file_delete: "File delete",
+  sms_sent: "SMS sent",
+  sms_failed: "SMS failed",
+  email_sent: "Email sent",
+  email_failed: "Email failed",
+  api_key_changed: "API key changed",
+  settings_changed: "Settings changed",
+  audit_export: "Audit log export",
+  api_unauthorized: "API unauthorized (401)",
+  api_forbidden: "API forbidden (403)",
+  api_server_error: "API server error (500)",
+};
+
+export function isAuditAction(value: string): value is AuditAction {
+  return (AUDIT_ACTIONS as readonly string[]).includes(value);
+}

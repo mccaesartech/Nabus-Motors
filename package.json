@@ -12,14 +12,16 @@
     "typecheck": "tsc --noEmit --incremental false",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:security": "vitest run src/lib/security/__tests__",
     "audit:prod": "npm audit --omit=dev --audit-level=high",
     "check:migrations": "node scripts/check-migrations.mjs",
     "load:smoke": "node scripts/load-smoke.mjs",
     "logo": "node scripts/process-logo.mjs",
+    "letterhead": "node scripts/export-letterhead.mjs",
     "pwa:icons": "node scripts/generate-pwa-icons.mjs",
     "countries:generate": "npx tsx scripts/generate-countries-data.ts",
-    "lighthouse:home": "npx lighthouse https://truegoshen.vercel.app --only-categories=performance,accessibility,best-practices,seo --output=html --output-path=./lighthouse-home.html --chrome-flags=\"--headless\"",
-    "lighthouse:platform": "npx lighthouse https://truegoshen.vercel.app/platform/dashboard --only-categories=performance,accessibility,best-practices --output=html --output-path=./lighthouse-platform-dashboard.html --chrome-flags=\"--headless\""
+    "lighthouse:home": "npx lighthouse https://www.truegoshengh.com --only-categories=performance,accessibility,best-practices,seo --output=html --output-path=./lighthouse-home.html --chrome-flags=\"--headless\"",
+    "lighthouse:platform": "npx lighthouse https://www.truegoshengh.com/platform/dashboard --only-categories=performance,accessibility,best-practices --output=html --output-path=./lighthouse-platform-dashboard.html --chrome-flags=\"--headless\""
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
@@ -38,6 +40,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "recharts": "^3.9.0",
+    "resend": "^6.18.1",
     "server-only": "^0.0.1",
     "shadcn": "^4.11.0",
     "sharp": "^0.35.2",

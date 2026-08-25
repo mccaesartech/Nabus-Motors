@@ -24,7 +24,11 @@ import {
 import { PageHeader } from "@/components/platform/page-header";
 import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
+import {
+  RESEND_DIAGNOSTICS_PATH,
+} from "@/lib/email/resend-constants";
 import { PLATFORM_INVITE_EXPIRY_LABEL } from "@/lib/platform/invite-ttl";
+import { ownerInviteDeliveryError } from "@/lib/platform/invite-delivery-messages";
 import { ROLE_LABELS } from "@/lib/platform/permissions";
 import type { PlatformUserInviteInfo, PlatformUserNotifyInfo, PlatformUserRow } from "@/lib/platform/modules";
 import { formatPlatformDate } from "@/lib/platform/datetime";
@@ -51,7 +55,7 @@ type InvitePanel = {
   name: string;
   link: string;
   emailSent: boolean;
-  emailError?: string;
+  emailHint?: string;
   notify?: PlatformUserNotifyInfo;
 };
 
@@ -66,7 +70,7 @@ function notifyBadge(notify?: PlatformUserNotifyInfo | null) {
   };
   return (
     <span
-      className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${styles[notify.status] ?? styles.pending}`}
+      className={`mt-1 inline-flex max-w-full rounded-full px-2 py-0.5 text-[10px] font-medium ${styles[notify.status] ?? styles.pending}`}
       title={notify.label}
     >
       {notify.label}
@@ -98,6 +102,13 @@ function inviteStatusLabel(invite: PlatformUserInviteInfo) {
   if (invite.status === "expired") return "Invite expired";
   if (invite.status === "active") return "Invite active";
   return "No invite";
+}
+
+function inviteEmailStatusLabel(invite: PlatformUserInviteInfo): string | null {
+  if (invite.emailStatus === "FAILED") return "Email failed";
+  if (invite.emailStatus === "SENT") return "Email sent";
+  if (invite.emailStatus === "PENDING") return "Email pending";
+  return null;
 }
 
 function UserProfileCell({ user }: { user: PlatformUserRow }) {
@@ -173,6 +184,22 @@ function InviteLinkCell({
           <span> · until {formatPlatformDate(invite.expiresAt)}</span>
         )}
       </p>
+      {inviteEmailStatusLabel(invite) && (
+        <p
+          className={`text-xs ${
+            invite.emailStatus === "FAILED"
+              ? "text-red-700"
+              : invite.emailStatus === "SENT"
+                ? "text-emerald-700"
+                : "text-amber-800"
+          }`}
+        >
+          {inviteEmailStatusLabel(invite)}
+          {invite.emailStatus === "FAILED"
+            ? " — use Resend or copy the link below"
+            : null}
+        </p>
+      )}
 
       {hasUrl && (
         <button
@@ -260,7 +287,16 @@ function EmailSetupHelp({ compact = false }: { compact?: boolean }) {
           >
             resend.com
           </a>{" "}
-          and verify your sending domain.
+          , add <code>truegoshengh.com</code> under <strong>Domains</strong>, and copy the
+          DKIM and SPF records it shows into your DNS. Wait until the domain reads{" "}
+          <strong>Verified</strong> — until then Resend only delivers to the account
+          owner&apos;s own inbox.
+        </li>
+        <li>
+          Create the API key <em>while signed into the same Resend team that lists the
+          verified domain</em>. A key from another account or team makes Resend answer
+          &ldquo;the truegoshengh.com domain is not verified&rdquo; even though your
+          dashboard shows it Verified.
         </li>
         <li>
           In your Vercel project, open <strong>Settings → Environment Variables</strong> and add:
@@ -269,12 +305,26 @@ function EmailSetupHelp({ compact = false }: { compact?: boolean }) {
               <code>RESEND_API_KEY</code> — API key from Resend dashboard
             </li>
             <li>
-              <code>RESEND_FROM_EMAIL</code> — e.g.{" "}
-              <code>True Goshen &lt;noreply@yourdomain.com&gt;</code>
+              <code>RESEND_FROM_EMAIL</code> —{" "}
+              <code>noreply@truegoshengh.com</code>
             </li>
           </ul>
+          <p className="mt-1.5">
+            Tick <strong>Production</strong> on both. Vercel stores a separate value per
+            environment, so a key saved only to Preview leaves production sending with
+            the old one.
+          </p>
         </li>
         <li>Redeploy the site (or run a new production deploy) so the variables take effect.</li>
+        <li>
+          Open{" "}
+          <a href={RESEND_DIAGNOSTICS_PATH} className="font-medium underline">
+            <code>{RESEND_DIAGNOSTICS_PATH}</code>
+          </a>{" "}
+          while signed in. It reports the domains the deployed key can actually see, the
+          key&apos;s last four characters, and which environment answered. Proceed only
+          once <code>status</code> reads <code>ok</code>.
+        </li>
         <li>Return here and use <strong>Resend email</strong> on a pending user to test delivery.</li>
       </ol>
     </details>
@@ -305,7 +355,7 @@ export default function UsersPage() {
   const [panelConfirm, setPanelConfirm] = useState("");
   const [panelError, setPanelError] = useState("");
   const [toast, setToast] = useState("");
-  const [toastVariant, setToastVariant] = useState<"success" | "warning">("success");
+  const [toastVariant, setToastVariant] = useState<"success" | "warning" | "error">("success");
   const [invitePanel, setInvitePanel] = useState<InvitePanel | null>(null);
   const [expandedInvitePanel, setExpandedInvitePanel] = useState(false);
   const [rowActionId, setRowActionId] = useState<string | null>(null);
@@ -318,7 +368,7 @@ export default function UsersPage() {
   ) {
     if (usersPayload.canViewInviteLinks) return true;
     const user = sessionPayload.user;
-    return Boolean(sessionPayload.ok && (user?.type === "owner" || user?.role === "owner"));
+    return Boolean(sessionPayload.ok && (user?.type === "owner" || user?.role === "owner" || user?.role === "super_admin"));
   }
 
   function applyInviteToUser(userId: string, link: string, expiresAt?: string) {
@@ -398,6 +448,7 @@ export default function UsersPage() {
       inviteUrl?: string;
       emailSent?: boolean;
       emailError?: string;
+      emailHint?: string;
       notify?: PlatformUserNotifyInfo;
     },
     resent = false
@@ -405,41 +456,101 @@ export default function UsersPage() {
     const link = json.inviteLink ?? json.inviteUrl ?? "";
     if (!link) return;
 
+    const emailSent = Boolean(json.emailSent);
+    const notifyFailed = json.notify?.status === "failed";
+    const emailHint = json.emailHint?.trim() || undefined;
+
     setInvitePanel({
       userId,
       email: invitedEmail,
       name: invitedName,
       link,
-      emailSent: Boolean(json.emailSent),
-      emailError: json.emailError,
+      emailSent,
+      emailHint,
       notify: json.notify,
     });
     setExpandedInvitePanel(false);
 
-    const notifyLabel = json.notify?.label;
     const smsSkipped = json.notify?.status === "skipped_no_phone";
-    const warn =
-      !json.emailSent ||
-      smsSkipped ||
-      json.notify?.status === "failed" ||
-      json.notify?.status === "skipped_not_configured";
-    setToastVariant(warn ? "warning" : "success");
+    const smsNotConfigured = json.notify?.status === "skipped_not_configured";
+    const deliveryError = ownerInviteDeliveryError({
+      emailSent,
+      notifyFailed,
+      emailHint,
+    });
+
+    if (deliveryError) {
+      setToastVariant("error");
+    } else if (smsSkipped || smsNotConfigured) {
+      setToastVariant("warning");
+    } else {
+      setToastVariant("success");
+    }
 
     const parts: string[] = [];
-    if (json.emailSent) {
+    if (emailSent) {
       parts.push(
         resent
           ? `Invite re-sent to ${invitedEmail}`
           : `Invite emailed to ${invitedEmail}`
       );
     } else {
-      parts.push(
-        json.emailError
-          ? `Invite link ready for ${invitedEmail}, but email could not be sent: ${json.emailError}`
-          : `Invite link ready for ${invitedEmail}. Copy the link to share manually`
-      );
+      parts.push(`Invite link ready for ${invitedEmail}`);
     }
-    if (notifyLabel) parts.push(notifyLabel);
+    if (deliveryError) {
+      parts.push(deliveryError);
+    } else if (smsSkipped) {
+      parts.push("SMS skipped (no phone)");
+    } else if (smsNotConfigured) {
+      parts.push("SMS not configured");
+    } else if (json.notify?.status === "sent") {
+      parts.push(json.notify.label);
+    }
+    setToast(`${parts.join(". ")}.`);
+  }
+
+  /** Toast when the API created an invite but did not return a copyable link. */
+  function toastInviteWithoutLink(
+    invitedEmail: string,
+    json: {
+      emailSent?: boolean;
+      emailHint?: string;
+      notify?: PlatformUserNotifyInfo;
+    }
+  ) {
+    const emailSent = Boolean(json.emailSent);
+    const notifyFailed = json.notify?.status === "failed";
+    const smsSkipped = json.notify?.status === "skipped_no_phone";
+    const smsNotConfigured = json.notify?.status === "skipped_not_configured";
+    const deliveryError = ownerInviteDeliveryError({
+      emailSent,
+      notifyFailed,
+      emailHint: json.emailHint,
+    });
+
+    if (deliveryError) {
+      setToastVariant("error");
+    } else if (smsSkipped || smsNotConfigured) {
+      setToastVariant("warning");
+    } else {
+      setToastVariant("success");
+    }
+
+    const parts: string[] = [];
+    if (emailSent) {
+      parts.push(`Invite emailed to ${invitedEmail}`);
+    } else {
+      parts.push(`Invite created for ${invitedEmail}`);
+    }
+    if (deliveryError) {
+      parts.push(deliveryError);
+    } else if (smsSkipped) {
+      parts.push("SMS skipped (no phone)");
+    } else if (smsNotConfigured) {
+      parts.push("SMS not configured");
+    } else if (json.notify?.label) {
+      parts.push(json.notify.label);
+    }
     setToast(`${parts.join(". ")}.`);
   }
 
@@ -490,17 +601,46 @@ export default function UsersPage() {
       setNewPassword("");
       setNewPasswordConfirm("");
       if (json.passwordSet) {
-        const notifyLabel = json.notify?.label;
-        setToastVariant(
-          json.notify?.status === "skipped_no_phone" || json.notify?.status === "failed"
-            ? "warning"
-            : "success"
-        );
-        setToast(
-          notifyLabel
-            ? `${invitedEmail} created with a password. ${notifyLabel}.`
-            : `${invitedEmail} created with a password. They can sign in immediately.`
-        );
+        const notifyLabel = json.notify?.label as string | undefined;
+        const deliveryError = ownerInviteDeliveryError({
+          emailSent: Boolean(json.emailSent),
+          notifyFailed: json.notify?.status === "failed",
+          emailHint: typeof json.emailHint === "string" ? json.emailHint : null,
+        });
+        if (link) {
+          setCanViewInviteLinks(true);
+          const userId = json.user?.id ?? "";
+          showInvitePanel(userId, invitedEmail, invitedName, json);
+          if (json.user) {
+            setUsers((prev) => [
+              {
+                ...json.user,
+                notify: json.notify,
+                invite: {
+                  status: "active" as const,
+                  inviteUrl: link,
+                  expiresAt: json.expiresAt,
+                  emailStatus: json.emailSent ? ("SENT" as const) : ("FAILED" as const),
+                },
+              },
+              ...prev.filter((user) => user.id !== json.user.id),
+            ]);
+          }
+          load();
+          return;
+        }
+        setToastVariant(deliveryError ? "error" : json.notify?.status === "skipped_no_phone" ? "warning" : "success");
+        if (deliveryError) {
+          setToast(
+            `${invitedEmail} created with a password, but delivery failed. ${deliveryError}`
+          );
+        } else {
+          setToast(
+            notifyLabel
+              ? `${invitedEmail} created with a password. Temporary password included in email/SMS. ${notifyLabel}.`
+              : `${invitedEmail} created with a password. Temporary password included in email/SMS with their invite link.`
+          );
+        }
         if (json.user) {
           setUsers((prev) => [
             { ...json.user, notify: json.notify },
@@ -523,18 +663,28 @@ export default function UsersPage() {
                 status: "active" as const,
                 inviteUrl: link,
                 expiresAt: json.expiresAt,
+                emailStatus: json.emailSent ? ("SENT" as const) : ("FAILED" as const),
               },
             },
             ...prev.filter((user) => user.id !== json.user.id),
           ]);
         }
       } else {
-        setToastVariant(json.notify?.status === "skipped_no_phone" ? "warning" : "success");
-        setToast(
-          json.notify?.label
-            ? `Invite sent to ${invitedEmail}. ${json.notify.label}.`
-            : `Invite sent to ${invitedEmail}.`
-        );
+        toastInviteWithoutLink(invitedEmail, json);
+        if (json.user) {
+          setUsers((prev) => [
+            {
+              ...json.user,
+              notify: json.notify,
+              invite: {
+                status: "active" as const,
+                expiresAt: json.expiresAt,
+                emailStatus: json.emailSent ? ("SENT" as const) : ("FAILED" as const),
+              },
+            },
+            ...prev.filter((user) => user.id !== json.user.id),
+          ]);
+        }
       }
       load();
     } else {
@@ -677,8 +827,19 @@ export default function UsersPage() {
         setPanelError(json.message ?? "Could not set password.");
         return;
       }
-      setToastVariant("success");
-      setToast(`Password set for ${passwordPanel.email}. They can sign in with it now.`);
+      setToastVariant(
+        json.emailSent === false || json.notify?.status === "failed" ? "warning" : "success"
+      );
+      const deliveryError = ownerInviteDeliveryError({
+        emailSent: json.emailSent !== false,
+        notifyFailed: json.notify?.status === "failed",
+        emailHint: typeof json.emailHint === "string" ? json.emailHint : null,
+      });
+      setToast(
+        deliveryError
+          ? `Password set for ${passwordPanel.email}, but delivery failed. ${deliveryError}`
+          : `Password set for ${passwordPanel.email}. Temporary password included in email/SMS so they can sign in.`
+      );
       setPasswordPanel(null);
       setPanelPassword("");
       setPanelConfirm("");
@@ -834,7 +995,9 @@ export default function UsersPage() {
           className={`rounded-lg border px-4 py-3 text-sm ${
             toastVariant === "success"
               ? "border-[var(--platform-success)]/30 bg-[rgba(16,185,129,0.08)] text-[var(--platform-success)]"
-              : "border-amber-500/30 bg-amber-500/10 text-amber-800"
+              : toastVariant === "error"
+                ? "border-red-500/40 bg-red-500/10 text-red-700"
+                : "border-amber-500/30 bg-amber-500/10 text-amber-800"
           }`}
         >
           {toast}
@@ -853,17 +1016,27 @@ export default function UsersPage() {
               <p className="mt-0.5 text-xs text-[var(--platform-text-secondary)]">
                 {invitePanel.name} · pending · link valid {PLATFORM_INVITE_EXPIRY_LABEL}
               </p>
-              {invitePanel.notify && (
+              {invitePanel.notify?.status === "sent" && (
                 <p className="mt-1 text-xs text-[var(--platform-text-secondary)]">
                   Notification: {invitePanel.notify.label}
                 </p>
               )}
-              {!invitePanel.emailSent && (
-                <p className="mt-2 text-xs text-amber-800">
-                  {invitePanel.emailError ??
-                    "Email was not sent. Copy the link below or configure Resend in Vercel."}
-                </p>
-              )}
+              {(() => {
+                const deliveryError = ownerInviteDeliveryError({
+                  emailSent: invitePanel.emailSent,
+                  notifyFailed: invitePanel.notify?.status === "failed",
+                  emailHint: invitePanel.emailHint,
+                });
+                return deliveryError ? (
+                  <p className="mt-2 text-sm text-red-700">{deliveryError}</p>
+                ) : null;
+              })()}
+              {!invitePanel.emailSent &&
+                invitePanel.notify?.status !== "failed" && (
+                  <p className="mt-2 text-xs text-[var(--platform-text-secondary)]">
+                    Copy or open the link below to share the invite manually.
+                  </p>
+                )}
             </div>
             <button
               type="button"
@@ -924,12 +1097,6 @@ export default function UsersPage() {
               </button>
             </div>
           </div>
-
-          {!emailConfigured && (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-3">
-              <EmailSetupHelp compact />
-            </div>
-          )}
         </div>
       )}
 
@@ -944,8 +1111,8 @@ export default function UsersPage() {
                 Set password for {passwordPanel.email}
               </p>
               <p className="mt-0.5 text-xs text-[var(--platform-text-secondary)]">
-                {passwordPanel.name} · they will sign in with this password. Enter it twice to
-                confirm.
+                {passwordPanel.name} · this temporary password will be included in the email and
+                SMS with the sign-in link. Enter it twice to confirm.
               </p>
             </div>
             <button
@@ -1071,6 +1238,11 @@ export default function UsersPage() {
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
           />
+          <span className="block text-[11px] text-[var(--platform-text-secondary)]">
+            {newPassword
+              ? "Temporary password will be included in the email and SMS with the sign-in link."
+              : "Leave blank to send an invite link so they set their own password."}
+          </span>
         </label>
         <label className="block space-y-1.5 sm:col-span-2">
           <span className="text-xs text-[var(--platform-text-secondary)]">
@@ -1085,13 +1257,6 @@ export default function UsersPage() {
             onChange={(e) => setNewPasswordConfirm(e.target.value)}
           />
         </label>
-        <p className="text-xs text-[var(--platform-text-secondary)] sm:col-span-4">
-          Set a password to activate the account immediately — no invite email needed. Leave
-          blank to send an invite link instead.
-          {smsConfig?.preferred
-            ? " SMS invites are enabled — a phone number is required so Arkesel can deliver the invite."
-            : " Add a phone number if you want SMS/WhatsApp notify when messaging is configured."}
-        </p>
         {newPasswordError && (
           <p className="text-sm text-red-600 sm:col-span-4">{newPasswordError}</p>
         )}
@@ -1137,13 +1302,21 @@ export default function UsersPage() {
                         disabled={user.role === "owner" || rowActionId === user.id}
                       >
                         {user.role === "owner" ? (
-                          <option value="owner">Owner</option>
+                          <option value="owner">{roleLabels.owner ?? "Owner"}</option>
                         ) : (
-                          roles.map((r) => (
-                            <option key={r} value={r}>
-                              {roleLabels[r] ?? r}
-                            </option>
-                          ))
+                          <>
+                            {/* Keep current legacy IAM role visible until reassigned */}
+                            {!roles.includes(user.role) && (
+                              <option value={user.role}>
+                                {roleLabels[user.role] ?? user.role} (legacy)
+                              </option>
+                            )}
+                            {roles.map((r) => (
+                              <option key={r} value={r}>
+                                {roleLabels[r] ?? r}
+                              </option>
+                            ))}
+                          </>
                         )}
                       </select>
                       <div className="text-[10px] text-[var(--platform-text-secondary)]">

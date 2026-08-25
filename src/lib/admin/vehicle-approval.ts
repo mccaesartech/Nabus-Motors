@@ -1,5 +1,6 @@
 import type { PlatformRole } from "@/lib/platform/permissions";
 import { hasPermission } from "@/lib/platform/permissions";
+import { mutationRequiresApproval } from "@/lib/platform/mutation-approval";
 
 export const VEHICLE_APPROVAL_STATUSES = [
   "approved",
@@ -19,8 +20,12 @@ export function canApproveInventory(role: PlatformRole): boolean {
   return hasPermission(role, "inventory_approve");
 }
 
+/**
+ * Non-owner/super_admin roles cannot publish live inventory changes.
+ * Their creates/edits go to pending_approval for Owner/Super Admin review.
+ */
 export function managerNeedsApproval(role: PlatformRole): boolean {
-  return role === "manager";
+  return mutationRequiresApproval(role);
 }
 
 export function defaultApprovalStatusForCreate(role: PlatformRole): VehicleApprovalStatus {

@@ -143,17 +143,15 @@ export async function collectInterestedRecipients(
     const ids = [...userIds];
     const { data: profiles } = await supabase
       .from("profiles")
-      .select("id, first_name, last_name, phone")
+      .select("id, first_name, last_name, phone, email")
       .in("id", ids);
 
     const profileById = new Map((profiles ?? []).map((p) => [p.id, p]));
 
-    await Promise.all(
-      ids.map(async (id) => {
-        const { data: authData } = await supabase.auth.admin.getUserById(id);
-        const email = authData.user?.email?.trim().toLowerCase();
-        if (!email) return;
+    ids.forEach((id) => {
         const profile = profileById.get(id);
+        const email = profile?.email?.trim().toLowerCase();
+        if (!email) return;
         const name = profile
           ? [profile.first_name, profile.last_name].filter(Boolean).join(" ").trim() || null
           : null;
@@ -162,8 +160,7 @@ export async function collectInterestedRecipients(
           name,
           userId: id,
         });
-      })
-    );
+      });
   }
 
   return [...map.values()];
@@ -213,6 +210,95 @@ export async function getVehicleInterestStats(
     totalActivities,
     recentActivities,
   };
+}
+
+/**
+ * Notify active price_alerts subscribers when a vehicle's price drops.
+ * Marks each alert as `notified` so the same drop is not re-sent.
+ */
+export async function notifyPriceDropSubscribers(
+  supabase: SupabaseClient,
+  vehicle: {
+    id: string;
+    slug: string;
+    make: string;
+    model: string;
+    year: number;
+    previousPrice: number;
+    newPrice: number;
+  }
+): Promise<{ notified: number; skipped: number }> {
+  if (
+    !Number.isFinite(vehicle.newPrice) ||
+    !Number.isFinite(vehicle.previousPrice) ||
+    vehicle.newPrice >= vehicle.previousPrice
+  ) {
+    return { notified: 0, skipped: 0 };
+  }
+
+  const { data: alerts, error } = await supabase
+    .from("price_alerts")
+    .select("id, email, phone, user_id, price_usd_at_signup")
+    .eq("vehicle_id", vehicle.id)
+    .eq("status", "active");
+
+  if (error || !alerts?.length) {
+    return { notified: 0, skipped: 0 };
+  }
+
+  const vehicleTitle = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
+  const vehicleUrl = `${getAutoSiteUrl()}${ROUTES.auto.inventoryDetail(vehicle.slug)}`;
+  const formatUsd = (n: number) =>
+    n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+
+  let notified = 0;
+  let skipped = 0;
+
+  for (const alert of alerts) {
+    const signupPrice = Number(alert.price_usd_at_signup);
+    // Only notify if the new price is below what they signed up at.
+    if (Number.isFinite(signupPrice) && vehicle.newPrice >= signupPrice) {
+      skipped += 1;
+      continue;
+    }
+
+    const email = alert.email?.trim().toLowerCase();
+    if (!email) {
+      skipped += 1;
+      continue;
+    }
+
+    try {
+      await notifyCustomer({
+        email,
+        phone: alert.phone,
+        template: "price_drop",
+        data: {
+          vehicleTitle,
+          vehicleUrl,
+          oldPrice: formatUsd(vehicle.previousPrice),
+          newPrice: formatUsd(vehicle.newPrice),
+        },
+        sourceTable: "price_alerts",
+        sourceId: alert.id,
+      });
+
+      await supabase
+        .from("price_alerts")
+        .update({ status: "notified" })
+        .eq("id", alert.id);
+
+      notified += 1;
+    } catch (err) {
+      console.warn(
+        "[price-drop] notify failed (non-blocking):",
+        err instanceof Error ? err.message : err
+      );
+      skipped += 1;
+    }
+  }
+
+  return { notified, skipped };
 }
 
 export async function notifyVehicleLocallyAvailable(

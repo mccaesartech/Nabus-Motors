@@ -39,6 +39,8 @@ const NOTIFICATION_Z_INDEX = 9999;
 
 const TYPE_ICONS: Record<string, typeof Bell> = {
   preorder: ShoppingBag,
+  order: ShoppingBag,
+  vehicle_order: Car,
   vehicle: Car,
   contact: MessageSquare,
   finance: CreditCard,
@@ -66,6 +68,8 @@ const URGENT_TYPES = new Set([
 
 const WARNING_TYPES = new Set([
   "preorder",
+  "order",
+  "vehicle_order",
   "finance",
   "freight_quote",
   "appraisal",
@@ -333,9 +337,12 @@ function NotificationRow({
       }}
       className={cn(
         "flex items-start gap-3 border-b border-[var(--platform-border)] px-4 py-3.5 transition-colors last:border-0 hover:bg-[rgba(76,29,149,0.04)] active:bg-[rgba(76,29,149,0.06)]",
-        unread && "bg-[rgba(139,92,246,0.06)]",
-        category === "urgent" && unread && "border-l-2 border-l-[var(--platform-error)]",
-        category === "warning" && unread && "border-l-2 border-l-[var(--platform-warning)]"
+        unread &&
+          category !== "urgent" &&
+          category !== "warning" &&
+          "bg-[rgba(139,92,246,0.06)]",
+        category === "urgent" && unread && "platform-card-accent-urgent",
+        category === "warning" && unread && "platform-card-accent-warning"
       )}
     >
       <span

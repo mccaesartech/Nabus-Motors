@@ -29,6 +29,7 @@ type TrashSummary = {
 };
 
 const VEHICLE_STATUSES = ["available", "pre_order", "sold", "reserved"] as const;
+const PAGE_SIZE = 50;
 
 function statusLabel(status: string): string {
   if (status === "pre_order") return "Pre-order";
@@ -39,10 +40,7 @@ export default function TrashPage() {
   const router = useRouter();
   const session = usePlatformSession();
   const { formatPrice } = usePlatformCurrency();
-  const canRestore =
-    session?.role === "owner" ||
-    session?.role === "super_admin" ||
-    session?.role === "manager";
+  const canRestore = Boolean(session?.permissions?.trash);
   const canPermanentDelete =
     session?.role === "owner" || session?.role === "super_admin";
   const [items, setItems] = useState<PlatformTrashRow[]>([]);
@@ -50,9 +48,11 @@ export default function TrashPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [entityType, setEntityType] = useState<TrashEntityType | "all">("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [deletedBy, setDeletedBy] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [page, setPage] = useState(1);
   const [toast, setToast] = useState("");
   const [restoreTarget, setRestoreTarget] = useState<PlatformTrashRow | null>(null);
   const [restoreStatus, setRestoreStatus] = useState<string>("available");
@@ -62,9 +62,14 @@ export default function TrashPage() {
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [bulkActing, setBulkActing] = useState(false);
 
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
   const load = useCallback(async () => {
     const params = new URLSearchParams();
+    params.set("page", String(page));
+    params.set("limit", String(PAGE_SIZE));
     if (entityType !== "all") params.set("entityType", entityType);
+    if (searchQuery.trim()) params.set("q", searchQuery.trim());
     if (deletedBy.trim()) params.set("deletedBy", deletedBy.trim());
     if (dateFrom) params.set("dateFrom", dateFrom);
     if (dateTo) params.set("dateTo", dateTo);
@@ -85,7 +90,7 @@ export default function TrashPage() {
     setSummary(json.summary ?? null);
     setSelectedIds(new Set());
     setLoading(false);
-  }, [router, entityType, deletedBy, dateFrom, dateTo]);
+  }, [router, entityType, searchQuery, deletedBy, dateFrom, dateTo, page]);
 
   useEffect(() => {
     load();
@@ -358,13 +363,53 @@ export default function TrashPage() {
         </div>
 
         {typeCounts.length > 0 && (
-          <div className="flex flex-wrap gap-2 text-xs">
+          <div className="flex flex-wrap gap-2 text-xs print:hidden">
+            <button
+              type="button"
+              onClick={() => {
+                setEntityType("all");
+                setPage(1);
+              }}
+              className={`rounded-full border px-2.5 py-1 ${
+                entityType === "all"
+                  ? "border-[var(--platform-accent)] bg-[var(--platform-accent)]/10 text-[var(--platform-text)]"
+                  : "border-[var(--platform-border)] bg-[var(--platform-bg-secondary)] text-[var(--platform-text-secondary)]"
+              }`}
+            >
+              All:{" "}
+              <span className="font-semibold text-[var(--platform-text)]">
+                {summary?.total ?? total}
+              </span>
+            </button>
+            {typeCounts.map((row) => (
+              <button
+                type="button"
+                key={row.type}
+                onClick={() => {
+                  setEntityType(row.type);
+                  setPage(1);
+                }}
+                className={`rounded-full border px-2.5 py-1 ${
+                  entityType === row.type
+                    ? "border-[var(--platform-accent)] bg-[var(--platform-accent)]/10 text-[var(--platform-text)]"
+                    : "border-[var(--platform-border)] bg-[var(--platform-bg-secondary)] text-[var(--platform-text-secondary)]"
+                }`}
+              >
+                {row.label}:{" "}
+                <span className="font-semibold text-[var(--platform-text)]">{row.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {typeCounts.length > 0 && (
+          <div className="hidden flex-wrap gap-2 text-xs print:flex">
             {typeCounts.map((row) => (
               <span
                 key={row.type}
                 className="rounded-full border border-[var(--platform-border)] bg-[var(--platform-bg-secondary)] px-2.5 py-1 text-[var(--platform-text-secondary)]"
               >
-                {row.label}: <span className="font-semibold text-[var(--platform-text)]">{row.count}</span>
+                {row.label}:{" "}
+                <span className="font-semibold text-[var(--platform-text)]">{row.count}</span>
               </span>
             ))}
           </div>
@@ -372,13 +417,28 @@ export default function TrashPage() {
       </section>
 
       <div className="platform-card rounded-xl p-4 print:hidden">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <label className="block text-xs text-[var(--platform-text-secondary)] sm:col-span-2 lg:col-span-1">
+            Search
+            <input
+              className="platform-input mt-1 w-full"
+              placeholder="Name, make, model, VIN, id…"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setPage(1);
+              }}
+            />
+          </label>
           <label className="block text-xs text-[var(--platform-text-secondary)]">
             Type
             <select
               className="platform-input mt-1 w-full"
               value={entityType}
-              onChange={(e) => setEntityType(e.target.value as TrashEntityType | "all")}
+              onChange={(e) => {
+                setEntityType(e.target.value as TrashEntityType | "all");
+                setPage(1);
+              }}
             >
               <option value="all">All types</option>
               {TRASH_ENTITY_TYPES.map((type) => (
@@ -394,7 +454,10 @@ export default function TrashPage() {
               className="platform-input mt-1 w-full"
               placeholder="Name or email"
               value={deletedBy}
-              onChange={(e) => setDeletedBy(e.target.value)}
+              onChange={(e) => {
+                setDeletedBy(e.target.value);
+                setPage(1);
+              }}
             />
           </label>
           <label className="block text-xs text-[var(--platform-text-secondary)]">
@@ -403,7 +466,10 @@ export default function TrashPage() {
               type="date"
               className="platform-input mt-1 w-full"
               value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
+              onChange={(e) => {
+                setDateFrom(e.target.value);
+                setPage(1);
+              }}
             />
           </label>
           <label className="block text-xs text-[var(--platform-text-secondary)]">
@@ -412,12 +478,19 @@ export default function TrashPage() {
               type="date"
               className="platform-input mt-1 w-full"
               value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
+              onChange={(e) => {
+                setDateTo(e.target.value);
+                setPage(1);
+              }}
             />
           </label>
         </div>
         <p className="mt-3 text-xs text-[var(--platform-text-secondary)]">
           {total} item{total !== 1 ? "s" : ""} matching filters
+          {totalPages > 1 ? ` · Page ${page} of ${totalPages}` : ""}
+          {entityType === "all" && (summary?.total ?? 0) > PAGE_SIZE
+            ? " · Newest first — use Type or Search to find older items"
+            : ""}
         </p>
       </div>
 
@@ -486,7 +559,14 @@ export default function TrashPage() {
                     colSpan={canRestore ? 5 : 4}
                     className="px-4 py-10 text-center text-[var(--platform-text-secondary)]"
                   >
-                    Trash is empty.
+                    {(summary?.total ?? 0) === 0 &&
+                    !searchQuery.trim() &&
+                    !deletedBy.trim() &&
+                    !dateFrom &&
+                    !dateTo &&
+                    entityType === "all"
+                      ? "Trash is empty."
+                      : "No trash items match these filters."}
                   </td>
                 </tr>
               ) : (
@@ -560,6 +640,31 @@ export default function TrashPage() {
             </tbody>
           </table>
         </div>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-[var(--platform-border)] px-4 py-3 print:hidden">
+            <p className="text-xs text-[var(--platform-text-secondary)]">
+              Page {page} of {totalPages} ({total} total)
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={page <= 1 || bulkActing}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="platform-btn-ghost text-xs disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                disabled={page >= totalPages || bulkActing}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                className="platform-btn-ghost text-xs disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <ConfirmDialog

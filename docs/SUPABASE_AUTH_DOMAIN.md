@@ -1,60 +1,173 @@
 # Supabase custom auth domain (hide `*.supabase.co` on Google)
 
 Use this runbook when Google’s account picker says **“Continue to
-`ddrknhvkhmgdtavpuiiq.supabase.co`”** (or similar) instead of your brand.
+`ddrknhvkhmgdtavpuiiq.supabase.co`”** instead of your brand.
 
 Google shows the **host of the OAuth redirect URI** registered for your Google
 Web client. With default Supabase Auth, that URI is always on
 `*.supabase.co`. Changing Next.js code or `redirectTo` **cannot** change that
 host — only **Supabase Custom Domain** (plus env + redeploy) can.
 
-**Related:** [GOOGLE_AUTH.md](./GOOGLE_AUTH.md) (consent screen, Supabase
-providers, redirect URLs).
+**Related:** [GOOGLE_AUTH.md](./GOOGLE_AUTH.md) · public DNS cutover: [LAUNCH_DOMAIN_CUTOVER.md](../LAUNCH_DOMAIN_CUTOVER.md)
 
 ---
 
 ## Chosen configuration (copy-paste)
 
-True Goshen Auto uses **`auth.truegoshen.com`** as the Supabase custom auth
-hostname. Complete Supabase Custom Domain + DNS first; only then point Vercel at
-this URL and redeploy.
-
 | Where | Value |
 |-------|--------|
-| **Supabase Custom Domain** | `auth.truegoshen.com` |
-| **Google — Authorized redirect URIs** | `https://ddrknhvkhmgdtavpuiiq.supabase.co/auth/v1/callback` (keep) |
-| | `https://auth.truegoshen.com/auth/v1/callback` (add) |
-| **Vercel — `NEXT_PUBLIC_SUPABASE_URL`** (Production + Preview) | `https://auth.truegoshen.com` |
-| **Supabase — Site URL** | `https://truegoshen.vercel.app` |
-| **Supabase — Redirect URLs** | See list below |
+| **Supabase Custom Domain** | `auth.truegoshengh.com` |
+| **Google — Authorized redirect URIs** | `https://ddrknhvkhmgdtavpuiiq.supabase.co/auth/v1/callback` (keep during cutover) |
+| | `https://auth.truegoshengh.com/auth/v1/callback` (**required** — Custom Domain Active) |
+| **Google — Authorized JavaScript origins** | `https://auth.truegoshengh.com`, `https://www.truegoshengh.com` |
+| **Vercel — `NEXT_PUBLIC_SUPABASE_URL`** | `https://auth.truegoshengh.com` |
+| **Supabase — Site URL** | `https://www.truegoshengh.com` (**must not** be `*.vercel.app` — that is the usual reason Google login lands on the Vercel host) |
+| **Canonical app URL (`NEXT_PUBLIC_SITE_URL`)** | `https://www.truegoshengh.com` |
 
-**Supabase → Authentication → URL Configuration → Redirect URLs** (app
-`/auth/callback`, one per line):
+**Supabase → Authentication → URL Configuration → Redirect URLs** (app return path — keep these regardless of custom domain):
+
+```
+https://www.truegoshengh.com/auth/callback
+https://truegoshengh.com/auth/callback
+http://localhost:3000/auth/callback
+https://www.truegoshengh.com/**
+```
+
+Optional legacy (app now 308-redirects `truegoshen.vercel.app` → www):
 
 ```
 https://truegoshen.vercel.app/auth/callback
-https://truegoshen.com/auth/callback
-https://truegoshenauto.com/auth/callback
-http://localhost:3000/auth/callback
 ```
+---
 
-Optional wildcard (same project): `https://truegoshen.vercel.app/**`
+## Namecheap DNS (required for Custom Domain)
 
-**Vercel env (Dashboard or CLI after `vercel login`):**
+Registrar: Namecheap BasicDNS (`dns1.registrar-servers.com` / `dns2.registrar-servers.com`).
 
-```powershell
-npx vercel env update NEXT_PUBLIC_SUPABASE_URL production --value https://auth.truegoshen.com --yes
-npx vercel env update NEXT_PUBLIC_SUPABASE_URL preview --value https://auth.truegoshen.com --yes
-npx vercel --prod --yes
-```
+Under **Domain List → truegoshengh.com → Advanced DNS → Host Records**:
 
-`NEXT_PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` stay unchanged.
-Alternate hostname `auth.truegoshenauto.com` is not used unless you change DNS
-and repeat the same steps for that subdomain.
+| Type | Host | Value | TTL |
+|------|------|-------|-----|
+| **CNAME** | `auth` | `ddrknhvkhmgdtavpuiiq.supabase.co.` | Automatic (or 5–30 min) |
+
+Optional during Supabase ownership / cert verification (Dashboard or `supabase domains create` shows exact values):
+
+| Type | Host | Value | TTL |
+|------|------|-------|-----|
+| **TXT** | `_acme-challenge.auth` | *(value from Supabase Custom Domains UI / CLI)* | Automatic |
+
+Notes:
+
+- Namecheap often appends `.truegoshengh.com` — enter Host as `auth`, **not** `auth.truegoshengh.com`.
+- Do **not** proxy `auth` through Cloudflare for this hostname (Namecheap BasicDNS is fine; avoid an extra orange-cloud proxy in front of Supabase’s edge).
+- Keep web records (`@` → Vercel, `www` → Vercel) and email SPF/DKIM untouched.
+- DNSSEC: zone currently publishes **DS + DNSKEY** (alg 13). If public resolvers SERVFAIL, fix DNSSEC first (see launch cutover). Validating resolvers currently resolve `auth` successfully.
+
+### DNS probe (2026-08-03 ~21:55 UTC re-probe)
+
+| Check | Result |
+|-------|--------|
+| `auth.truegoshengh.com` CNAME | → `ddrknhvkhmgdtavpuiiq.supabase.co` **OK** |
+| Resolved A (via CNAME) | Cloudflare `172.64.149.246`, `104.18.38.10` |
+| `_acme-challenge.auth` TXT | **NXDOMAIN** (Status 3 on Google DoH — no challenge published) |
+| CAA (`truegoshengh.com`) | **none** (no Answer; not blocking issuance) |
+| DNSSEC | DS (alg 13) + 2 DNSKEY; DoH `AD=true` |
+
+**DNS is not the current blocker.** TLS/cert on the custom hostname is. CLI `supabase domains *` blocked: not logged in (`Access token not provided`).
 
 ---
 
-## True Goshen project facts (from this repo)
+## Health gate before switching Vercel
+
+Point Production `NEXT_PUBLIC_SUPABASE_URL` at the custom domain only when
+all of these pass:
+
+1. DNS: `auth.truegoshengh.com` CNAME → this Supabase project (**already OK**)
+2. HTTPS: `curl -I https://auth.truegoshengh.com/auth/v1/health` succeeds (not TLS abort)
+3. Supabase Dashboard → Custom Domains shows **Active**
+4. Google OAuth client includes `https://auth.truegoshengh.com/auth/v1/callback`
+
+### Current TLS status (2026-08-03 ~22:35 UTC re-probe)
+
+| Host | Result |
+|------|--------|
+| `https://ddrknhvkhmgdtavpuiiq.supabase.co/auth/v1/health` | **TLS OK** — HTTP 401 without API key is expected |
+| `https://auth.truegoshengh.com/auth/v1/health` | **TLS OK** — HTTP 401 without API key; `sb-project-ref: ddrknhvkhmgdtavpuiiq` |
+
+**Live Google OAuth (pre-cutover):** even while the browser client still preconnected to
+`*.supabase.co`, Google’s error page reported:
+
+`redirect_uri=https://auth.truegoshengh.com/auth/v1/callback`
+
+So Custom Domain activation already changed the Google callback host. Google Cloud
+**must** list that URI (app code alone cannot fix `redirect_uri_mismatch`).
+
+App safety nets (`BROKEN_*` denylists that rewrote `auth.truegoshengh.com` →
+`*.supabase.co`) are **removed** now that TLS is healthy.
+
+Never leave Production `NEXT_PUBLIC_SUPABASE_URL` empty — empty builds disable browser Auth.
+
+---
+
+## Exact user checklist (TLS still broken — do this in dashboards)
+
+Code/CLI alone cannot mint the Cloudflare/Supabase edge cert for `auth.truegoshengh.com`. Complete:
+
+### 1. Supabase → Custom Domains
+
+1. Open [Project Settings → Custom Domains](https://supabase.com/dashboard/project/ddrknhvkhmgdtavpuiiq/settings/general) (or Add-ons → Custom Domain).
+2. Confirm add-on is enabled (paid plan).
+3. Hostname: `auth.truegoshengh.com`.
+4. Ensure Namecheap CNAME matches the target Supabase shows (usually `ddrknhvkhmgdtavpuiiq.supabase.co`).
+5. Add any **TXT** verification / `_acme-challenge.auth` record Supabase displays.
+6. Run **Reverify** (Dashboard) or CLI:
+   ```bash
+   npx supabase login
+   npx supabase domains reverify --project-ref ddrknhvkhmgdtavpuiiq
+   ```
+7. Wait up to ~30 minutes for certificate issuance.
+8. If status stays broken: **delete** the custom domain, wait a few minutes, **re-create** it (forces new cert), then re-add TXT if asked.
+9. Gate: `curl -I https://auth.truegoshengh.com/auth/v1/health` must not fail TLS.
+10. Only when HTTPS works: **Activate** the custom domain (`domains activate`).
+
+**If Custom Domain is Active but TLS is still broken:** deactivate/remove it immediately so OAuth stays on `*.supabase.co`. An Active-but-broken host can break Google login.
+
+### 2. Google Cloud → OAuth Web client
+
+Only after step 1 HTTPS is healthy:
+
+| Field | Action |
+|-------|--------|
+| Authorized redirect URIs | **Keep** `https://ddrknhvkhmgdtavpuiiq.supabase.co/auth/v1/callback` |
+| | **Add** `https://auth.truegoshengh.com/auth/v1/callback` |
+| Authorized JavaScript origins | Keep `https://www.truegoshengh.com` (and apex / vercel / localhost as today) |
+
+Until TLS works: do **not** rely on the `auth.` redirect URI; remove it if Google already has it and Auth still advertises the broken host.
+
+### 3. Vercel Production (only after health gate)
+
+1. Set `NEXT_PUBLIC_SUPABASE_URL=https://auth.truegoshengh.com`
+2. Redeploy Production (`NEXT_PUBLIC_*` is build-time).
+3. Remove `auth.truegoshengh.com` from `BROKEN_*` denylists in code and redeploy again.
+4. Smoke-test Google: account chooser must say **auth.truegoshengh.com**, then land on `https://www.truegoshengh.com/auth/callback`.
+
+### 4. Keep Supabase Auth redirect allow-list
+
+Do **not** remove `https://www.truegoshengh.com/auth/callback` from Supabase **Redirect URLs** — that is the app callback after Google, not the Google→Supabase callback.
+
+---
+
+## If browsers still open broken `auth.truegoshengh.com`
+
+1. Confirm Vercel Production `NEXT_PUBLIC_SUPABASE_URL` is the `*.supabase.co` URL
+2. Redeploy
+3. Supabase Custom Domains: remove/disable until HTTPS healthy
+4. Google OAuth client: keep only `…supabase.co/auth/v1/callback` until SSL works
+5. Hard-refresh `/login` and confirm Google’s `redirect_uri` is `…supabase.co/auth/v1/callback`
+
+---
+
+## Project facts
 
 | Item | Value |
 |------|--------|
@@ -62,147 +175,6 @@ and repeat the same steps for that subdomain.
 | Default Supabase URL | `https://ddrknhvkhmgdtavpuiiq.supabase.co` |
 | Google OAuth redirect (default) | `https://ddrknhvkhmgdtavpuiiq.supabase.co/auth/v1/callback` |
 | Vercel project | `mccaesartech/truegoshenauto` |
-| Canonical app URL (`NEXT_PUBLIC_SITE_URL`) | `https://truegoshen.vercel.app` |
-| **Chosen Supabase auth hostname** | `auth.truegoshen.com` |
-| Custom domains in routing docs | `truegoshen.com`, `truegoshenauto.com`, `auto.truegoshen.com` |
-
-**Production check:** As of the last deploy, the live site HTML still preconnects
-to `ddrknhvkhmgdtavpuiiq.supabase.co` — so `NEXT_PUBLIC_SUPABASE_URL` on Vercel
-is still the default URL. That is **why** Google shows Supabase.
-
-Custom domains **cannot** be activated via API from this repo; you must use the
-Supabase Dashboard (and your DNS registrar).
-
----
-
-## What `*.vercel.app` cannot do
-
-You **cannot** make Google show `truegoshen.vercel.app` as the OAuth redirect
-host while using hosted Supabase Google Auth. Google’s redirect must hit
-Supabase’s **`/auth/v1/callback`** endpoint, which lives on your Supabase
-project host (default `*.supabase.co`, or your **custom auth subdomain**).
-
-So:
-
-- **`truegoshen.vercel.app` alone** → users still see `*.supabase.co` until you
-  add a **custom domain you control** (e.g. `auth.truegoshen.com`).
-- **Partial UX without custom domain:** polish the [Google OAuth consent
-  screen](./GOOGLE_AUTH.md#a-google-cloud--oauth-consent-screen) (app name,
-  logo, homepage). Some flows emphasize the app name; Android often still shows
-  the redirect host.
-
----
-
-## Step 1 — Supabase: enable Custom Domain
-
-1. Open [Supabase Dashboard](https://supabase.com/dashboard/project/ddrknhvkhmgdtavpuiiq/settings/general) → project **ddrknhvkhmgdtavpuiiq**.
-2. Go to **Project Settings → Custom Domains** (or **Add-ons → Custom Domain**).
-3. **Requires Supabase Pro** (paid) and the Custom Domain add-on where applicable.
-4. Enter: **`auth.truegoshen.com`** (chosen for this project).
-5. Supabase shows **DNS records** (typically a **CNAME** pointing at Supabase’s
-   target, plus sometimes TXT for verification). Copy them exactly.
-
----
-
-## Step 2 — DNS (registrar / Cloudflare / etc.)
-
-At the DNS provider for **truegoshen.com**:
-
-1. Add the **CNAME** (and any **TXT**) records Supabase displays.
-2. Wait for propagation (minutes to hours).
-3. In Supabase, wait until Custom Domain status is **Active** and **SSL** is
-   issued (Supabase manages the certificate).
-
-Do **not** point the auth subdomain at Vercel — it must point at Supabase.
-
----
-
-## Step 3 — Google Cloud: redirect URI
-
-1. [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services → Credentials** → your **Web** OAuth client (used in Supabase Google provider).
-2. Under **Authorized redirect URIs**, **keep** the existing URI:
-   - `https://ddrknhvkhmgdtavpuiiq.supabase.co/auth/v1/callback`
-3. **Add**:
-   - `https://auth.truegoshen.com/auth/v1/callback`
-4. Save.
-
-Optional: add `auth.truegoshen.com` under **OAuth consent screen → Authorized
-domains** once DNS is live.
-
----
-
-## Step 4 — Supabase: URL configuration (unchanged app callback)
-
-**Authentication → URL Configuration**
-
-- **Site URL:** `https://truegoshen.vercel.app` (or your primary custom app domain).
-- **Redirect URLs:** include every app origin where users sign in, e.g.
-  - `https://truegoshen.vercel.app/auth/callback`
-  - `https://truegoshen.com/auth/callback`
-  - `https://truegoshenauto.com/auth/callback`
-  - `http://localhost:3000/auth/callback`
-
-These are **your Next.js** `/auth/callback` routes, not the Google → Supabase
-`/auth/v1/callback` URI.
-
----
-
-## Step 5 — Vercel: point the app at the custom Supabase host
-
-1. Vercel → **truegoshenauto** → **Settings → Environment Variables**.
-2. **Production** (and Preview if you test OAuth there):
-   - `NEXT_PUBLIC_SUPABASE_URL` = `https://auth.truegoshen.com`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = **unchanged** (same anon key from Supabase API settings)
-   - `SUPABASE_SERVICE_ROLE_KEY` = **unchanged**
-3. **Redeploy** production (`npx vercel --prod --yes` or redeploy from the Vercel UI).
-
-Optional CLI (same values as [Chosen configuration](#chosen-configuration-copy-paste)):
-`npx vercel env update NEXT_PUBLIC_SUPABASE_URL production --value https://auth.truegoshen.com --yes`
-
-`NEXT_PUBLIC_*` values are embedded at **build time**. Changing env without
-redeploying leaves the old Supabase host in the bundle.
-
----
-
-## Step 6 — Verify
-
-1. Open production `/login` on a **phone** → **Continue with Google**.
-2. Account chooser should show **`auth.truegoshen.com`**, not
-   `ddrknhvkhmgdtavpuiiq.supabase.co`.
-3. View page source: `<link rel="preconnect" href="https://auth.truegoshen.com"`.
-4. Sign-in completes and lands on `/account` (or your `redirect` target).
-
----
-
-## How the app uses the URL (no extra code after DNS + env)
-
-| Layer | Behavior |
-|-------|----------|
-| `src/lib/supabase/env.ts` | Accepts `https://auth.yourdomain.com` or `https://*.supabase.co` |
-| `src/lib/supabase/client.ts` | Browser Auth (`signInWithOAuth`, `exchangeCodeForSession`) uses `NEXT_PUBLIC_SUPABASE_URL` |
-| `src/lib/customer/google-oauth.ts` | `redirectTo` → your app `/auth/callback` on **current site origin** (not Supabase host) |
-| `src/app/auth/callback/page.tsx` | Exchanges `code` with the same Supabase client |
-| `src/components/layout/resource-hints.tsx` | Preconnect follows `getSupabaseUrl()` |
-| Middleware | None — no Supabase host hardcoding |
-
-After custom domain, OAuth starts on `auth.truegoshen.com`; Google’s redirect
-URI matches that host; users no longer see `*.supabase.co`.
-
----
-
-## Storage / images note
-
-Existing media URLs in the database may still use
-`https://ddrknhvkhmgdtavpuiiq.supabase.co/storage/...`. Those keep working.
-New relative storage paths use `NEXT_PUBLIC_SUPABASE_URL`. This repo adds the
-custom Supabase hostname to Next.js `images.remotePatterns` at build time when
-env is set.
-
----
-
-## Rollback
-
-1. Set `NEXT_PUBLIC_SUPABASE_URL` back to
-   `https://ddrknhvkhmgdtavpuiiq.supabase.co`.
-2. Redeploy.
-3. Google redirect URI on the default host still works if you kept it in step 3.
+| Public app | `https://www.truegoshengh.com` |
+| Chosen auth hostname | `auth.truegoshengh.com` |
+| Can switch app to branded URL today? | **No** — TLS handshake still fails |

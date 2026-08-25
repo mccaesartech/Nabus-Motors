@@ -8,8 +8,10 @@ import {
   DELETE_CONFIRM_PHRASE,
 } from "@/components/platform/confirm-dialog";
 import { PageHeader } from "@/components/platform/page-header";
+import { usePlatformSession } from "@/components/platform/platform-shell";
 import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
+import { canDirectMutate } from "@/lib/platform/mutation-approval";
 import type { NotificationFeedbackVariant } from "@/lib/notifications/notification-status";
 import { PlatformDateTime } from "@/components/platform/platform-datetime";
 
@@ -42,6 +44,8 @@ const STATUSES = ["pending", "confirmed", "completed", "cancelled", "no_show"] a
 
 export default function AppointmentsPage() {
   const router = useRouter();
+  const session = usePlatformSession();
+  const canMutate = session ? canDirectMutate(session.role) : false;
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
@@ -113,7 +117,8 @@ export default function AppointmentsPage() {
       )}
 
       <div className="platform-card overflow-hidden rounded-xl">
-        <table className="platform-table w-full text-left text-sm">
+        <div className="scroll-touch overflow-x-auto">
+        <table className="platform-table w-full min-w-[640px] text-left text-sm">
           <thead>
             <tr className="text-xs text-[var(--platform-text-secondary)]">
               <th className="px-4 py-3 font-medium">Customer</th>
@@ -167,6 +172,7 @@ export default function AppointmentsPage() {
                       <select
                         className="platform-select text-xs"
                         value={appt.status}
+                        disabled={!canMutate}
                         onChange={(e) => void updateStatus(appt.id, e.target.value)}
                       >
                         {STATUSES.map((s) => (
@@ -177,6 +183,7 @@ export default function AppointmentsPage() {
                       </select>
                     </td>
                     <td className="px-4 py-3">
+                      {canMutate ? (
                       <button
                         type="button"
                         className="platform-btn-ghost text-[var(--platform-error)]"
@@ -184,6 +191,7 @@ export default function AppointmentsPage() {
                       >
                         <Trash2 className="size-4" />
                       </button>
+                      ) : null}
                     </td>
                   </tr>
                 );
@@ -191,6 +199,7 @@ export default function AppointmentsPage() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       <ConfirmDialog

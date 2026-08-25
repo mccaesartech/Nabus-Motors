@@ -161,17 +161,21 @@ export async function POST(req: NextRequest) {
       await linkCustomerFreightQuotesByEmail(userId, trimmedEmail, registrationId);
     }
 
+    const savedReference =
+      (inserted?.reference_code as string | undefined) ?? referenceCode;
+
     if (inserted?.id && adminSupabase) {
       await notifyFreightQuoteRequest(adminSupabase, {
         id: String(inserted.id),
         name: trimmedName,
+        email: trimmedEmail,
+        phone: trimmedPhone,
         service_type: service,
         origin_country: originCountry ? String(originCountry).trim() : null,
+        reference_code: savedReference,
+        cargo_description: trimmedCargoDescription,
       });
     }
-
-    const savedReference =
-      (inserted?.reference_code as string | undefined) ?? referenceCode;
 
     const isConsultation = String(message ?? "").includes("[Shipping consultation]");
     const accountCreated = Boolean(userId && !authUser);

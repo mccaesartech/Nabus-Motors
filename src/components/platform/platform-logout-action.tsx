@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Loader2, LogOut } from "lucide-react";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { LogoutConfirmDialog } from "@/components/platform/confirm-dialog";
 import { clearPlatformHistoryGuard } from "@/lib/platform/history-guard";
 import { requestPlatformLogout } from "@/lib/admin/logout-client";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,7 @@ export function PlatformLogoutAction({
     window.location.replace(href);
   },
 }: PlatformLogoutActionProps) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [controller] = useState(() =>
@@ -79,13 +81,33 @@ export function PlatformLogoutAction({
   );
   const label = pending ? "Logging out…" : "Log out";
 
+  function openConfirm() {
+    if (pending) return;
+    setConfirmOpen(true);
+  }
+
+  async function confirmLogout() {
+    setConfirmOpen(false);
+    await controller.run();
+  }
+
+  const confirmDialog = (
+    <LogoutConfirmDialog
+      open={confirmOpen}
+      onOpenChange={setConfirmOpen}
+      pending={pending}
+      onConfirm={confirmLogout}
+      confirmLabel="Log out"
+    />
+  );
+
   if (variant === "menu") {
     return (
       <>
         <DropdownMenuItem
           closeOnClick={false}
           disabled={pending}
-          onClick={() => void controller.run()}
+          onClick={openConfirm}
           data-testid="platform-menu-logout"
           className="min-h-11 cursor-pointer gap-2 px-3 py-2 text-[var(--platform-text-secondary)] focus:bg-[rgba(76,29,149,0.06)] focus:text-[var(--platform-text)]"
         >
@@ -100,6 +122,7 @@ export function PlatformLogoutAction({
             {error}
           </p>
         ) : null}
+        {confirmDialog}
       </>
     );
   }
@@ -108,7 +131,7 @@ export function PlatformLogoutAction({
     <div className={cn("min-w-0", collapsed && "flex justify-center")}>
       <button
         type="button"
-        onClick={() => void controller.run()}
+        onClick={openConfirm}
         disabled={pending}
         data-testid="platform-sidebar-logout"
         className={cn(
@@ -134,6 +157,7 @@ export function PlatformLogoutAction({
           {error}
         </p>
       ) : null}
+      {confirmDialog}
     </div>
   );
 }

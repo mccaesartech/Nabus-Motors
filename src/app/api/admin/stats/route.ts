@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
+import { canViewFinance } from "@/lib/platform/permissions";
 import { getPlatformStats } from "@/lib/platform/stats-server";
 
 export async function GET() {
@@ -19,12 +20,15 @@ export async function GET() {
   }
 
   const stats = await getPlatformStats();
+  const financeVisible = canViewFinance(auth.auth.role);
+  const sanitizedStats =
+    stats && !financeVisible ? { ...stats, estimatedRevenue: 0 } : stats;
 
   return NextResponse.json(
     {
       ok: true,
       configured: true,
-      stats,
+      stats: sanitizedStats,
     },
     {
       headers: {

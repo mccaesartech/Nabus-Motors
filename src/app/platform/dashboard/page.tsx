@@ -25,6 +25,7 @@ import { leadTypeLabel } from "@/lib/platform/types";
 import { PaymentStatusBadge } from "@/components/platform/status-badge";
 import { usePlatformCurrency } from "@/context/platform-currency-context";
 import { usePlatformSession } from "@/components/platform/platform-shell";
+import { canViewFinance } from "@/lib/platform/permissions";
 import { useAdminNotifications } from "@/context/admin-notifications-context";
 import { PlatformDateTime } from "@/components/platform/platform-datetime";
 import { useAfterIdle } from "@/hooks/use-after-idle";
@@ -122,6 +123,7 @@ export default function PlatformDashboardPage() {
   const permissions = session?.permissions;
   const role = session?.role ?? "staff";
   const userName = session?.name ?? "Admin";
+  const financeVisible = canViewFinance(role);
 
   const loadCore = useCallback(async () => {
     setCoreDataError("");
@@ -329,12 +331,13 @@ export default function PlatformDashboardPage() {
         loading={statsLoading || !stats}
       />
 
-      <QuickActions permissions={permissions} />
+      <QuickActions permissions={permissions} role={role} />
 
       <AttentionCenter
         stats={stats}
         notifications={notifications}
         permissions={permissions}
+        role={role}
         extras={extras}
       />
 
@@ -347,6 +350,7 @@ export default function PlatformDashboardPage() {
       <InsightsSection
         stats={stats}
         permissions={permissions}
+        role={role}
         chartVehicles={chartVehicles}
         extras={extras}
         notifications={notifications}
@@ -369,6 +373,7 @@ export default function PlatformDashboardPage() {
           recentLeads={recentLeads}
           tablesLoading={tablesLoading}
           canDeleteTransactions={canDeleteTransactions}
+          showFinance={financeVisible}
           formatCurrency={formatCurrency}
           onDeleteTarget={setDeleteVehicleTarget}
         />
@@ -396,6 +401,7 @@ export default function PlatformDashboardPage() {
 type InsightsSectionProps = {
   stats: PlatformStats | null;
   permissions: NonNullable<ReturnType<typeof usePlatformSession>>["permissions"];
+  role: NonNullable<ReturnType<typeof usePlatformSession>>["role"];
   chartVehicles: DbVehicle[];
   extras: DashboardExtras;
   notifications: ReturnType<typeof useAdminNotifications>["notifications"];
@@ -414,6 +420,7 @@ type InsightsSectionProps = {
 function InsightsSection({
   stats,
   permissions,
+  role,
   chartVehicles,
   extras,
   notifications,
@@ -438,6 +445,7 @@ function InsightsSection({
           <BusinessInsights
             stats={stats}
             permissions={permissions}
+            role={role}
             vehicles={chartVehicles}
             vehiclesLoading={insightsLoading}
             extras={extras}
@@ -455,6 +463,7 @@ type DashboardTablesSectionProps = {
   recentLeads: UnifiedLead[];
   tablesLoading: boolean;
   canDeleteTransactions: boolean;
+  showFinance: boolean;
   formatCurrency: (n: number) => string;
   onDeleteTarget: (v: DashboardRecentTransaction) => void;
 };
@@ -464,6 +473,7 @@ function DashboardTablesSection({
   recentLeads,
   tablesLoading,
   canDeleteTransactions,
+  showFinance,
   formatCurrency,
   onDeleteTarget,
 }: DashboardTablesSectionProps) {
@@ -492,13 +502,19 @@ function DashboardTablesSection({
                 </span>
               ),
             },
-            {
-              id: "price",
-              header: "Price",
-              sortable: true,
-              sortValue: (v) => v.price,
-              accessor: (v) => <span className="tabular-nums">{formatCurrency(v.price)}</span>,
-            },
+            ...(showFinance
+              ? [
+                  {
+                    id: "price",
+                    header: "Price",
+                    sortable: true,
+                    sortValue: (v: DashboardRecentTransaction) => v.price,
+                    accessor: (v: DashboardRecentTransaction) => (
+                      <span className="tabular-nums">{formatCurrency(v.price)}</span>
+                    ),
+                  },
+                ]
+              : []),
             {
               id: "status",
               header: "Status",

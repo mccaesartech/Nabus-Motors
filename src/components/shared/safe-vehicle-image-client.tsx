@@ -95,8 +95,10 @@ export function SafeVehicleImageClient({
   }, [showImage, imgSrc, src]);
 
   const imageClassName = cn(
-    "object-cover transition-opacity duration-300",
-    showImage ? "opacity-100" : "opacity-0",
+    "object-cover",
+    priority
+      ? "opacity-100"
+      : cn("transition-opacity duration-300", showImage ? "opacity-100" : "opacity-0"),
     className
   );
 

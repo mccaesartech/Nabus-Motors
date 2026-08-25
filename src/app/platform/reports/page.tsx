@@ -3,8 +3,12 @@
 import { useState } from "react";
 import { Download } from "lucide-react";
 import { PageHeader } from "@/components/platform/page-header";
+import { usePlatformSession } from "@/components/platform/platform-shell";
+import { canViewFinance } from "@/lib/platform/permissions";
 
 export default function ReportsPage() {
+  const session = usePlatformSession();
+  const showFinance = session ? canViewFinance(session.role) : false;
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [exporting, setExporting] = useState<string | null>(null);
@@ -93,7 +97,9 @@ export default function ReportsPage() {
             { type: "inventory" as const, label: "Export Inventory CSV", desc: "All vehicles in stock" },
             { type: "leads" as const, label: "Export Leads CSV", desc: "Contact, vehicle, finance, appraisal, pre-order" },
             { type: "preorders" as const, label: "Export Pre-orders CSV", desc: "Pre-order inquiries with payment status" },
-            { type: "sales" as const, label: "Export Sales CSV", desc: "Quotations and completed sales" },
+            ...(showFinance
+              ? [{ type: "sales" as const, label: "Export Sales CSV", desc: "Quotations and completed sales" }]
+              : []),
           ] as const
         ).map((item) => (
           <div key={item.type} className="platform-card flex flex-col rounded-xl p-5">

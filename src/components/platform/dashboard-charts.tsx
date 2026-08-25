@@ -598,7 +598,13 @@ export function FreightStatusChart({
   );
 }
 
-export function RecentOrdersList({ vehicles }: { vehicles: DbVehicle[] }) {
+export function RecentOrdersList({
+  vehicles,
+  showPrices = true,
+}: {
+  vehicles: DbVehicle[];
+  showPrices?: boolean;
+}) {
   const orders = useMemo(
     () =>
       vehicles
@@ -646,7 +652,7 @@ export function RecentOrdersList({ vehicles }: { vehicles: DbVehicle[] }) {
               </span>
             </span>
             <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--platform-text)]">
-              {formatPrice(v.price)}
+              {showPrices ? formatPrice(v.price) : v.status === "sold" ? "Sold" : "Reserved"}
             </span>
           </Link>
         </li>
@@ -697,9 +703,11 @@ export function TopSellingVehicles({ vehicles }: { vehicles: DbVehicle[] }) {
 export function MonthlyPerformanceSummary({
   stats,
   extras,
+  showFinance = true,
 }: {
   stats: PlatformStats;
   extras?: { pendingShipments?: number; freightQuotes?: number };
+  showFinance?: boolean;
 }) {
   const { formatPrice } = usePlatformCurrency();
   const now = new Date();
@@ -721,11 +729,15 @@ export function MonthlyPerformanceSummary({
       value: String(stats.soldVehicles ?? 0),
       tone: "text-emerald-600",
     },
-    {
-      label: "Est. revenue",
-      value: formatPrice(stats.estimatedRevenue),
-      tone: "text-[var(--platform-text)]",
-    },
+    ...(showFinance
+      ? [
+          {
+            label: "Est. revenue",
+            value: formatPrice(stats.estimatedRevenue),
+            tone: "text-[var(--platform-text)]",
+          },
+        ]
+      : []),
     {
       label: "Pending shipments",
       value: String(extras?.pendingShipments ?? 0),

@@ -9,15 +9,15 @@ import { cn } from "@/lib/utils";
 type BackNavVariant = "public" | "platform";
 
 export type BackNavProps = {
-  /** Explicit destination — renders a prefetched link (preferred for labeled back). */
+  /** Explicit destination — renders a prefetched link (skips history). */
   href?: string;
   label?: string;
   /** Used when history back is unavailable, or as Link target when preferFallback. */
   fallbackHref?: string;
   /**
    * When true (default), navigate via Link to fallbackHref instead of history.back().
-   * Labeled backs ("Back to inventory") stay predictable and soft-nav fast.
-   * Set false only when true browser-history back is required.
+   * Set false for generic Back controls so users return to the prior in-app page;
+   * fallbackHref is used only when history is empty (e.g. opened in a new tab).
    */
   preferFallback?: boolean;
   variant?: BackNavVariant;

@@ -5,6 +5,12 @@ for production error tracking. The SDK is **gated by DSN**: if no DSN is set,
 Sentry does nothing and the app behaves as before (structured `next_request_error`
 logs in Vercel still work).
 
+The Platform **Error Log** admin screen was removed — owners should not triage
+app failures in the dashboard. Developers use Sentry Issues (and Vercel logs).
+The owner-only `GET/PATCH /api/admin/error-log` endpoint remains for rare
+support lookups against `platform_error_log`; persistence via `logAppError()`
+still runs when that table exists.
+
 ## What is already in the repo
 
 | File | Role |
@@ -14,7 +20,8 @@ logs in Vercel still work).
 | `src/sentry.edge.config.ts` | Edge runtime SDK init |
 | `src/instrumentation.ts` | Loads server/edge configs; captures request errors |
 | `src/app/global-error.tsx` | Reports App Router render failures |
-| `src/lib/observability/schema-issue.ts` | Server-side schema/migration warnings → Sentry |
+| `src/lib/errors/logger.ts` | Handled API errors → console + Sentry + optional DB |
+| `src/lib/observability/schema-issue.ts` | Schema/migration warnings → Sentry |
 
 Optional source-map upload (readable stack traces) is **not** required for
 basic error capture. Add `SENTRY_AUTH_TOKEN` + org/project later if you want it.
@@ -65,7 +72,8 @@ Then **redeploy** Production so the new env vars are baked into the build
 
 **Current production status:** as of the last check, neither `SENTRY_DSN` nor
 `NEXT_PUBLIC_SENTRY_DSN` was present on the Vercel project. Until you add them
-and redeploy, schema warnings only appear in Vercel function logs (not Sentry).
+and redeploy, schema warnings and handled errors only appear in Vercel function
+logs / console (not Sentry).
 
 ## Verify
 

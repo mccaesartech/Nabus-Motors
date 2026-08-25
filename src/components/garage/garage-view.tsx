@@ -202,7 +202,7 @@ export function GarageView() {
 
           <TabsContent value="compare" className="mt-6">
             {savedVehicles.length >= 2 ? (
-              <div className="overflow-x-auto">
+              <div className="scroll-touch overflow-x-auto">
                 <table className="w-full min-w-[600px] border-collapse text-sm">
                   <thead>
                     <tr className="border-b border-border">

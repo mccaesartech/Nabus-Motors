@@ -2,6 +2,30 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PlatformAuthContext } from "@/lib/admin/auth";
 import { actorUserId } from "@/lib/platform/team-messages";
 import type { AdminNotification } from "@/lib/platform/types";
+import {
+  SCHEMA_CAPS,
+  isMissingRelationError,
+  isSchemaMissing,
+  markSchemaMissing,
+  markSchemaPresent,
+} from "@/lib/observability/schema-capability";
+
+/** One warn per process for missing dismissals table (client-safe; no server-only). */
+let dismissalsMissingWarned = false;
+
+function noteDismissalsMissing(message: string): void {
+  markSchemaMissing(SCHEMA_CAPS.adminNotificationDismissals);
+  if (dismissalsMissingWarned) return;
+  dismissalsMissingWarned = true;
+  console.warn(
+    JSON.stringify({
+      event: "schema_issue",
+      table: "admin_notification_dismissals",
+      migration: "075 / 086_postgres_error_clearance.sql",
+      message: message.slice(0, 300),
+    })
+  );
+}
 
 export const LOW_STOCK_NOTIFICATION_ID = "low-stock";
 
@@ -69,16 +93,25 @@ export async function listDismissedAdminNotificationKeys(
   supabase: SupabaseClient,
   scope: string
 ): Promise<Set<string>> {
+  if (isSchemaMissing(SCHEMA_CAPS.adminNotificationDismissals)) {
+    return new Set();
+  }
+
   const { data, error } = await supabase
     .from("admin_notification_dismissals")
     .select("notification_key")
     .eq("scope", scope);
 
   if (error) {
+    if (isMissingRelationError(error.message, "admin_notification_dismissals")) {
+      noteDismissalsMissing(error.message);
+      return new Set();
+    }
     console.error("[admin_notification_dismissals] list failed:", error.message);
     return new Set();
   }
 
+  markSchemaPresent(SCHEMA_CAPS.adminNotificationDismissals);
   return new Set((data ?? []).map((row) => String(row.notification_key)));
 }
 
@@ -89,6 +122,7 @@ export async function dismissAdminNotificationKeys(
 ): Promise<void> {
   const uniqueKeys = [...new Set(keys.filter(Boolean))];
   if (uniqueKeys.length === 0) return;
+  if (isSchemaMissing(SCHEMA_CAPS.adminNotificationDismissals)) return;
 
   const now = new Date().toISOString();
   const rows = uniqueKeys.map((notification_key) => ({
@@ -102,7 +136,13 @@ export async function dismissAdminNotificationKeys(
     .upsert(rows, { onConflict: "scope,notification_key" });
 
   if (error) {
+    if (isMissingRelationError(error.message, "admin_notification_dismissals")) {
+      noteDismissalsMissing(error.message);
+      return;
+    }
     console.error("[admin_notification_dismissals] upsert failed:", error.message);
+  } else {
+    markSchemaPresent(SCHEMA_CAPS.adminNotificationDismissals);
   }
 }
 

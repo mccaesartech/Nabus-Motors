@@ -55,7 +55,7 @@ export function VehicleCompareTable({ vehicles }: { vehicles: Vehicle[] }) {
   ];
 
   return (
-    <div className="overflow-x-auto">
+    <div className="scroll-touch overflow-x-auto">
       <table className="w-full min-w-[720px] border-collapse text-sm">
         <thead>
           <tr className="border-b border-border">

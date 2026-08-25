@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { insertRow, jsonError, jsonOk } from "@/lib/inquiries/server";
-import { createServerSupabase } from "@/lib/supabase/server";
+import { getCustomerFromAuthHeader } from "@/lib/customer/auth";
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,11 +13,10 @@ export async function POST(req: NextRequest) {
 
     let userId: string | null = null;
     try {
-      const supabase = await createServerSupabase();
-      if (supabase) {
-        const { data: { user } } = await supabase.auth.getUser();
-        userId = user?.id ?? null;
-      }
+      const user = await getCustomerFromAuthHeader(
+        req.headers.get("authorization")
+      );
+      userId = user?.id ?? null;
     } catch {
       // guest alert is fine
     }

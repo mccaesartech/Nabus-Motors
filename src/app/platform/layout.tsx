@@ -4,9 +4,13 @@ import { redirect } from "next/navigation";
 import { PlatformShell } from "@/components/platform/platform-shell";
 import { SkipToContent } from "@/components/layout/skip-to-content";
 import { AdminPwaShell } from "@/components/pwa/admin-pwa-shell";
-import { getPlatformAuth } from "@/lib/admin/auth";
+import { getPlatformAuth, platformUserMustChangePassword } from "@/lib/admin/auth";
 import { adminLoginPath } from "@/lib/admin/paths";
 import { buildSessionPermissions } from "@/lib/platform/permissions";
+import {
+  isPlatformForcedPasswordChangePath,
+  platformForcedPasswordChangeRedirectUrl,
+} from "@/lib/platform/paths";
 import { getSiteSettings } from "@/lib/platform/site-settings-server";
 import { ADMIN_PWA, ADMIN_PWA_THEME_COLOR } from "@/lib/pwa/constants";
 import "./platform.css";
@@ -50,7 +54,10 @@ export const metadata: Metadata = {
 };
 
 function isInvitePath(pathname: string) {
-  return /^\/admin\/platform\/invite\/[^/]+$/.test(pathname);
+  return (
+    /^\/admin\/platform\/invite\/[^/]+$/.test(pathname) ||
+    /^\/platform\/invite\/[^/]+$/.test(pathname)
+  );
 }
 
 export default async function PlatformLayout({
@@ -73,6 +80,24 @@ export default async function PlatformLayout({
   const auth = await getPlatformAuth();
   if (!auth) {
     redirect(adminLoginPath());
+  }
+
+  const mustChangePassword =
+    auth.type === "user" && auth.userId
+      ? auth.mustChangePassword ?? (await platformUserMustChangePassword(auth.userId))
+      : false;
+
+  if (mustChangePassword) {
+    if (!isPlatformForcedPasswordChangePath(pathname)) {
+      redirect(platformForcedPasswordChangeRedirectUrl());
+    }
+
+    return (
+      <div className="platform-theme min-h-dvh overflow-x-clip bg-[var(--platform-bg)]">
+        {children}
+        <AdminPwaShell />
+      </div>
+    );
   }
 
   const settings = await getSiteSettings();

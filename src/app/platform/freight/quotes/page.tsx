@@ -10,8 +10,10 @@ import {
 } from "@/components/platform/confirm-dialog";
 import { PageHeader } from "@/components/platform/page-header";
 import { CustomerVisibleNoteField } from "@/components/platform/customer-visible-note-field";
+import { usePlatformSession } from "@/components/platform/platform-shell";
 import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
+import { canDirectMutate } from "@/lib/platform/mutation-approval";
 import { platformPath } from "@/lib/platform/paths";
 import { canUseCustomerNoteAi, type PlatformRole } from "@/lib/platform/permissions";
 import {
@@ -31,6 +33,8 @@ type FreightQuote = FreightQuoteRow;
 export default function FreightQuotesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const session = usePlatformSession();
+  const canMutate = session ? canDirectMutate(session.role) : false;
   const [quotes, setQuotes] = useState<FreightQuote[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -314,6 +318,7 @@ export default function FreightQuotesPage() {
                           >
                             {resendingId === quote.id ? "Sending…" : "Resend confirmation"}
                           </button>
+                          {canMutate ? (
                           <button
                             type="button"
                             className="platform-btn-ghost text-xs text-[var(--platform-error)]"
@@ -321,6 +326,7 @@ export default function FreightQuotesPage() {
                           >
                             <Trash2 className="size-3.5" />
                           </button>
+                          ) : null}
                         </div>
                       </td>
                     </tr>

@@ -124,6 +124,26 @@ function RegisterForm() {
       return;
     }
 
+    // Welcome must not depend solely on idle sync-account (skipped when email
+    // confirm yields no session, or when an older preorder auth user is
+    // outside the 7d window). Idempotent server-side.
+    if (data.user?.id && localEmail.normalized) {
+      try {
+        await fetch("/api/customer/post-signup-welcome", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: data.user.id,
+            email: localEmail.normalized,
+            name: fullName.trim(),
+            phone: phone.trim(),
+          }),
+        });
+      } catch {
+        // Non-blocking — sync-account may still send on first authenticated load.
+      }
+    }
+
     if (data.session) {
       if (!hasChosenSessionPreference()) {
         markSessionPreferencePromptPending();

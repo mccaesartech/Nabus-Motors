@@ -31,6 +31,7 @@ import {
 import { SessionPreferenceModal } from "@/components/customer/session-preference-modal";
 import { CustomerSessionGuard } from "@/components/customer/customer-session-guard";
 import { readPendingVehicleInterest, clearPendingVehicleInterest } from "@/lib/vehicle-interest/client";
+import { resolveCustomerApiUrl } from "@/lib/site-url";
 
 type CustomerAuthContextValue = {
   user: User | null;
@@ -65,13 +66,34 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const { data } = await supabase
+    const enrichedSelect =
+      "id, first_name, last_name, phone, registration_id, session_preference, avatar_url, address_line, city, country, preferred_contact, created_at, email";
+    const coreSelect =
+      "id, first_name, last_name, phone, registration_id, session_preference";
+
+    let row: (CustomerProfile & { session_preference?: string | null }) | null = null;
+
+    const enriched = await supabase
       .from("profiles")
-      .select("id, first_name, last_name, phone, registration_id, session_preference")
+      .select(enrichedSelect)
       .eq("id", nextUser.id)
       .maybeSingle();
 
-    const row = data as (CustomerProfile & { session_preference?: string | null }) | null;
+    if (!enriched.error) {
+      row = enriched.data as (CustomerProfile & { session_preference?: string | null }) | null;
+    } else {
+      const fallback = await supabase
+        .from("profiles")
+        .select(coreSelect)
+        .eq("id", nextUser.id)
+        .maybeSingle();
+      if (fallback.error) {
+        setProfile(null);
+        return;
+      }
+      row = fallback.data as (CustomerProfile & { session_preference?: string | null }) | null;
+    }
+
     setProfile(row ?? null);
 
     const profilePref = row?.session_preference;
@@ -101,12 +123,16 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const syncAccount = useCallback(
-    async (nextUser: User, preference?: SessionPreference) => {
+    async (
+      nextUser: User,
+      preference?: SessionPreference,
+      options?: { recordLogin?: boolean; loginMethod?: string }
+    ) => {
       const token = await getAccessToken();
       if (!token || !nextUser.email) return;
       try {
         const vehicleInterestPending = readPendingVehicleInterest();
-        await fetch("/api/customer/sync-account", {
+        const res = await fetch(resolveCustomerApiUrl("/api/customer/sync-account"), {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -117,14 +143,28 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
             ...(vehicleInterestPending.length
               ? { vehicleInterestPending }
               : {}),
+            ...(options?.recordLogin ? { recordLogin: true } : {}),
+            ...(options?.loginMethod
+              ? { loginMethod: options.loginMethod }
+              : {}),
           }),
         });
+        if (!res.ok) {
+          console.warn(
+            "[customer-auth] sync-account failed:",
+            res.status,
+            await res.text().catch(() => "")
+          );
+        }
         if (vehicleInterestPending.length) {
           clearPendingVehicleInterest();
         }
         await loadProfile(nextUser);
-      } catch {
-        // Non-blocking — account page will retry via inquiries fetch
+      } catch (error) {
+        console.warn(
+          "[customer-auth] sync-account error:",
+          error instanceof Error ? error.message : error
+        );
       }
     },
     [getAccessToken, loadProfile]
@@ -197,7 +237,24 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
 
       if (event === "SIGNED_IN" && nextSession?.user) {
         recordSessionStart();
-        const syncLater = () => void syncAccount(nextSession.user);
+        let recordLogin = false;
+        let loginMethod = "password";
+        try {
+          const pending = sessionStorage.getItem("tg_pending_login_method");
+          if (pending) {
+            sessionStorage.removeItem("tg_pending_login_method");
+            recordLogin = true;
+            loginMethod = pending.slice(0, 32);
+          }
+        } catch {
+          // private mode / SSR — skip history only
+        }
+        const syncLater = () =>
+          void syncAccount(
+            nextSession.user,
+            undefined,
+            recordLogin ? { recordLogin: true, loginMethod } : undefined
+          );
         if (typeof window.requestIdleCallback === "function") {
           window.requestIdleCallback(syncLater, { timeout: 4000 });
         } else {

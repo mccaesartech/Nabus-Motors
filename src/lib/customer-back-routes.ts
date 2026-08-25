@@ -53,9 +53,15 @@ export function getCustomerBackNav(pathname: string): CustomerBackNavConfig | nu
 
   if (
     pathname === ROUTES.corporate.account ||
-    pathname.startsWith(`${ROUTES.corporate.account}/`)
+    pathname.startsWith(`${ROUTES.corporate.account}/`) ||
+    pathname === "/dashboard" ||
+    pathname.startsWith("/dashboard/")
   ) {
-    return { label: "Back to home", fallbackHref: CORPORATE_HOME };
+    return {
+      label: "Back",
+      fallbackHref: CORPORATE_HOME,
+      preferFallback: false,
+    };
   }
 
   if (pathname === ROUTES.auto.customRequest) {

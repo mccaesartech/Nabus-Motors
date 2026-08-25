@@ -180,7 +180,7 @@ export function CorporateHeader({ content, showFreightNav = true }: CorporateHea
         aria-label="Mobile navigation"
         inert={!mobileOpen ? true : undefined}
         className={cn(
-          "fixed inset-y-0 right-0 z-[45] flex w-[min(100vw-3rem,19rem)] flex-col border-l border-white/10 bg-brand-charcoal shadow-xl transition-transform duration-300 ease-out will-change-transform lg:hidden",
+          "fixed inset-y-0 right-0 z-[45] flex w-[min(100dvw-3rem,19rem)] flex-col border-l border-white/10 bg-brand-charcoal shadow-xl transition-transform duration-300 ease-out will-change-transform lg:hidden",
           mobileOpen ? "translate-x-0" : "pointer-events-none translate-x-full"
         )}
         {...swipeToCloseHandlers}

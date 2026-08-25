@@ -79,7 +79,7 @@ export function SiteChrome({
   return (
     <>
       <PlatformPublicHistoryBounce />
-      {operational.maintenanceMode ? (
+      {operational.maintenanceMode && pathname !== "/maintenance" ? (
         <MaintenanceBanner message={operational.maintenance_message} />
       ) : null}
       {useAutoHeader ? (
@@ -95,12 +95,12 @@ export function SiteChrome({
       <main
         id="main-content"
         tabIndex={-1}
-        className="min-w-0 flex-1 overflow-x-hidden pt-[var(--header-height)] outline-none"
+        className="min-w-0 flex-1 overflow-x-hidden pt-[var(--header-height)] pb-[var(--compare-bar-height,0px)] outline-none"
       >
         {useFreightSubNav ? <FreightSubNav /> : <DivisionContextBar />}
-        <InstallCustomerAppBanner />
         <CustomerBackBar />
         {children}
+        <InstallCustomerAppBanner />
       </main>
       <Footer
         content={displayContent}

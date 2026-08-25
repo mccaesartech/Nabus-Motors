@@ -7,6 +7,7 @@ import { ChevronDown, ChevronLeft, ChevronRight, Star, X } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import {
   PLATFORM_DASHBOARD_ITEM,
+  PLATFORM_CUSTOMERS_ITEM,
   PLATFORM_NAV_DEPARTMENTS,
   ROUTE_TO_DEPARTMENT,
 } from "@/lib/platform/nav";
@@ -81,9 +82,15 @@ export function PlatformSidebar({
     [permissions]
   );
 
+  const showCustomers = permissions[navPermissionForHref(PLATFORM_CUSTOMERS_ITEM.href)];
+
   const navItems = useMemo(
-    () => [PLATFORM_DASHBOARD_ITEM, ...departments.flatMap((g) => g.items)],
-    [departments]
+    () => [
+      PLATFORM_DASHBOARD_ITEM,
+      ...(showCustomers ? [PLATFORM_CUSTOMERS_ITEM] : []),
+      ...departments.flatMap((g) => g.items),
+    ],
+    [departments, showCustomers]
   );
 
   const { unreadByNavHref } = useAdminNotifications();
@@ -260,6 +267,8 @@ export function PlatformSidebar({
 
   const dashboardActive = isActive(PLATFORM_DASHBOARD_ITEM.href);
   const DashboardIcon = PLATFORM_DASHBOARD_ITEM.icon;
+  const customersActive = isActive(PLATFORM_CUSTOMERS_ITEM.href);
+  const CustomersIcon = PLATFORM_CUSTOMERS_ITEM.icon;
 
   return (
     <>
@@ -283,7 +292,7 @@ export function PlatformSidebar({
           "flex h-dvh min-h-0 flex-col overflow-hidden border-r border-[var(--platform-border)] bg-[var(--platform-bg-secondary)] transition-[transform,width] duration-300 ease-out",
           "max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50 max-lg:shadow-xl max-lg:will-change-transform",
           "lg:relative lg:z-auto lg:h-full lg:shrink-0 lg:shadow-none",
-          collapsed ? "w-[4.5rem]" : "w-[min(100%-3rem,16rem)] max-lg:w-[min(calc(100vw-3rem),16rem)] sm:w-64",
+          collapsed ? "w-[4.5rem]" : "w-[min(100%-3rem,16rem)] max-lg:w-[min(calc(100dvw-3rem),16rem)] sm:w-64",
           showMobileDrawer || showMobileIconRail ? "max-lg:translate-x-0" : "max-lg:-translate-x-full"
         )}
         {...swipeHandlers}
@@ -339,7 +348,7 @@ export function PlatformSidebar({
         />
 
         <nav className="platform-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-2 pb-2">
-          {/* Dashboard — always visible */}
+          {/* Dashboard & Customers — always visible top-level links */}
           <ul className="space-y-0.5">
             <li>
               <Link
@@ -357,6 +366,31 @@ export function PlatformSidebar({
                 )}
               </Link>
             </li>
+            {showCustomers ? (
+              <li>
+                <Link
+                  href={PLATFORM_CUSTOMERS_ITEM.href}
+                  onClick={onMobileClose}
+                  onMouseEnter={() => prefetchRoute(PLATFORM_CUSTOMERS_ITEM.href)}
+                  onFocus={() => prefetchRoute(PLATFORM_CUSTOMERS_ITEM.href)}
+                  data-active={customersActive}
+                  className={cn("platform-sidebar-link relative", collapsed && "justify-center px-2")}
+                  title={collapsed ? PLATFORM_CUSTOMERS_ITEM.label : undefined}
+                >
+                  <CustomersIcon className="size-4 shrink-0" />
+                  {!collapsed && (
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate">{PLATFORM_CUSTOMERS_ITEM.label}</span>
+                      {PLATFORM_CUSTOMERS_ITEM.description && (
+                        <span className="block truncate text-[10px] font-normal leading-tight text-[var(--platform-text-secondary)] opacity-80">
+                          {PLATFORM_CUSTOMERS_ITEM.description}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            ) : null}
           </ul>
 
           {/* Department groups */}

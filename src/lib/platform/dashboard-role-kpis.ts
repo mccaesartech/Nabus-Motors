@@ -1,4 +1,4 @@
-import type { PlatformPermission, PlatformRole } from "./permissions";
+import { canViewFinance, type PlatformPermission, type PlatformRole } from "./permissions";
 import type { PlatformStats } from "./types";
 
 /** Department personas used for dashboard KPI prioritization. */
@@ -176,11 +176,9 @@ export function resolveDashboardPersona(
   permissions: SessionPermissions
 ): DashboardPersona {
   if (role === "owner" || role === "super_admin") return "ceo";
-  if (permissions.reports) return "ceo";
   if (permissions.freight && !permissions.sales && !permissions.inventory_edit) return "freight";
   if (permissions.inventory_edit || (permissions.inventory && role === "manager")) return "inventory";
   if (permissions.messages && !permissions.sales && role === "staff") return "customer_support";
-  if (permissions.finance && !permissions.sales) return "operations";
   if (role === "manager") return "operations";
   if (permissions.sales || permissions.leads) return "sales";
   return "customer_support";
@@ -218,11 +216,13 @@ export function buildKpiValues(
 export function getKpisForPersona(
   persona: DashboardPersona,
   values: DashboardKpiValues,
-  permissions: SessionPermissions
+  permissions: SessionPermissions,
+  role: PlatformRole
 ): Array<{ definition: DashboardKpiDefinition; value: number }> {
+  const financeVisible = canViewFinance(role);
   return PERSONA_KPI_KEYS[persona]
     .filter((key) => {
-      if (key === "pendingFinance" && !permissions.finance) return false;
+      if ((key === "pendingFinance" || key === "todayRevenue") && !financeVisible) return false;
       if (key === "freightQuotes" && !permissions.freight) return false;
       if (key === "pendingShipments" && !permissions.freight && !permissions.leads) return false;
       return true;

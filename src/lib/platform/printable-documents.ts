@@ -145,7 +145,7 @@ export function buildInquiryDocumentHtml(
     : "";
 
   const body = `
-    ${brandHeader(ref)}
+    ${brandHeader(ref, "INQUIRY")}
     <h2 class="doc-title">${escapeHtml(title)}</h2>
     <p class="doc-subtitle">Issued ${escapeHtml(formatPrintDate(createdAt))}</p>
     ${sectionBlock("Customer", customerMetaGrid(customer, metaExtra))}
@@ -307,9 +307,10 @@ export function buildAdminPreorderDocumentHtml(inquiry: PreorderInquiryRow): str
     : "";
 
   const docTitle = isCustom ? "Custom Vehicle Request" : "Pre-Order Inquiry";
+  const docTypeLabel = isCustom ? "REQUEST" : "PRE-ORDER";
 
   const body = `
-    ${brandHeader(ref)}
+    ${brandHeader(ref, docTypeLabel)}
     <h2 class="doc-title">${escapeHtml(docTitle)}</h2>
     <p class="doc-subtitle">Issued ${escapeHtml(formatPrintDate(createdAt))}</p>
     ${sectionBlock("Customer", customerMetaGrid(customer, metaExtra))}
@@ -390,7 +391,7 @@ export function buildCustomerInvoiceDocumentHtml(customer: AdminCustomerDetail):
       : "<p>No pre-orders yet.</p>";
 
   const body = `
-    ${brandHeader(ref)}
+    ${brandHeader(ref, "INVOICE")}
     <h2 class="doc-title">Customer Invoice</h2>
     <p class="doc-subtitle">Issued ${escapeHtml(formatPrintDate(issuedAt))} · ${escapeHtml(customer.name)}</p>
     ${sectionBlock("Bill to", customerMetaGrid(customer, contactMeta))}

@@ -20,11 +20,6 @@ export async function deleteCustomerAccount(
     return { ok: false, message: dataError.message };
   }
 
-  const { error: authError } = await supabase.auth.admin.deleteUser(userId);
-  if (authError && !/not found|user not found/i.test(authError.message)) {
-    return { ok: false, message: authError.message };
-  }
-
   return { ok: true };
 }
 

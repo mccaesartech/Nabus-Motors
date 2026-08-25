@@ -5,6 +5,11 @@ import { geminiErrorToHttp, getGeminiApiKey, getGeminiKeyWarning } from "@/lib/a
 import { fetchUrlsAsGeminiInlineImages } from "@/lib/ai/gemini-vision-images";
 import { isPhotoRequest } from "@/lib/ai/photo-request";
 import {
+  buildVehicleAiLabel,
+  inferAiChatAction,
+  logAiUsage,
+} from "@/lib/ai/usage-log";
+import {
   generateStockPhotoSuggestions,
   generateVehicleAiChatReply,
 } from "@/lib/ai/vehicle-ai-chat";
@@ -58,12 +63,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: { messages?: unknown; currentVehicle?: VehicleAiChatVehicleState };
+  let body: {
+    messages?: unknown;
+    currentVehicle?: VehicleAiChatVehicleState;
+    vehicleId?: string;
+  };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ ok: false, message: "Invalid JSON body" }, { status: 400 });
   }
+
+  const vehicleId =
+    typeof body.vehicleId === "string" && body.vehicleId.trim()
+      ? body.vehicleId.trim()
+      : null;
 
   const rawMessages = body.messages;
   if (!Array.isArray(rawMessages) || rawMessages.length === 0) {
@@ -124,10 +138,25 @@ export async function POST(req: NextRequest) {
   const lastUserMessage = messages[messages.length - 1]?.content ?? "";
   const fillFromPhotos = isFillFromPhotosRequest(lastUserMessage);
   const photoOnly = isPhotoRequest(lastUserMessage) && !fillFromPhotos;
+  const vehicleLabel = buildVehicleAiLabel(currentVehicle);
+  const vehicleSlug = currentVehicle.slug ?? null;
+  const inferredAction = photoOnly
+    ? ("suggest_photos" as const)
+    : inferAiChatAction(lastUserMessage);
 
   // Stock photos use the local Pexels URL pool — free, no Gemini key or quota.
   if (photoOnly) {
     const result = generateStockPhotoSuggestions(currentVehicle);
+    void logAiUsage({
+      auth: auth.auth,
+      action: "suggest_photos",
+      status: "success",
+      vehicleId,
+      vehicleSlug,
+      vehicleLabel,
+      previewSnippet: lastUserMessage,
+      metadata: { source: "ai-chat", photoOnly: true },
+    });
     return NextResponse.json({
       ok: true,
       configured: Boolean(getGeminiApiKey()),
@@ -137,6 +166,17 @@ export async function POST(req: NextRequest) {
 
   const apiKey = getGeminiApiKey();
   if (!apiKey) {
+    void logAiUsage({
+      auth: auth.auth,
+      action: inferredAction,
+      status: "error",
+      vehicleId,
+      vehicleSlug,
+      vehicleLabel,
+      previewSnippet: lastUserMessage,
+      errorMessage: "GEMINI_API_KEY not configured",
+      metadata: { source: "ai-chat", configured: false },
+    });
     return NextResponse.json(
       {
         ok: false,
@@ -162,13 +202,31 @@ export async function POST(req: NextRequest) {
     const result = await generateVehicleAiChatReply(messages, currentVehicle, {
       visionImages,
     });
+    const visionFetchFailed = visionUrls.length > 0 && visionImages.length === 0;
+    void logAiUsage({
+      auth: auth.auth,
+      action: inferredAction,
+      status: visionFetchFailed ? "partial" : "success",
+      vehicleId,
+      vehicleSlug,
+      vehicleLabel,
+      previewSnippet: result.reply ?? lastUserMessage,
+      metadata: {
+        source: "ai-chat",
+        fillFromPhotos,
+        visionImagesAttached: visionImages.length,
+        visionUrlsAttempted: visionUrls.length,
+        visionFetchFailed,
+        hasChanges: Boolean(result.changes),
+      },
+    });
     return NextResponse.json({
       ok: true,
       configured: true,
       ...(keyWarning ? { keyWarning } : {}),
       visionImagesAttached: visionImages.length,
       visionUrlsAttempted: visionUrls.length,
-      visionFetchFailed: visionUrls.length > 0 && visionImages.length === 0,
+      visionFetchFailed,
       ...result,
     });
   } catch (err) {
@@ -178,6 +236,17 @@ export async function POST(req: NextRequest) {
       code === "QUOTA_EXCEEDED"
         ? " Text editing is paused until quota resets. Stock photos still work — use “Find stock photos (free)”."
         : "";
+    void logAiUsage({
+      auth: auth.auth,
+      action: inferredAction,
+      status: "error",
+      vehicleId,
+      vehicleSlug,
+      vehicleLabel,
+      previewSnippet: lastUserMessage,
+      errorMessage: message,
+      metadata: { source: "ai-chat", code: code ?? null },
+    });
     return NextResponse.json(
       {
         ok: false,

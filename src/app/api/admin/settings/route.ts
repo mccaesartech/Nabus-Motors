@@ -5,7 +5,7 @@ import { requirePermission } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { checkDbHealth } from "@/lib/supabase/health";
 import { DEFAULT_SITE_SETTINGS, SITE_SETTING_KEYS, type SiteSettingKey } from "@/lib/platform/modules";
-import { mergeSiteSettings } from "@/lib/platform/site-settings";
+import { mergeSiteSettings, parseBoolean } from "@/lib/platform/site-settings";
 import { getAutoSiteUrl, getPublicSiteUrl } from "@/lib/site-url";
 import { getEmailDeliveryHealth } from "@/lib/email/delivery-health";
 import { isTermiiProviderEnv } from "@/lib/notifications/termii-config";
@@ -18,9 +18,27 @@ import {
   maskSettingsSecrets,
   stripMaskedSecretUpdates,
 } from "@/lib/platform/settings-secrets";
+import { logPlatformActivity } from "@/lib/platform/activity";
+import { enqueueAuditLog } from "@/lib/audit/write";
+import { revalidateSiteSettings } from "@/lib/platform/site-settings-server";
+import { invalidateMaintenanceCache } from "@/lib/maintenance/state";
 
 const SETTINGS_DB_UNREACHABLE =
   "Settings could not be read from the database, so defaults are shown. Reload to retry.";
+
+const API_KEY_SETTING_KEYS = new Set([
+  "whatsapp_api_access_token",
+  "arkesel_api_key",
+  "twilio_auth_token",
+  "termii_api_key",
+]);
+
+function actorLabel(auth: { name: string; email: string }): string {
+  const name = auth.name?.trim();
+  const email = auth.email?.trim();
+  if (name && email) return `${name} <${email}>`;
+  return name || email || "Owner";
+}
 
 export async function GET() {
   const auth = await requirePermission("settings");
@@ -127,8 +145,17 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "No valid settings" }, { status: 400 });
   }
 
+  // Audit metadata is written server-side only — ignore client copies.
+  delete updates.maintenance_enabled_by;
+  delete updates.maintenance_enabled_at;
+  delete updates.maintenance_disabled_by;
+  delete updates.maintenance_disabled_at;
+  delete updates.maintenance_updated_by;
+  delete updates.maintenance_updated_at;
+
   const supabase = createAdminSupabase();
   if (!supabase) {
+    invalidateMaintenanceCache();
     return NextResponse.json({
       ok: true,
       configured: false,
@@ -137,10 +164,39 @@ export async function PATCH(req: NextRequest) {
     });
   }
 
+  // Capture prior maintenance flag when the toggle is part of this save.
+  let previousMaintenance: boolean | null = null;
+  if (Object.prototype.hasOwnProperty.call(updates, "maintenance_mode")) {
+    const { data: priorRows } = await supabase
+      .from("site_settings")
+      .select("key, value")
+      .eq("key", "maintenance_mode");
+    previousMaintenance = parseBoolean(priorRows?.[0]?.value, false);
+  }
+
+  const nowIso = new Date().toISOString();
+  const actor = actorLabel(auth.auth);
+
+  // Only stamp enable/disable audit when the flag actually flips — not on every settings save.
+  if (previousMaintenance !== null) {
+    const nextOn = parseBoolean(String(updates.maintenance_mode), false);
+    if (nextOn !== previousMaintenance) {
+      updates.maintenance_updated_by = actor;
+      updates.maintenance_updated_at = nowIso;
+      if (nextOn) {
+        updates.maintenance_enabled_by = actor;
+        updates.maintenance_enabled_at = nowIso;
+      } else {
+        updates.maintenance_disabled_by = actor;
+        updates.maintenance_disabled_at = nowIso;
+      }
+    }
+  }
+
   const rows = Object.entries(updates).map(([key, value]) => ({
     key,
     value: String(value),
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso,
   }));
 
   const { error } = await supabase.from("site_settings").upsert(rows, { onConflict: "key" });
@@ -150,6 +206,59 @@ export async function PATCH(req: NextRequest) {
     return dbFailure(error, {
       module: "api.admin.settings.PATCH",
       message: "Your settings could not be saved. Try again.",
+      request: req,
+    });
+  }
+
+  invalidateMaintenanceCache();
+  try {
+    revalidateSiteSettings();
+  } catch {
+    // revalidateTag can throw outside a request context in some runtimes — ignore.
+  }
+
+  const changedKeys = Object.keys(updates);
+  if (previousMaintenance !== null) {
+    const nextOn = parseBoolean(String(updates.maintenance_mode), false);
+    if (nextOn !== previousMaintenance) {
+      await logPlatformActivity(
+        auth.auth,
+        nextOn ? "maintenance_enabled" : "maintenance_disabled",
+        "maintenance_mode",
+        {
+          enabled: nextOn,
+          message: updates.maintenance_message ?? null,
+          actor,
+        }
+      );
+    } else {
+      await logPlatformActivity(auth.auth, "settings_updated", "site_settings", {
+        keys: changedKeys,
+      });
+    }
+  } else {
+    await logPlatformActivity(auth.auth, "settings_updated", "site_settings", {
+      keys: changedKeys,
+    });
+  }
+
+  enqueueAuditLog({
+    action: "settings_changed",
+    success: true,
+    actor: auth.auth,
+    targetType: "site_settings",
+    metadata: { keys: changedKeys },
+    request: req,
+  });
+
+  const apiKeyKeys = changedKeys.filter((key) => API_KEY_SETTING_KEYS.has(key));
+  if (apiKeyKeys.length > 0) {
+    enqueueAuditLog({
+      action: "api_key_changed",
+      success: true,
+      actor: auth.auth,
+      targetType: "site_settings",
+      metadata: { keys: apiKeyKeys },
       request: req,
     });
   }

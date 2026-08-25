@@ -17,7 +17,7 @@ type Passkey = {
   lastUsedAt: string | null;
 };
 
-export function SecuritySettings() {
+export function SecuritySettings({ forcedChange = false }: { forcedChange?: boolean }) {
   const featureEnabled = isWebAuthnFeatureEnabled();
   const webAuthnAvailable = isBrowserWebAuthnAvailable();
 
@@ -43,7 +43,7 @@ export function SecuritySettings() {
   }, []);
 
   const load = useCallback(async () => {
-    if (!featureEnabled) {
+    if (!featureEnabled || forcedChange) {
       setLoading(false);
       return;
     }
@@ -56,7 +56,7 @@ export function SecuritySettings() {
       setOwnerAccount(Boolean(json.ownerAccount));
     }
     setLoading(false);
-  }, [featureEnabled]);
+  }, [featureEnabled, forcedChange]);
 
   useEffect(() => {
     void load();
@@ -153,24 +153,38 @@ export function SecuritySettings() {
       showToast("New passwords do not match.", true);
       return;
     }
+    if (currentPassword === newPassword) {
+      showToast("New password must be different from your current password.", true);
+      return;
+    }
 
     setPasswordBusy(true);
-    const res = await fetch("/api/admin/change-password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "same-origin",
-      body: JSON.stringify({ currentPassword, newPassword }),
-    });
-    const json = await res.json();
-    setPasswordBusy(false);
+    let json: { ok?: boolean; message?: string; redirect?: string } = {};
+    try {
+      const res = await fetch("/api/admin/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      json = await res.json().catch(() => ({}));
+      setPasswordBusy(false);
 
-    if (res.ok && json.ok) {
-      showToast(json.message ?? "Password updated.");
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-    } else {
-      showToast(json.message ?? "Could not change password.", true);
+      if (res.ok && json.ok === true) {
+        if (forcedChange && typeof json.redirect === "string") {
+          window.location.replace(json.redirect);
+          return;
+        }
+        showToast(json.message ?? "Password updated.");
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      } else {
+        showToast(json.message ?? "Could not change password.", true);
+      }
+    } catch {
+      setPasswordBusy(false);
+      showToast("Could not change password. Check your connection and try again.", true);
     }
   }
 
@@ -194,7 +208,9 @@ export function SecuritySettings() {
 
       {!ownerAccount ? (
         <form onSubmit={handleChangePassword} className="space-y-4">
-          <h3 className="text-sm font-semibold text-[var(--platform-text)]">Change password</h3>
+          <h3 className="text-sm font-semibold text-[var(--platform-text)]">
+            {forcedChange ? "Choose your new password" : "Change password"}
+          </h3>
           <label className="block space-y-1.5">
             <span className="text-xs font-medium text-[var(--platform-text-secondary)]">
               Current password
@@ -219,6 +235,10 @@ export function SecuritySettings() {
               className="platform-input w-full"
               autoComplete="new-password"
             />
+            <span className="block text-[11px] text-[var(--platform-text-secondary)]">
+              At least 10 characters with uppercase, lowercase, and a number. Must differ from your
+              current password.
+            </span>
           </label>
           <label className="block space-y-1.5">
             <span className="text-xs font-medium text-[var(--platform-text-secondary)]">
@@ -235,7 +255,11 @@ export function SecuritySettings() {
           </label>
           <button type="submit" disabled={passwordBusy} className="platform-btn-secondary">
             <KeyRound className="size-4" />
-            {passwordBusy ? "Updating…" : "Update password"}
+            {passwordBusy
+              ? "Updating…"
+              : forcedChange
+                ? "Save password and continue"
+                : "Update password"}
           </button>
         </form>
       ) : (
@@ -245,7 +269,7 @@ export function SecuritySettings() {
         </p>
       )}
 
-      {featureEnabled && !ownerAccount ? (
+      {featureEnabled && !ownerAccount && !forcedChange ? (
         <div className="space-y-4 border-t border-[var(--platform-border)] pt-4">
           <div className="flex items-start gap-3">
             <Fingerprint className="mt-0.5 size-5 shrink-0 text-[var(--platform-accent)]" />

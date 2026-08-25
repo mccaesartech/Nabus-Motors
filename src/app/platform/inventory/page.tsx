@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Check, Download, Plus, Search, X, AlertTriangle } from "lucide-react";
+import { Check, Download, History, Plus, Search, X, AlertTriangle } from "lucide-react";
 import { PageHeader } from "@/components/platform/page-header";
 import {
   ConfirmDialog,
@@ -11,7 +11,7 @@ import {
 } from "@/components/platform/confirm-dialog";
 import { ApprovalStatusBadge } from "@/components/platform/status-badge";
 import { VehicleStatusControl } from "@/components/platform/vehicle-status-control";
-import { VEHICLE_STATUS_LABELS, type VehicleInput } from "@/lib/admin/vehicle-fields";
+import { VEHICLE_STATUS_LABELS, normalizeStockQuantity, type VehicleInput } from "@/lib/admin/vehicle-fields";
 import { cn } from "@/lib/utils";
 import {
   ActiveFiltersSummary,
@@ -271,11 +271,45 @@ export default function InventoryPage() {
       return false;
     }
     if (successMessage !== undefined) {
-      const autoNote =
-        json.autoPreOrder && status === "sold"
-          ? " Listing moved to pre-order — last unit of this model."
-          : "";
-      setToast(`${successMessage}${autoNote}`);
+      let extra = "";
+      if (status === "sold") {
+        if (json.unitDecremented) {
+          const remaining = Number(json.stock_quantity);
+          extra =
+            Number.isFinite(remaining)
+              ? ` One unit sold — ${remaining} still in stock on this listing.`
+              : " One unit sold — quantity reduced.";
+        } else if (json.autoPreOrder) {
+          extra = " Listing moved to pre-order — last unit of this model.";
+        }
+      }
+      setToast(`${successMessage}${extra}`);
+    }
+    return true;
+  }
+
+  async function updateVehicleQuantity(
+    id: string,
+    name: string,
+    quantity: number
+  ): Promise<boolean> {
+    const stock_quantity = normalizeStockQuantity(quantity, 0);
+    setActingOnId(id);
+    const res = await fetch("/api/admin/vehicles", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, stock_quantity }),
+    });
+    const json = await parseAdminResponse(res);
+    setActingOnId(null);
+    if (!res.ok || !json.ok) {
+      setToast(adminErrorMessage(json, "Could not update units in stock."));
+      return false;
+    }
+    if (json.pendingApproval) {
+      setToast(`${name}: units change submitted for approval.`);
+    } else {
+      setToast(`${name}: units in stock set to ${stock_quantity}.`);
     }
     return true;
   }
@@ -483,6 +517,10 @@ export default function InventoryPage() {
         breadcrumb="Inventory"
         actions={
           <>
+            <Link href={platformPath("inventory/ai-usage")} className="platform-btn-ghost">
+              <History className="size-4" />
+              AI usage
+            </Link>
             <button type="button" onClick={handleExport} className="platform-btn-ghost">
               <Download className="size-4" />
               Export CSV
@@ -888,18 +926,19 @@ export default function InventoryPage() {
         )}
         <VirtualTableScroll className="platform-table-scroll max-h-[min(70vh,48rem)] max-w-full overflow-x-auto overflow-y-auto">
           {(scrollRef) => (
-          <table className="platform-table w-full min-w-[64rem] text-left text-sm">
+          <table className="platform-table w-full min-w-[70rem] text-left text-sm">
             <colgroup>
               {canEdit && <col className="w-10" />}
               <col className="w-16" />
-              <col className="w-[min(14rem,20%)]" />
-              <col className="w-[min(10rem,14%)]" />
-              <col className="w-[min(8rem,11%)]" />
-              <col className="w-[min(7rem,9%)]" />
-              <col className="w-[min(7rem,9%)]" />
-              <col className="w-[min(8rem,11%)]" />
-              <col className="w-[min(9rem,12%)]" />
-              <col className="w-[min(10rem,14%)]" />
+              <col className="w-[min(14rem,18%)]" />
+              <col className="w-[min(10rem,12%)]" />
+              <col className="w-[min(8rem,10%)]" />
+              <col className="w-[min(7rem,8%)]" />
+              <col className="w-[min(6rem,7%)]" />
+              <col className="w-[min(7rem,8%)]" />
+              <col className="w-[min(8rem,10%)]" />
+              <col className="w-[min(9rem,11%)]" />
+              <col className="w-[min(10rem,12%)]" />
             </colgroup>
             <thead>
               <tr className="text-xs text-[var(--platform-text-secondary)]">
@@ -922,6 +961,9 @@ export default function InventoryPage() {
                 <th className="px-4 py-3 font-medium">Category</th>
                 <th className="px-4 py-3 font-medium">Price</th>
                 <th className="px-4 py-3 font-medium">Mileage</th>
+                <th className="px-4 py-3 font-medium" title="Identical cars covered by this listing">
+                  Units
+                </th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Approval</th>
                 <th className="px-4 py-3 font-medium">Listed</th>
@@ -931,13 +973,13 @@ export default function InventoryPage() {
             <VirtualTableBody
               scrollRef={scrollRef}
               items={filtered}
-              colSpan={canEdit ? 10 : 9}
+              colSpan={canEdit ? 11 : 10}
               rowHeight={88}
               getKey={(v) => v.id}
               emptyRow={
                 <tr>
                   <td
-                    colSpan={canEdit ? 10 : 9}
+                    colSpan={canEdit ? 11 : 10}
                     className="px-4 py-12 text-center text-[var(--platform-text-secondary)]"
                   >
                     No vehicles match your filters.
@@ -1062,6 +1104,62 @@ export default function InventoryPage() {
                       </td>
                       <td className="px-4 py-3 align-middle tabular-nums whitespace-nowrap">
                         {display.mileage.toLocaleString()} km
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        {canEdit ? (
+                          <input
+                            type="number"
+                            min={0}
+                            step={1}
+                            defaultValue={normalizeStockQuantity(
+                              display.stock_quantity ?? v.stock_quantity,
+                              1
+                            )}
+                            key={`${v.id}-${normalizeStockQuantity(display.stock_quantity ?? v.stock_quantity, 1)}-${isEditPending ? "p" : "l"}`}
+                            disabled={actingOnId === v.id}
+                            onBlur={(e) => {
+                              const next = normalizeStockQuantity(e.target.value, 0);
+                              const current = normalizeStockQuantity(
+                                display.stock_quantity ?? v.stock_quantity,
+                                1
+                              );
+                              if (next === current) return;
+                              void updateVehicleQuantity(
+                                v.id,
+                                `${display.year} ${display.make} ${display.model}`,
+                                next
+                              ).then((ok) => {
+                                if (ok) void load();
+                                else e.target.value = String(current);
+                              });
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                (e.target as HTMLInputElement).blur();
+                              }
+                            }}
+                            className="platform-input w-16 px-2 py-1 text-center tabular-nums"
+                            aria-label={`Units in stock for ${display.year} ${display.make} ${display.model}`}
+                            title="How many identical cars this listing covers. Marking sold reduces this by 1."
+                          />
+                        ) : (
+                          <span className="tabular-nums">
+                            {normalizeStockQuantity(
+                              display.stock_quantity ?? v.stock_quantity,
+                              1
+                            )}
+                          </span>
+                        )}
+                        {modelAvailable !==
+                          normalizeStockQuantity(
+                            display.stock_quantity ?? v.stock_quantity,
+                            1
+                          ) &&
+                          v.status === "available" && (
+                            <p className="mt-0.5 text-[10px] text-[var(--platform-text-secondary)]">
+                              Model: {modelAvailable}
+                            </p>
+                          )}
                       </td>
                       <td className="px-4 py-3 align-middle">
                         <VehicleStatusControl
@@ -1285,8 +1383,8 @@ export default function InventoryPage() {
         description={
           statusConfirmTarget
             ? statusConfirmTarget.bulk
-              ? `Mark ${statusConfirmTarget.name} as sold? Sold listings are hidden from public buy-now inventory. If any vehicle is the last available unit of its model, it will move to pre-order instead.`
-              : `Mark ${statusConfirmTarget.name} as sold? It will be removed from public buy-now inventory. If this is the last available unit of this model, the listing will move to pre-order instead.`
+              ? `Mark one unit sold on each of ${statusConfirmTarget.name}? Multi-unit listings reduce Units by 1 and stay available. A last unit of a model moves to pre-order; otherwise the listing is marked sold and hidden from buy-now inventory.`
+              : `Mark one unit of ${statusConfirmTarget.name} as sold? If this listing has multiple units, Units decreases by 1 and it stays available. If it is the last unit of this model, the listing moves to pre-order; otherwise it is marked sold.`
             : ""
         }
         confirmLabel="Mark sold"

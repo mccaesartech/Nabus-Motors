@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { ExternalLink, KeyRound, MessageSquare, Package, Ship, ShoppingBag, Copy, Check, Trash2 } from "lucide-react";
-import { ContactEmailAction, ContactPhoneAction, ContactWhatsAppAction } from "@/components/platform/contact-actions";
+import { ContactEmailAction, ContactPhoneAction } from "@/components/platform/contact-actions";
+import { WhatsAppAssistAction } from "@/components/platform/whatsapp-assist-dialog";
 import { CustomerDataTrustNote } from "@/components/forms/customer-data-trust-note";
 import {
   ConfirmDialog,
@@ -25,6 +26,7 @@ import { freightServiceLabel } from "@/lib/platform/freight-quote-display";
 import { platformPath } from "@/lib/platform/paths";
 import type { NotificationFeedbackVariant } from "@/lib/notifications/notification-status";
 import type { AdminCustomerDetail } from "@/lib/platform/customers-admin";
+import { seedCachedCustomer } from "@/lib/print/pdf-cache";
 import { PlatformDateLabel, PlatformDateTime } from "@/components/platform/platform-datetime";
 
 export default function CustomerProfilePage() {
@@ -62,6 +64,7 @@ export default function CustomerProfilePage() {
       setCustomer(null);
     } else {
       setCustomer(json.customer);
+      seedCachedCustomer(json.customer as AdminCustomerDetail);
       setNotFound(false);
     }
     setLoading(false);
@@ -313,9 +316,16 @@ export default function CustomerProfilePage() {
                 <p className="text-xs text-[var(--platform-text-secondary)]">Phone</p>
                 <ContactPhoneAction phone={customer.phone} variant="detail" />
                 <div className="mt-2">
-                  <ContactWhatsAppAction
+                  <WhatsAppAssistAction
                     phone={customer.phone}
                     customerName={customer.name}
+                    context={{
+                      type: "customer",
+                      customerId,
+                      userId: customer.userId ?? undefined,
+                      email: customer.email,
+                    }}
+                    variant="link"
                   />
                 </div>
               </li>

@@ -290,13 +290,96 @@ export async function processExpiredAccountDeletions(): Promise<number> {
   const supabase = createAdminSupabase();
   if (!supabase) return 0;
 
+  // Load contacts before anonymization so we can notify while email/phone remain.
+  const { data: due, error: dueError } = await supabase
+    .from("profiles")
+    .select("id, email, phone, first_name, last_name, retention_expires_at")
+    .eq("account_status", "pending_deletion")
+    .not("retention_expires_at", "is", null)
+    .lt("retention_expires_at", new Date().toISOString())
+    .order("retention_expires_at", { ascending: true })
+    .limit(200);
+
+  if (dueError) {
+    console.error(
+      "[account-lifecycle] expired deletion query failed:",
+      dueError.message
+    );
+  }
+
+  for (const row of due ?? []) {
+    const email = row.email?.trim().toLowerCase() || "";
+    const phone = row.phone?.trim() || null;
+    // Skip already-anonymized placeholders (should not appear in pending_deletion).
+    if (email && !email.endsWith("@deleted.truegoshen.local")) {
+      const scheduledDate = row.retention_expires_at
+        ? new Date(row.retention_expires_at).toLocaleDateString(undefined, {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })
+        : "";
+      const name =
+        [row.first_name, row.last_name].filter(Boolean).join(" ").trim() ||
+        undefined;
+      try {
+        await notifyCustomer({
+          email,
+          phone,
+          customerName: name,
+          template: "account_deletion_completed",
+          data: { scheduledDeletionDate: scheduledDate },
+          sourceTable: "profiles",
+          sourceId: `${row.id}:deletion_completed`,
+          emailRequired: true,
+        });
+      } catch (err) {
+        console.warn(
+          "[account-lifecycle] deletion-completed notify failed (non-blocking):",
+          err instanceof Error ? err.message : err
+        );
+      }
+    }
+
+    try {
+      const { error: anonError } = await supabase.rpc(
+        "execute_account_anonymization",
+        {
+          p_user_id: row.id,
+          p_administrator_id: null,
+          p_ip_address: null,
+        }
+      );
+      if (anonError) {
+        console.error(
+          "[account-lifecycle] execute_account_anonymization failed:",
+          anonError.message
+        );
+      } else {
+        await supabase.rpc("log_account_lifecycle_event", {
+          p_action: "retention_expired",
+          p_user_id: row.id,
+          p_administrator_id: null,
+          p_ip_address: null,
+          p_metadata: { processed_at: new Date().toISOString() },
+        });
+      }
+    } catch (err) {
+      console.error(
+        "[account-lifecycle] anonymization step failed:",
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
+
+  // Fallback batch for any rows the per-id path missed (e.g. query errors).
   const { data, error } = await supabase.rpc("process_expired_deletions");
   if (error) {
     console.error("[account-lifecycle] process_expired_deletions failed:", error.message);
-    return 0;
   }
 
-  const count = typeof data === "number" ? data : 0;
+  const count =
+    (due?.length ?? 0) || (typeof data === "number" ? data : 0);
 
   // Always retry archived users. If a previous run anonymized the profile but
   // failed between the RPC and Auth deletion, limiting cleanup to newly

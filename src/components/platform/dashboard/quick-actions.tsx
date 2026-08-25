@@ -7,10 +7,11 @@ import {
   MessageSquarePlus,
   Package,
   Ship,
-  UserPlus,
+  Users,
 } from "lucide-react";
 import { platformPath } from "@/lib/platform/paths";
-import type { PlatformPermission } from "@/lib/platform/permissions";
+import type { PlatformPermission, PlatformRole } from "@/lib/platform/permissions";
+import { canDirectMutate } from "@/lib/platform/mutation-approval";
 
 type QuickAction = {
   label: string;
@@ -18,15 +19,18 @@ type QuickAction = {
   href: string;
   icon: typeof Car;
   permission?: PlatformPermission;
+  requiresDirectMutation?: boolean;
+  allowPendingInventory?: boolean;
 };
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
     label: "Add vehicle",
-    description: "List a new car for sale",
+    description: "Submit a listing for approval",
     href: platformPath("inventory/new"),
     icon: Car,
     permission: "inventory_edit",
+    allowPendingInventory: true,
   },
   {
     label: "Add spare part",
@@ -34,6 +38,7 @@ const QUICK_ACTIONS: QuickAction[] = [
     href: platformPath("parts/inventory"),
     icon: Package,
     permission: "parts",
+    requiresDirectMutation: true,
   },
   {
     label: "Create shipment",
@@ -41,23 +46,24 @@ const QUICK_ACTIONS: QuickAction[] = [
     href: platformPath("freight/orders"),
     icon: Ship,
     permission: "freight",
+    requiresDirectMutation: true,
   },
   {
-    label: "Create quote",
-    description: "Review freight quote requests",
+    label: "Freight quotes",
+    description: "Review inbound quote requests",
     href: platformPath("freight/quotes"),
     icon: MessageSquarePlus,
     permission: "freight",
   },
   {
-    label: "Create customer",
+    label: "Customers",
     description: "View customer directory",
     href: platformPath("customers"),
-    icon: UserPlus,
+    icon: Users,
     permission: "customers",
   },
   {
-    label: "Schedule appointment",
+    label: "Appointments",
     description: "Viewings & test drives",
     href: platformPath("appointments"),
     icon: Calendar,
@@ -67,12 +73,17 @@ const QUICK_ACTIONS: QuickAction[] = [
 
 type QuickActionsProps = {
   permissions: Record<PlatformPermission, boolean>;
+  role: PlatformRole;
 };
 
-export function QuickActions({ permissions }: QuickActionsProps) {
-  const actions = QUICK_ACTIONS.filter(
-    (a) => !a.permission || permissions[a.permission]
-  );
+export function QuickActions({ permissions, role }: QuickActionsProps) {
+  const direct = canDirectMutate(role);
+  const actions = QUICK_ACTIONS.filter((a) => {
+    if (a.permission && !permissions[a.permission]) return false;
+    if (a.requiresDirectMutation && !direct) return false;
+    if (a.allowPendingInventory && !permissions.inventory_edit && !direct) return false;
+    return true;
+  });
 
   if (actions.length === 0) return null;
 

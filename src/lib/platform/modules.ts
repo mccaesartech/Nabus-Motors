@@ -12,9 +12,18 @@ import {
 import { DEFAULT_DISPLAY_CURRENCY } from "@/lib/currency/types";
 import { DEFAULT_CARGO_OPTIONS_JSON } from "@/lib/freight/cargo-options";
 
-import { INVITABLE_ROLES, ROLE_LABELS, type PlatformRole } from "@/lib/platform/permissions";
+import {
+  INVITABLE_ROLES,
+  PRODUCT_ROLES,
+  ROLE_LABELS,
+  type PlatformRole,
+} from "@/lib/platform/permissions";
 
+/** Assignable roles for invite / role-change UI (excludes owner + legacy IAM). */
 export const PLATFORM_USER_ROLES = INVITABLE_ROLES;
+
+/** Product role set: owner, super_admin, manager, staff. */
+export const PLATFORM_PRODUCT_ROLES = PRODUCT_ROLES;
 
 export type PlatformUserRole = PlatformRole;
 
@@ -59,6 +68,12 @@ export const SITE_SETTING_KEY_LIST = [
   "shipment_update_frequency",
   "maintenance_mode",
   "maintenance_message",
+  "maintenance_enabled_by",
+  "maintenance_enabled_at",
+  "maintenance_disabled_by",
+  "maintenance_disabled_at",
+  "maintenance_updated_by",
+  "maintenance_updated_at",
   "feature_show_spare_parts_nav",
   "feature_show_freight_nav",
   "whatsapp_api_provider",
@@ -86,6 +101,8 @@ export const SITE_SETTING_KEY_LIST = [
   "arkesel_sender_id",
   "arkesel_base_url",
   "arkesel_enabled",
+  "audit_log_retention_days",
+  "audit_log_enabled",
 ] as const;
 
 export type SiteSettingKey = (typeof SITE_SETTING_KEY_LIST)[number];
@@ -129,6 +146,12 @@ export const DEFAULT_SITE_SETTINGS: SiteSettingsMap = {
   maintenance_mode: "false",
   maintenance_message:
     "We are performing scheduled maintenance. Some features may be temporarily unavailable.",
+  maintenance_enabled_by: "",
+  maintenance_enabled_at: "",
+  maintenance_disabled_by: "",
+  maintenance_disabled_at: "",
+  maintenance_updated_by: "",
+  maintenance_updated_at: "",
   feature_show_spare_parts_nav: "true",
   feature_show_freight_nav: "true",
   whatsapp_api_provider: "",
@@ -156,6 +179,8 @@ export const DEFAULT_SITE_SETTINGS: SiteSettingsMap = {
   arkesel_sender_id: "",
   arkesel_base_url: "https://sms.arkesel.com",
   arkesel_enabled: "true",
+  audit_log_retention_days: "365",
+  audit_log_enabled: "true",
 };
 
 export const SITE_SETTING_KEYS: SiteSettingKey[] = [...SITE_SETTING_KEY_LIST];
@@ -174,13 +199,18 @@ export type PlatformUserInviteInfo = {
   expiresAt?: string;
   acceptedAt?: string;
   needsRegenerate?: boolean;
+  /** Last Resend attempt for this invite row (migration 089). */
+  emailStatus?: "PENDING" | "SENT" | "FAILED";
 };
 
 /** Delivery outcome for invite / role / password team notifications. */
 export type PlatformUserNotifyInfo = {
   channel: "sms" | "whatsapp" | "none" | "email";
   status: "sent" | "skipped_no_phone" | "skipped_not_configured" | "failed" | "pending";
+  /** Short Owner-facing label (e.g. "SMS submitted" / "SMS failed"). */
   label: string;
+  /** Arkesel message id on accept, or a technical reason on failure (tooltip / logs). */
+  detail?: string;
 };
 
 export type PlatformUserRow = {
@@ -195,6 +225,7 @@ export type PlatformUserRow = {
   invited_at: string | null;
   activated_at: string | null;
   last_login_at: string | null;
+  must_change_password?: boolean;
   invite?: PlatformUserInviteInfo;
   /** Last invite/role notification status from this session (not persisted). */
   notify?: PlatformUserNotifyInfo;

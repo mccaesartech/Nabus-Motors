@@ -440,6 +440,35 @@ button.platform-dashboard-card:disabled:hover {
   transform: none;
 }
 
+/* Card gradient accents — informative status washes (replaces solid left borders) */
+.platform-card-accent-attention {
+  background: linear-gradient(
+    145deg,
+    rgba(139, 92, 246, 0.11) 0%,
+    rgba(167, 139, 250, 0.05) 38%,
+    var(--platform-card) 72%
+  );
+  border-color: rgba(139, 92, 246, 0.28);
+}
+
+.platform-card-accent-urgent {
+  background: linear-gradient(
+    145deg,
+    rgba(220, 38, 38, 0.09) 0%,
+    rgba(248, 113, 113, 0.04) 32%,
+    var(--platform-card) 68%
+  );
+}
+
+.platform-card-accent-warning {
+  background: linear-gradient(
+    145deg,
+    rgba(217, 119, 6, 0.1) 0%,
+    rgba(251, 191, 36, 0.04) 32%,
+    var(--platform-card) 68%
+  );
+}
+
 /* Chart load & micro-animations */
 @keyframes platform-chart-fade-in {
   from {
@@ -1122,6 +1151,34 @@ button.platform-dashboard-card:disabled:hover {
 
 .platform-ai-chat {
   position: relative;
+}
+
+.platform-ai-photo-drop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0 0.75rem 0.5rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px dashed var(--platform-ai-border);
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--platform-ai-text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-align: center;
+  transition:
+    border-color 0.12s ease,
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.platform-ai-photo-drop--active {
+  border-color: var(--platform-ai-accent);
+  background: rgba(124, 58, 237, 0.12);
+  color: var(--platform-ai-accent);
+  outline: 2px dashed var(--platform-ai-accent);
+  outline-offset: -2px;
 }
 
 .platform-ai-chat--drag-over {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin/auth";
+import { requireDirectMutation, requirePermission } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { fetchPreorderInquiryById } from "@/lib/platform/data";
 import { softDeleteEntity } from "@/lib/platform/trash";
@@ -7,7 +7,7 @@ import { softDeleteEntity } from "@/lib/platform/trash";
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, context: RouteContext) {
-  const auth = await requireAdmin();
+  const auth = await requirePermission("leads");
   if (!auth.ok) {
     return NextResponse.json({ ok: false }, { status: auth.status });
   }
@@ -34,7 +34,7 @@ export async function GET(_req: NextRequest, context: RouteContext) {
 }
 
 export async function DELETE(_req: NextRequest, context: RouteContext) {
-  const auth = await requireAdmin();
+  const auth = await requireDirectMutation("leads");
   if (!auth.ok) {
     return NextResponse.json({ ok: false }, { status: auth.status });
   }

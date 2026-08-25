@@ -42,12 +42,42 @@ Phone numbers are normalized with Ghana helpers in
    fallback on opt-out, deferral, or failure.
 4. SMS failures never block business flows — they are logged and ignored.
 
-Successful SMS rows are written to `notification_log` with `channel = sms`.
+Customer **and** platform-team SMS attempts are written to `notification_log`
+with `channel = sms` — `sent` rows carry the Arkesel message id, `failed` and
+`skipped` rows carry the provider's reason.
+
+## Reading the Arkesel response
+
+Arkesel v2 answers a successful call with `status: "success"` and a `data`
+**array** of per-recipient entries:
+
+```json
+{ "status": "success", "data": [{ "recipient": "233…", "id": "9b752841-…" }] }
+```
+
+Recipients the gateway refuses come back inside the same 200 response as
+`{ "invalid numbers": ["…"] }`. `sendArkeselSms` treats that as a failure — a
+2xx alone does not mean the message left the gateway.
+
+Documented error statuses: `401` auth failed, `402` insufficient balance, `403`
+inactive gateway (also raised for an unapproved sender ID), `422` validation,
+`500` internal.
 
 ## What to paste
 
 1. Create an Arkesel account and generate an API key.
-2. Register/approve a sender ID in the Arkesel dashboard.
-3. In Vercel (Production): set `ARKESEL_API_KEY`, `ARKESEL_SENDER_ID`, and
+2. Register/approve a sender ID in the Arkesel dashboard (max 11 characters).
+   An unapproved sender ID fails with `403 Inactive Gateway`.
+3. Top up SMS credit — an empty balance fails with `402`.
+4. In Vercel (Production): set `ARKESEL_API_KEY`, `ARKESEL_SENDER_ID`, and
    `SMS_PROVIDER=arkesel`.
-4. Or paste the same values under Platform → Settings → SMS (Arkesel).
+5. Or paste the same values under Platform → Settings → SMS (Arkesel).
+
+## Troubleshooting "sent but never arrived"
+
+1. Open Platform → Notifications and find the `channel = sms` row. A `failed`
+   or `skipped` row carries the exact provider reason.
+2. No row at all means the send path was never reached — check that the user
+   has a phone number and that `smsConfig.ready` is true on Platform → Users.
+3. A `sent` row with a message id means Arkesel accepted it; check the Arkesel
+   dashboard SMS history for the final network status.

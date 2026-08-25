@@ -18,6 +18,13 @@ import {
   sanitizeStack,
   sanitizeUrl,
 } from "./sanitize";
+import {
+  SCHEMA_CAPS,
+  isMissingRelationError,
+  isSchemaMissing,
+  markSchemaMissing,
+  markSchemaPresent,
+} from "@/lib/observability/schema-capability";
 
 export const ERROR_LOG_TABLE = "platform_error_log";
 
@@ -170,29 +177,34 @@ function toRow(record: ErrorLogRecord) {
  * and everything continues on console-only logging.
  */
 async function persist(record: ErrorLogRecord): Promise<void> {
-  if (persistDisabled) return;
+  if (persistDisabled || isSchemaMissing(SCHEMA_CAPS.platformErrorLog)) return;
 
   const supabase = createAdminSupabase();
   if (!supabase) return;
 
   const { error } = await supabase.from(ERROR_LOG_TABLE).insert(toRow(record));
-  if (!error) return;
+  if (!error) {
+    markSchemaPresent(SCHEMA_CAPS.platformErrorLog);
+    return;
+  }
 
   const message = error.message?.toLowerCase() ?? "";
   const missingTable =
     error.code === "42P01" ||
     error.code === "PGRST205" ||
+    isMissingRelationError(error.message, ERROR_LOG_TABLE) ||
     message.includes("does not exist") ||
     message.includes("schema cache");
 
   if (missingTable) {
     persistDisabled = true;
+    markSchemaMissing(SCHEMA_CAPS.platformErrorLog);
     console.warn(
       JSON.stringify({
         event: "error_log_persist_disabled",
         reason: "table_missing",
         table: ERROR_LOG_TABLE,
-        migration: "084_platform_error_log.sql",
+        migration: "084_platform_error_log.sql / 086_postgres_error_clearance.sql",
       })
     );
     return;

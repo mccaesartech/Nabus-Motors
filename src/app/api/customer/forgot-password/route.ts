@@ -5,7 +5,9 @@ import {
 } from "@/lib/customer/password-reset";
 import { resolveWhatsAppPreferred } from "@/lib/notifications/customer-notify";
 import { createAdminSupabase } from "@/lib/supabase/admin";
-import { consumeRateLimit, requestIp } from "@/lib/security/rate-limit";
+import { consumeRateLimitDurable, requestIp } from "@/lib/security/rate-limit";
+import { assertSameOrigin, forbiddenOriginResponse } from "@/lib/security/csrf";
+import { enqueueAuditLog } from "@/lib/audit/write";
 
 const GENERIC_SUCCESS =
   "If an account exists with that email or phone, we've sent password reset instructions.";
@@ -33,6 +35,10 @@ async function logSkippedRecovery(
 }
 
 export async function POST(req: NextRequest) {
+  if (!assertSameOrigin(req)) {
+    return forbiddenOriginResponse();
+  }
+
   try {
     const body = await req.json();
     const email = String(body.email ?? "").trim();
@@ -46,7 +52,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const rateLimit = consumeRateLimit(
+    const rateLimit = await consumeRateLimitDurable(
       "customer-password-reset",
       `${requestIp(req.headers)}:${identifier.toLowerCase()}`,
       { limit: 5, windowMs: 15 * 60_000 }
@@ -64,6 +70,12 @@ export async function POST(req: NextRequest) {
     const account = await lookupCustomerAccount(identifier);
 
     if (!account?.email) {
+      enqueueAuditLog({
+        action: "password_reset_request",
+        success: false,
+        metadata: { accountFound: false },
+        request: req,
+      });
       return NextResponse.json({ ok: true, message: GENERIC_SUCCESS });
     }
 
@@ -84,6 +96,13 @@ export async function POST(req: NextRequest) {
     });
 
     if (!result.ok) {
+      enqueueAuditLog({
+        action: "password_reset_request",
+        success: false,
+        actorUserId: account.userId,
+        metadata: { accountFound: true },
+        request: req,
+      });
       if (result.error?.includes("Could not generate reset link")) {
         await logSkippedRecovery(
           account,
@@ -96,6 +115,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, message: GENERIC_SUCCESS });
     }
 
+    enqueueAuditLog({
+      action: "password_reset_request",
+      success: true,
+      actorUserId: account.userId,
+      metadata: { accountFound: true },
+      request: req,
+    });
     return NextResponse.json({ ok: true, message: GENERIC_SUCCESS });
   } catch {
     console.error("[forgot-password] unexpected error; request detail omitted");

@@ -12,10 +12,12 @@ import {
 import type { CustomerNotification } from "@/lib/customer/notification-types";
 import { useCustomerAuth } from "@/context/customer-auth-context";
 import { useAfterIdle } from "@/hooks/use-after-idle";
+import { isVercelAppHostname } from "@/lib/cache-recovery";
 import {
   countUnreadAdminNotifications,
   mergeLoadedNotificationReadState,
 } from "@/lib/platform/notification-read-state";
+import { resolveCustomerApiUrl } from "@/lib/site-url";
 
 type MarkReadMatchingOptions = {
   link?: string;
@@ -61,14 +63,21 @@ export function CustomerNotificationsProvider({ children }: { children: ReactNod
       return;
     }
 
+    // Do not poll on *.vercel.app — migrate/redirect handles that host.
+    // Relative fetches there 308 to www and drop Authorization → noisy 401s.
+    if (isVercelAppHostname()) return;
+
     const token = await getAccessToken();
     if (!token) return;
 
     setLoading(true);
     try {
-      const res = await fetch("/api/customer/notifications?limit=50", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        resolveCustomerApiUrl("/api/customer/notifications?limit=50"),
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       if (!res.ok) return;
       const json = await res.json();
       const incoming = (json.notifications ?? []) as CustomerNotification[];
@@ -89,6 +98,7 @@ export function CustomerNotificationsProvider({ children }: { children: ReactNod
       setUnreadCount(0);
       return;
     }
+    if (isVercelAppHostname()) return;
 
     void load();
     const interval = window.setInterval(() => void load(), POLL_MS);
@@ -111,7 +121,9 @@ export function CustomerNotificationsProvider({ children }: { children: ReactNod
       const token = await getAccessToken();
       if (!token) return false;
 
-      const res = await fetch("/api/customer/notifications", {
+      if (isVercelAppHostname()) return false;
+
+      const res = await fetch(resolveCustomerApiUrl("/api/customer/notifications"), {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

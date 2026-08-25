@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbFailure } from "@/lib/errors/api";
-import { requirePermission } from "@/lib/admin/auth";
+import { requireFinanceAccess } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { recordExpenseMovement } from "@/lib/platform/inventory-movements/record";
 import { notDeletedFilter, softDeleteEntity } from "@/lib/platform/trash";
@@ -14,7 +14,7 @@ const EMPTY_SUMMARY = {
 };
 
 export async function GET() {
-  const auth = await requirePermission("finance");
+  const auth = await requireFinanceAccess();
   if (!auth.ok) {
     return NextResponse.json({ ok: false }, { status: auth.status });
   }
@@ -69,7 +69,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requirePermission("finance");
+  const auth = await requireFinanceAccess();
   if (!auth.ok) {
     return NextResponse.json({ ok: false }, { status: auth.status });
   }
@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const auth = await requirePermission("finance");
+  const auth = await requireFinanceAccess();
   if (!auth.ok) {
     return NextResponse.json({ ok: false }, { status: auth.status });
   }

@@ -4,11 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { ExternalLink, FileText, Mail, MessageSquare, Phone, RotateCcw, Trash2, User } from "lucide-react";
-import { ContactWhatsAppAction } from "@/components/platform/contact-actions";
+import { WhatsAppAssistAction } from "@/components/platform/whatsapp-assist-dialog";
 import { customerProfileIdForOrder } from "@/lib/platform/orders-admin";
 import { PageHeader } from "@/components/platform/page-header";
 import { PlatformPrintButton, PrintableRecord } from "@/components/platform/printable-record";
 import { buildAdminPreorderDocumentHtml } from "@/lib/platform/printable-documents";
+import { seedCachedPreorder } from "@/lib/print/pdf-cache";
 import { useMarkNotificationsOnVisit } from "@/hooks/use-mark-notifications-read";
 import {
   ConfirmDialog,
@@ -35,6 +36,7 @@ import {
 } from "@/lib/platform/custom-request";
 import { usePlatformSession } from "@/components/platform/platform-shell";
 import { formatPlatformDateTime } from "@/lib/platform/datetime";
+import { canDirectMutate } from "@/lib/platform/mutation-approval";
 
 type LinkedSale = {
   id: string;
@@ -56,6 +58,7 @@ export default function PreorderDetailPage() {
   const session = usePlatformSession();
   useMarkNotificationsOnVisit({ link: pathname });
   const canEditInventory = session?.permissions.inventory_edit ?? false;
+  const canMutate = session ? canDirectMutate(session.role) : false;
   const { formatPrice } = usePlatformCurrency();
   const params = useParams();
   const id = String(params.id ?? "");
@@ -85,6 +88,7 @@ export default function PreorderDetailPage() {
     }
     const json = await res.json();
     const row = json.inquiry as PreorderInquiryRow;
+    seedCachedPreorder(row);
     setInquiry(row);
     setLinkedSale((json.linkedSale as LinkedSale | null) ?? null);
     setNotes(row.follow_up_notes ?? "");
@@ -219,10 +223,15 @@ export default function PreorderDetailPage() {
               Customer profile
             </Link>
             {inquiry.phone ? (
-              <ContactWhatsAppAction
+              <WhatsAppAssistAction
                 phone={inquiry.phone}
                 customerName={inquiry.name}
-                message={followUpIntro}
+                context={{
+                  type: "preorder",
+                  id,
+                  userId: inquiry.user_id ?? undefined,
+                  email: inquiry.email,
+                }}
                 variant="button"
               />
             ) : null}
@@ -237,6 +246,7 @@ export default function PreorderDetailPage() {
               <MessageSquare className="size-4" />
               Message customer
             </Link>
+            {canMutate ? (
             <button
               type="button"
               onClick={() => setShowDelete(true)}
@@ -245,6 +255,7 @@ export default function PreorderDetailPage() {
               <Trash2 className="size-4" />
               Delete
             </button>
+            ) : null}
           </div>
         }
       />

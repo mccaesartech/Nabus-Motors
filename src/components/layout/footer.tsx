@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import type { SiteContent } from "@/lib/site-content/defaults";
 
 const footerLinkClass =
-  "inline-flex min-h-9 items-center text-sm text-white/80 transition-colors duration-200 hover:text-brand-cta-gold";
+  "inline-flex min-h-11 items-center text-sm text-white/80 transition-colors duration-200 hover:text-brand-cta-gold";
 
 const contactTextClass =
   "text-sm leading-snug text-white/80 transition-colors duration-200 hover:text-white";
@@ -210,7 +210,7 @@ export function Footer({ content, showInventory = false, brand = "corporate" }: 
                         href={social.href.trim()}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center rounded-md border border-white/15 bg-white/[0.06] px-3 py-1.5 text-xs font-medium text-white/80 transition-colors hover:border-brand-cta-gold/40 hover:text-brand-cta-gold"
+                        className="inline-flex min-h-11 items-center rounded-md border border-white/15 bg-white/[0.06] px-3 py-2 text-xs font-medium text-white/80 transition-colors hover:border-brand-cta-gold/40 hover:text-brand-cta-gold"
                       >
                         {social.label}
                       </a>
@@ -236,7 +236,7 @@ export function Footer({ content, showInventory = false, brand = "corporate" }: 
               <FullPageLink
                 key={link.href}
                 href={link.href}
-                className="text-xs text-white/65 transition-colors hover:text-brand-cta-gold"
+                className="inline-flex min-h-11 items-center text-xs text-white/65 transition-colors hover:text-brand-cta-gold"
               >
                 {link.label}
               </FullPageLink>

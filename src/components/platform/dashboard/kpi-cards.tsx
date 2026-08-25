@@ -104,7 +104,7 @@ export function KpiCards({ stats, role, permissions, extras, loading }: KpiCards
   const { formatPrice } = usePlatformCurrency();
   const persona = resolveDashboardPersona(role, permissions);
   const values = buildKpiValues(stats, extras);
-  const kpis = getKpisForPersona(persona, values, permissions);
+  const kpis = getKpisForPersona(persona, values, permissions, role);
 
   if (loading) {
     return (
@@ -150,10 +150,10 @@ export function KpiCards({ stats, role, permissions, extras, loading }: KpiCards
               onClick={definition.href ? () => router.push(definition.href!) : undefined}
               disabled={!definition.href}
               className={cn(
-                "flex min-h-[6.5rem] min-w-0 flex-col justify-between rounded-lg border bg-[var(--platform-card)] p-3.5 text-left transition-colors sm:min-h-[7.5rem] sm:p-5",
+                "flex min-h-[6.5rem] min-w-0 flex-col justify-between rounded-lg border p-3.5 text-left transition-colors sm:min-h-[7.5rem] sm:p-5",
                 needsAttention
-                  ? "border-[var(--platform-border)]/60 border-l-2 border-l-[var(--platform-accent)]"
-                  : "border-[var(--platform-border)]/60",
+                  ? "platform-card-accent-attention border-[var(--platform-border)]/60"
+                  : "border-[var(--platform-border)]/60 bg-[var(--platform-card)]",
                 definition.href && "cursor-pointer hover:border-[#c4b5fd]",
                 !definition.href && "cursor-default"
               )}

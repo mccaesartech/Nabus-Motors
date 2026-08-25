@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbFailure } from "@/lib/errors/api";
-import { requirePermission } from "@/lib/admin/auth";
+import { requireDirectMutation, requirePermission } from "@/lib/admin/auth";
 import type { PlatformAuthContext } from "@/lib/admin/auth";
 import { revalidatePublicSite } from "@/lib/admin/revalidate";
 import { fetchPreorderInquiryById } from "@/lib/platform/data";
@@ -74,7 +74,7 @@ async function completeSale(
   if (vehicleId) {
     const { data: vehicle } = await supabase
       .from("vehicles")
-      .select("id, slug, make, model, year")
+      .select("id, slug, make, model, year, stock_quantity, status")
       .eq("id", vehicleId)
       .maybeSingle();
 
@@ -262,9 +262,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requirePermission("sales");
+  const auth = await requireDirectMutation("sales");
   if (!auth.ok) {
-    return NextResponse.json({ ok: false }, { status: auth.status });
+    return NextResponse.json({ ok: false, message: auth.message }, { status: auth.status });
   }
 
   const body = await req.json();
@@ -389,9 +389,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const auth = await requirePermission("sales");
+  const auth = await requireDirectMutation("sales");
   if (!auth.ok) {
-    return NextResponse.json({ ok: false }, { status: auth.status });
+    return NextResponse.json({ ok: false, message: auth.message }, { status: auth.status });
   }
 
   const body = await req.json();
@@ -470,9 +470,9 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const auth = await requirePermission("sales");
+  const auth = await requireDirectMutation("sales");
   if (!auth.ok) {
-    return NextResponse.json({ ok: false }, { status: auth.status });
+    return NextResponse.json({ ok: false, message: auth.message }, { status: auth.status });
   }
 
   const id = req.nextUrl.searchParams.get("id");

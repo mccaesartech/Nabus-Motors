@@ -133,3 +133,80 @@ export function ConfirmDialog({
     </Dialog>
   );
 }
+
+type LogoutConfirmDialogProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void | Promise<void>;
+  pending?: boolean;
+  confirmLabel?: string;
+};
+
+export function LogoutConfirmDialog({
+  open,
+  onOpenChange,
+  onConfirm,
+  pending = false,
+  confirmLabel = "Log out",
+}: LogoutConfirmDialogProps) {
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open) setBusy(false);
+  }, [open]);
+
+  const isPending = pending || busy;
+
+  async function handleConfirm() {
+    if (isPending) return;
+    setBusy(true);
+    try {
+      await onConfirm();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!isPending) onOpenChange(next);
+      }}
+    >
+      <DialogContent
+        className="sm:max-w-md"
+        showCloseButton={!isPending}
+        aria-labelledby="logout-confirm-title"
+        aria-describedby="logout-confirm-description"
+      >
+        <DialogHeader>
+          <DialogTitle id="logout-confirm-title">
+            Are you sure you want to log out?
+          </DialogTitle>
+          <DialogDescription id="logout-confirm-description">
+            You&apos;ll need to sign in again to access your account.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isPending}
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            disabled={isPending}
+            onClick={() => void handleConfirm()}
+            aria-label={isPending ? "Logging out" : confirmLabel}
+          >
+            {isPending ? "Logging out\u2026" : confirmLabel}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

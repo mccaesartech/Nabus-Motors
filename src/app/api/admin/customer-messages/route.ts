@@ -291,7 +291,7 @@ export async function DELETE(req: NextRequest) {
 
   if (!canManageTrash(auth.auth)) {
     return NextResponse.json(
-      { ok: false, message: "Only owners, super admins, and managers can delete support tickets." },
+      { ok: false, message: "Only owners and super admins can delete support tickets." },
       { status: 403 }
     );
   }

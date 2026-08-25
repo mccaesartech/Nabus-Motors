@@ -112,10 +112,10 @@ export const ADMIN_VEHICLE_SELECT_LIST = [
 
 /** PATCH pre-read — includes local availability when migrated (067). */
 export const ADMIN_PATCH_EXISTING_SELECT =
-  "id, slug, approval_status, pending_changes, year, make, model, status, available_locally, local_availability_at, shipment_available";
+  "id, slug, approval_status, pending_changes, year, make, model, status, price, stock_quantity, available_locally, local_availability_at, shipment_available";
 
 export const ADMIN_PATCH_EXISTING_SELECT_MINIMAL =
-  "id, slug, approval_status, pending_changes, year, make, model, status";
+  "id, slug, approval_status, pending_changes, year, make, model, status, price, stock_quantity";
 
 export type AdminVehicleSelectMode = "full" | "safe" | "list";
 
@@ -227,6 +227,11 @@ export type VehicleWriteAttempt<T> = {
 /**
  * Run an insert/update with full optional columns; on missing-column errors,
  * retry with optional fields stripped and a safe select list.
+ *
+ * If stripping leaves an empty payload (e.g. units-only PATCH when
+ * `stock_quantity` is not migrated), return the original missing-column error
+ * instead of issuing `UPDATE {}` which PostgREST reports as 0 rows — that
+ * used to surface a misleading SUPABASE_SERVICE_ROLE_KEY message.
  */
 export async function vehicleWriteWithOptionalFallback<T>(
   write: (selectColumns: string, payload: Record<string, unknown>) => Promise<VehicleWriteAttempt<T>>,
@@ -241,6 +246,10 @@ export async function vehicleWriteWithOptionalFallback<T>(
 
   const warning = optionalVehicleColumnWarning(result.error.message);
   const stripped = stripOptionalVehicleColumns(prepared);
+  if (Object.keys(stripped).length === 0) {
+    return { result, warning };
+  }
+
   result = await write(adminVehicleSelectColumns("safe"), stripped);
 
   return { result, warning };

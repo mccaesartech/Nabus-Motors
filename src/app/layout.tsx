@@ -1,5 +1,6 @@
 import { Inter } from "next/font/google";
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { Suspense } from "react";
 import { DeferredChunkReloadHandler } from "@/components/layout/deferred-chunk-reload-handler";
 import { ResourceHints } from "@/components/layout/resource-hints";
@@ -12,14 +13,18 @@ import { CurrencyProvider } from "@/context/currency-context";
 import { CustomerAuthProvider } from "@/context/customer-auth-context";
 import { CustomerNotificationsProvider } from "@/context/customer-notifications-context";
 import { PartsCartProvider } from "@/context/parts-cart-context";
-import { CACHE_RECOVERY_INLINE_SCRIPT } from "@/lib/cache-recovery-inline-script";
+import { buildCacheRecoveryInlineScript } from "@/lib/cache-recovery-inline-script";
 import { CUSTOMER_PWA, PWA_BACKGROUND_COLOR, PWA_THEME_COLOR } from "@/lib/pwa/constants";
 import { DEFAULT_SITE_CONTENT } from "@/lib/site-content/defaults";
 import { getPublicSiteUrl } from "@/lib/site-url";
 import "./globals.css";
 
-/** ISR for public shell — busted via revalidateSiteContent() after CMS saves. */
-export const revalidate = 120;
+const CACHE_RECOVERY_INLINE_SCRIPT = buildCacheRecoveryInlineScript(getPublicSiteUrl());
+
+/**
+ * Root layout reads `x-nonce` for CSP. That opts the tree into dynamic rendering
+ * (required for per-request script nonces — see docs/CSP.md).
+ */
 
 const inter = Inter({
   subsets: ["latin"],
@@ -83,11 +88,13 @@ function ChromeFallback({ children }: { children: React.ReactNode }) {
   return <SiteChrome content={DEFAULT_SITE_CONTENT}>{children}</SiteChrome>;
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <html lang="en" className={`${inter.variable} light h-full`} suppressHydrationWarning>
       <head>
@@ -97,6 +104,7 @@ export default function RootLayout({
           content={process.env.NEXT_PUBLIC_BUILD_ID ?? "dev"}
         />
         <script
+          nonce={nonce}
           dangerouslySetInnerHTML={{ __html: CACHE_RECOVERY_INLINE_SCRIPT }}
         />
       </head>

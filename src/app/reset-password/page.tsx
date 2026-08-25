@@ -8,7 +8,12 @@ import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
+import { PasswordStrengthMeter } from "@/components/customer/password-strength-meter";
 import { supabase } from "@/lib/supabase/client";
+import {
+  PASSWORD_MIN_LENGTH,
+  validatePasswordPolicy,
+} from "@/lib/customer/password-policy";
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -39,8 +44,9 @@ function ResetPasswordForm() {
     e.preventDefault();
     setError("");
 
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+    const policy = validatePasswordPolicy(password);
+    if (!policy.ok) {
+      setError(policy.message);
       return;
     }
 
@@ -62,6 +68,19 @@ function ResetPasswordForm() {
       setError(updateError.message);
       setLoading(false);
       return;
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (accessToken) {
+      void fetch("/api/customer/auth/audit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ event: "password_changed" }),
+      }).catch(() => {});
     }
 
     setSuccess(true);
@@ -110,9 +129,10 @@ function ResetPasswordForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={8}
+                minLength={PASSWORD_MIN_LENGTH}
                 disabled={!ready || loading}
               />
+              <PasswordStrengthMeter password={password} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="reset-confirm">Confirm password</Label>
@@ -122,7 +142,7 @@ function ResetPasswordForm() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
-                minLength={8}
+                minLength={PASSWORD_MIN_LENGTH}
                 disabled={!ready || loading}
               />
             </div>

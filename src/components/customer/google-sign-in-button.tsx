@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { signInWithGoogle } from "@/lib/customer/google-oauth";
 import { cn } from "@/lib/utils";
 
+/** Must use Supabase signInWithOAuth — Google redirect_uri comes from NEXT_PUBLIC_SUPABASE_URL. */
+
 function GoogleIcon({ className }: { className?: string }) {
   return (
     <svg

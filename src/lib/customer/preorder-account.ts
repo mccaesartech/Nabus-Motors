@@ -1,5 +1,6 @@
 import type { User } from "@supabase/supabase-js";
 import { customerLoginErrorMessage } from "@/lib/customer/login-errors";
+import { ensureProfileRegistrationId } from "@/lib/customer/registration-id";
 import { validateEmailForSignup } from "@/lib/email/validate-email-server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createServerSupabase } from "@/lib/supabase/server";
@@ -57,7 +58,7 @@ export async function ensureCustomerProfile(
 
   const { data: existing, error: readError } = await admin
     .from("profiles")
-    .select("id, registration_id")
+    .select("id, registration_id, phone, email, first_name, last_name")
     .eq("id", userId)
     .maybeSingle();
 
@@ -65,12 +66,45 @@ export async function ensureCustomerProfile(
     console.warn("[preorder] profile lookup failed:", readError.message);
   }
 
-  if (existing?.registration_id) {
-    return existing.registration_id;
-  }
-
+  // Auth trigger often creates the row before sync — fill signup phone/email/name
+  // when missing so welcome SMS and profile are not blank forever.
   if (existing) {
-    return existing.registration_id ?? null;
+    const { firstName, lastName } = splitName(name);
+    const updates: Record<string, unknown> = {};
+    const trimmedPhone = phone?.trim() || "";
+    const trimmedEmail = email.trim();
+
+    if (trimmedPhone && !existing.phone?.trim()) {
+      updates.phone = trimmedPhone;
+    }
+    if (trimmedEmail && !existing.email?.trim()) {
+      updates.email = trimmedEmail;
+    }
+    if (firstName && !existing.first_name?.trim()) {
+      updates.first_name = firstName;
+    }
+    if (lastName && !existing.last_name?.trim()) {
+      updates.last_name = lastName;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      updates.updated_at = new Date().toISOString();
+      const { error: updateError } = await admin
+        .from("profiles")
+        .update(updates)
+        .eq("id", userId);
+      if (updateError) {
+        console.warn(
+          "[preorder] profile signup field backfill failed:",
+          updateError.message
+        );
+      }
+    }
+
+    if (existing.registration_id?.trim()) {
+      return existing.registration_id.trim();
+    }
+    return ensureProfileRegistrationId(admin, userId);
   }
 
   const { firstName, lastName } = splitName(name);
@@ -119,7 +153,11 @@ export async function ensureCustomerProfile(
     return null;
   }
 
-  return fallback?.registration_id ?? null;
+  if (fallback?.registration_id?.trim()) {
+    return fallback.registration_id.trim();
+  }
+
+  return ensureProfileRegistrationId(admin, userId);
 }
 
 /** Resolve authenticated user or create/sign-in via inline registration fields. */
@@ -328,6 +366,12 @@ export async function syncCustomerAccount(
   linkedPreorders: number;
   linkedFreightQuotes: number;
   linkedPartsOrders: number;
+  welcome?: {
+    sent: boolean;
+    emailSent: boolean;
+    smsSent: boolean;
+    reason?: string;
+  };
 }> {
   const admin = createAdminSupabase();
   if (!admin) {
@@ -335,6 +379,7 @@ export async function syncCustomerAccount(
   }
 
   const trimmedEmail = email.trim();
+  const trimmedPhone = options?.phone?.trim() || null;
   const displayName =
     options?.fullName?.trim() ||
     trimmedEmail.split("@")[0] ||
@@ -344,12 +389,12 @@ export async function syncCustomerAccount(
     userId,
     trimmedEmail,
     displayName,
-    options?.phone?.trim() || undefined
+    trimmedPhone || undefined
   );
 
   const { data: profile } = await admin
     .from("profiles")
-    .select("registration_id, email")
+    .select("registration_id, email, phone, created_at")
     .eq("id", userId)
     .maybeSingle();
 
@@ -370,10 +415,79 @@ export async function syncCustomerAccount(
     linkCustomerPartsOrdersByEmail(userId, trimmedEmail),
   ]);
 
+  // First-signup welcome (Google OAuth + password register). Idempotent; email is required.
+  // Catch-up also covers preorder-created auth users who finish UI registration later.
+  let welcome: {
+    sent: boolean;
+    emailSent: boolean;
+    smsSent: boolean;
+    reason?: string;
+  } | undefined;
+
+  try {
+    const {
+      maybeSendCustomerWelcomeEmail,
+      isWithinWelcomeWindow,
+      isWithinNeverWelcomedCatchupWindow,
+    } = await import("@/lib/customer/welcome-email");
+    const profileCreatedAt =
+      typeof profile?.created_at === "string" ? profile.created_at : null;
+    const knownNewAccount =
+      isWithinWelcomeWindow(profileCreatedAt) ||
+      isWithinNeverWelcomedCatchupWindow(profileCreatedAt);
+    const result = await maybeSendCustomerWelcomeEmail({
+      userId,
+      email: trimmedEmail,
+      name: displayName,
+      phone: trimmedPhone || profile?.phone || null,
+      registrationId,
+      // Prefer profile age we already loaded — avoids a second auth lookup fail-closed.
+      ...(knownNewAccount ? { knownNewAccount: true } : {}),
+    });
+    welcome = {
+      sent: result.sent,
+      emailSent: result.emailSent,
+      smsSent: result.smsSent,
+      ...(result.reason ? { reason: result.reason } : {}),
+    };
+    if (result.emailSent) {
+      console.info(
+        "[syncCustomerAccount] welcome email sent",
+        result.smsSent ? "(sms too)" : "(sms skipped or failed)"
+      );
+    } else {
+      console.warn(
+        "[syncCustomerAccount] welcome email not sent:",
+        result.reason ?? "unknown"
+      );
+    }
+  } catch (error) {
+    console.warn(
+      "[syncCustomerAccount] welcome email failed:",
+      error instanceof Error ? error.message : error
+    );
+    const { logAppError } = await import("@/lib/errors/logger");
+    logAppError({
+      error,
+      module: "customer.syncCustomerAccount.welcome",
+      userMessage: "The welcome email could not be sent.",
+      kind: "external_service",
+      status: 502,
+      actor: { id: userId, type: "customer" },
+    });
+    welcome = {
+      sent: false,
+      emailSent: false,
+      smsSent: false,
+      reason: "send_failed",
+    };
+  }
+
   return {
     registrationId,
     linkedPreorders,
     linkedFreightQuotes,
     linkedPartsOrders,
+    welcome,
   };
 }

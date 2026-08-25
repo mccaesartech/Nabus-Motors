@@ -22,6 +22,19 @@ import {
   type SessionPreference,
 } from "@/lib/customer/session-preference";
 import { supabase } from "@/lib/supabase/client";
+import { resolveCustomerApiUrl } from "@/lib/site-url";
+
+async function reportFailedLoginAttempt(email: string) {
+  try {
+    await fetch(resolveCustomerApiUrl("/api/customer/auth/login-attempt"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email.trim().toLowerCase(), method: "password" }),
+    });
+  } catch {
+    // non-blocking — sign-in UX must not depend on alert delivery
+  }
+}
 
 function LoginForm() {
   const router = useRouter();
@@ -89,9 +102,16 @@ function LoginForm() {
     });
 
     if (signInError) {
+      void reportFailedLoginAttempt(email);
       setError(customerLoginErrorMessage(signInError.message));
       setLoading(false);
       return;
+    }
+
+    try {
+      sessionStorage.setItem("tg_pending_login_method", "password");
+    } catch {
+      // ignore
     }
 
     if (!hasChosenSessionPreference()) {

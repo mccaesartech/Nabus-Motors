@@ -7,6 +7,8 @@ import { isLowStock } from "@/lib/platform/site-settings";
  *
  * - Fleet low stock: total `status = available` units < `inventory_low_stock_threshold`
  * - Model low stock: available units of the same make + model + year ≤ MODEL_LOW_STOCK_THRESHOLD
+ * - Marking sold / completing a sale decrements `stock_quantity` by 1; the last unit
+ *   flips status to sold (siblings remain) or pre_order (none left).
  *
  * Model threshold stays at 1 so unique-VIN inventory is not permanently highlighted.
  */

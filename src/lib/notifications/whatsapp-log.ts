@@ -104,6 +104,8 @@ export async function insertWhatsAppNotificationLog(row: {
   template: string;
   status: NotificationLogStatus;
   recipient: string;
+  /** Defaults to WhatsApp; SMS senders pass "sms" so Platform → Notifications shows them. */
+  channel?: string;
   provider?: string;
   providerMessageId?: string;
   idempotencyKey?: string;
@@ -128,7 +130,7 @@ export async function insertWhatsAppNotificationLog(row: {
         source_table: row.sourceTable ?? null,
         source_id: row.sourceId ?? null,
         template: row.template,
-        channel: "whatsapp",
+        channel: row.channel ?? "whatsapp",
         status: row.status,
         recipient: row.recipient,
         detail: row.detail ? buildDetail(row.detail) : row.provider ?? null,

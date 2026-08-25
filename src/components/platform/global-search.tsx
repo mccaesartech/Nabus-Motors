@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   Car,
@@ -38,6 +45,13 @@ const SEARCH_SUGGESTIONS = [
   "Find parts by SKU or brand",
 ];
 
+const RESULTS_LISTBOX_ID = "platform-global-search-results";
+const VIEW_ALL_OPTION_ID = "platform-search-option-view-all";
+
+function searchOptionId(resultId: string) {
+  return `platform-search-option-${resultId}`;
+}
+
 type GlobalSearchProps = {
   className?: string;
   inputClassName?: string;
@@ -59,6 +73,7 @@ export function GlobalSearch({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const [recent] = useState<string[]>(() => readRecentSearches());
 
   const runSearch = useCallback(
@@ -129,6 +144,7 @@ export function GlobalSearch({
     function onPointerDown(event: MouseEvent) {
       if (!containerRef.current?.contains(event.target as Node)) {
         setOpen(false);
+        setActiveIndex(-1);
         inputRef.current?.blur();
       }
     }
@@ -153,20 +169,120 @@ export function GlobalSearch({
     if (!trimmed) return;
     saveRecentSearch(trimmed);
     setOpen(false);
+    setActiveIndex(-1);
     router.push(`${platformPath("search")}?q=${encodeURIComponent(trimmed)}`);
   }
 
   function selectResult(result: AdminSearchResult) {
     saveRecentSearch(query);
     setOpen(false);
+    setActiveIndex(-1);
     setQuery("");
     router.push(result.href);
   }
 
   const trimmed = query.trim();
   const showDropdown = open;
-  const totalResults = groups.reduce((sum, g) => sum + g.results.length, 0);
+  const flatResults = useMemo(
+    () => groups.flatMap((group) => group.results),
+    [groups]
+  );
+  const totalResults = flatResults.length;
   const showRecent = trimmed.length < 2 && recent.length > 0;
+  const showResultList =
+    trimmed.length >= 2 && !loading && !error && totalResults > 0;
+  const canViewAll = trimmed.length >= 2;
+  /** Flat navigable options: search hits, then optional "View all" footer. */
+  const navigableCount = showResultList
+    ? totalResults + (canViewAll ? 1 : 0)
+    : canViewAll && !loading && !error
+      ? 1
+      : 0;
+  const viewAllIndex = showResultList && canViewAll ? totalResults : canViewAll && !loading && !error ? 0 : -1;
+
+  useEffect(() => {
+    setActiveIndex(-1);
+  }, [query, groups, loading, error]);
+
+  useEffect(() => {
+    if (!open || activeIndex < 0 || navigableCount === 0) return;
+    const id =
+      activeIndex === viewAllIndex
+        ? VIEW_ALL_OPTION_ID
+        : flatResults[activeIndex]
+          ? searchOptionId(flatResults[activeIndex].id)
+          : null;
+    if (!id) return;
+    const el = document.getElementById(id);
+    el?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, open, navigableCount, viewAllIndex, flatResults]);
+
+  const activeDescendantId =
+    open && activeIndex >= 0
+      ? activeIndex === viewAllIndex
+        ? VIEW_ALL_OPTION_ID
+        : flatResults[activeIndex]
+          ? searchOptionId(flatResults[activeIndex].id)
+          : undefined
+      : undefined;
+
+  function moveActive(delta: number) {
+    if (navigableCount === 0) return;
+    setActiveIndex((prev) => {
+      if (prev < 0) return delta > 0 ? 0 : navigableCount - 1;
+      return (prev + delta + navigableCount) % navigableCount;
+    });
+  }
+
+  function activateHighlighted() {
+    if (activeIndex >= 0 && activeIndex < flatResults.length) {
+      selectResult(flatResults[activeIndex]);
+      return;
+    }
+    if (activeIndex === viewAllIndex && canViewAll) {
+      goToFullSearch();
+      return;
+    }
+    const first = flatResults[0];
+    if (first) selectResult(first);
+    else goToFullSearch();
+  }
+
+  function onInputKeyDown(e: ReactKeyboardEvent<HTMLInputElement>) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!open) setOpen(true);
+      moveActive(1);
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!open) setOpen(true);
+      moveActive(-1);
+      return;
+    }
+    if (e.key === "Home" && open && navigableCount > 0) {
+      e.preventDefault();
+      setActiveIndex(0);
+      return;
+    }
+    if (e.key === "End" && open && navigableCount > 0) {
+      e.preventDefault();
+      setActiveIndex(navigableCount - 1);
+      return;
+    }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      activateHighlighted();
+      return;
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
+      setActiveIndex(-1);
+      inputRef.current?.blur();
+    }
+  }
 
   return (
     <div ref={containerRef} className={cn("relative", className)}>
@@ -174,6 +290,7 @@ export function GlobalSearch({
       <input
         ref={inputRef}
         type="text"
+        role="combobox"
         name="global-search"
         value={query}
         onChange={(e) => {
@@ -181,18 +298,7 @@ export function GlobalSearch({
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            const first = groups[0]?.results[0];
-            if (first) selectResult(first);
-            else goToFullSearch();
-          }
-          if (e.key === "Escape") {
-            setOpen(false);
-            inputRef.current?.blur();
-          }
-        }}
+        onKeyDown={onInputKeyDown}
         placeholder="Search VIN, customers, leads, parts..."
         className={cn(
           "relative z-[1] h-10 w-full min-w-0 platform-input platform-input--icon pr-14 text-sm",
@@ -200,7 +306,9 @@ export function GlobalSearch({
         )}
         aria-label="Global search"
         aria-expanded={showDropdown}
-        aria-controls="platform-global-search-results"
+        aria-controls={RESULTS_LISTBOX_ID}
+        aria-autocomplete="list"
+        aria-activedescendant={activeDescendantId}
         autoComplete="off"
         spellCheck={false}
       />
@@ -212,7 +320,9 @@ export function GlobalSearch({
 
       {showDropdown && (
         <div
-          id="platform-global-search-results"
+          id={RESULTS_LISTBOX_ID}
+          role="listbox"
+          aria-label="Search results"
           className="absolute left-0 right-0 top-[calc(100%+0.4rem)] z-50 min-w-0 overflow-hidden rounded-xl border border-[var(--platform-border)] bg-[var(--platform-card)] shadow-xl sm:min-w-[20rem]"
         >
           {showRecent && (
@@ -268,46 +378,61 @@ export function GlobalSearch({
             </div>
           )}
 
-          {trimmed.length >= 2 && !loading && !error && totalResults > 0 && (
+          {showResultList && (
             <div className="max-h-[28rem] overflow-y-auto py-1">
-              {groups.map((group) => (
-                <div key={group.type}>
-                  <p className="px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-[var(--platform-text-secondary)]">
-                    {group.label}
-                  </p>
-                  <ul>
-                    {group.results.map((result) => {
-                      const Icon = TYPE_ICONS[result.type];
-                      return (
-                        <li key={result.id}>
-                          <button
-                            type="button"
-                            onClick={() => selectResult(result)}
-                            className="flex w-full items-start gap-3 px-4 py-2.5 text-left transition-colors hover:bg-[rgba(76,29,149,0.06)]"
-                          >
-                            <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-[rgba(139,92,246,0.1)] text-[var(--platform-accent)]">
-                              <Icon className="size-4" />
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="flex items-center gap-2">
-                                <span className="truncate text-sm font-medium text-[var(--platform-text)]">
-                                  {result.title}
+              {groups.map((group) => {
+                const groupStartIndex = flatResults.findIndex(
+                  (r) => r.id === group.results[0]?.id && r.type === group.type
+                );
+                return (
+                  <div key={group.type}>
+                    <p className="px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-[var(--platform-text-secondary)]">
+                      {group.label}
+                    </p>
+                    <ul role="group" aria-label={group.label}>
+                      {group.results.map((result, resultIndex) => {
+                        const Icon = TYPE_ICONS[result.type];
+                        const flatIndex =
+                          groupStartIndex >= 0 ? groupStartIndex + resultIndex : resultIndex;
+                        const isActive = flatIndex === activeIndex;
+                        return (
+                          <li key={result.id} role="presentation">
+                            <button
+                              id={searchOptionId(result.id)}
+                              type="button"
+                              role="option"
+                              aria-selected={isActive}
+                              onClick={() => selectResult(result)}
+                              onMouseEnter={() => setActiveIndex(flatIndex)}
+                              className={cn(
+                                "flex w-full items-start gap-3 px-4 py-2.5 text-left transition-colors hover:bg-[rgba(76,29,149,0.06)]",
+                                isActive && "bg-[rgba(76,29,149,0.06)]"
+                              )}
+                            >
+                              <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-[rgba(139,92,246,0.1)] text-[var(--platform-accent)]">
+                                <Icon className="size-4" />
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="flex items-center gap-2">
+                                  <span className="truncate text-sm font-medium text-[var(--platform-text)]">
+                                    {result.title}
+                                  </span>
+                                  <span className="shrink-0 rounded bg-[rgba(139,92,246,0.12)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--platform-accent)]">
+                                    {result.badge}
+                                  </span>
                                 </span>
-                                <span className="shrink-0 rounded bg-[rgba(139,92,246,0.12)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--platform-accent)]">
-                                  {result.badge}
+                                <span className="mt-0.5 block truncate text-xs text-[var(--platform-text-secondary)]">
+                                  {result.subtitle}
                                 </span>
                               </span>
-                              <span className="mt-0.5 block truncate text-xs text-[var(--platform-text-secondary)]">
-                                {result.subtitle}
-                              </span>
-                            </span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ))}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -319,14 +444,21 @@ export function GlobalSearch({
 
           <div className="border-t border-[var(--platform-border)] px-3 py-2">
             <button
+              id={VIEW_ALL_OPTION_ID}
               type="button"
+              role="option"
+              aria-selected={activeIndex === viewAllIndex}
               onClick={() => goToFullSearch()}
-              disabled={trimmed.length < 2}
+              onMouseEnter={() => {
+                if (canViewAll && viewAllIndex >= 0) setActiveIndex(viewAllIndex);
+              }}
+              disabled={!canViewAll}
               className={cn(
                 "flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-medium",
-                trimmed.length >= 2
+                canViewAll
                   ? "text-[var(--platform-accent)] hover:bg-[rgba(76,29,149,0.06)]"
-                  : "cursor-not-allowed text-[var(--platform-text-secondary)] opacity-60"
+                  : "cursor-not-allowed text-[var(--platform-text-secondary)] opacity-60",
+                activeIndex === viewAllIndex && canViewAll && "bg-[rgba(76,29,149,0.06)]"
               )}
             >
               <Search className="size-4 shrink-0" />

@@ -7,18 +7,23 @@ import { parsePlatformSessionCookieValue } from "@/lib/platform/session";
 export async function resolvePlatformAuthFromRequest(req: NextRequest): Promise<{
   authenticated: boolean;
   role: PlatformRole | null;
+  mustChangePassword: boolean;
 }> {
   const ownerToken = req.cookies.get(ADMIN_COOKIE)?.value;
   const expected = await expectedAdminToken();
   if (ownerToken && expected && ownerToken === expected) {
-    return { authenticated: true, role: "owner" };
+    return { authenticated: true, role: "owner", mustChangePassword: false };
   }
 
   const platformCookie = req.cookies.get(PLATFORM_USER_COOKIE)?.value;
   const payload = await parsePlatformSessionCookieValue(platformCookie);
   if (!payload) {
-    return { authenticated: false, role: null };
+    return { authenticated: false, role: null, mustChangePassword: false };
   }
 
-  return { authenticated: true, role: normalizeRole(payload.role) };
+  return {
+    authenticated: true,
+    role: normalizeRole(payload.role),
+    mustChangePassword: Boolean(payload.mcp),
+  };
 }

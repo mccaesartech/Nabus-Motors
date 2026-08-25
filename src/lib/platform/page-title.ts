@@ -5,11 +5,15 @@ const PLATFORM_PREFIX = platformPathPrefix();
 
 /** Resolve the mobile/desktop topbar title for a platform route. */
 export function platformPageTitle(pathname: string): string {
+  if (pathname.startsWith(platformPath("account/security"))) return "Account security";
+  if (pathname.startsWith(platformPath("account"))) return "Account";
   if (pathname.startsWith(platformPath("notifications"))) return "Notifications";
   if (pathname.startsWith(platformPath("emails"))) return "Emails";
   if (pathname.startsWith(platformPath("search"))) return "Search";
   if (pathname.includes("/inventory/new")) return "Add vehicle";
   if (pathname.includes("/inventory/") && pathname.endsWith("/edit")) return "Edit vehicle";
+  if (pathname.includes("/inventory/ai-usage")) return "AI usage";
+  if (pathname.includes("/inventory/movements")) return "Movement Ledger";
   if (pathname.endsWith("/users/activity")) return "Activity";
   if (pathname.includes("/leads/preorder/")) return "Pre-order detail";
   if (new RegExp(`^${PLATFORM_PREFIX}/customers/[^/]+$`).test(pathname)) return "Customer detail";

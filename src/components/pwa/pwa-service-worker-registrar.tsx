@@ -4,7 +4,10 @@ import { useEffect } from "react";
 import {
   BUILD_RELOAD_KEY,
   getBuildIdFromDom,
+  isVercelAppHostname,
+  unregisterStaleServiceWorkers,
 } from "@/lib/cache-recovery";
+import { PRODUCTION_PUBLIC_SITE_URL } from "@/lib/site-url";
 
 type PwaServiceWorkerRegistrarProps = {
   /** SW scope — customer uses `/`, admin uses `/admin` for separate install identity. */
@@ -14,6 +17,9 @@ type PwaServiceWorkerRegistrarProps = {
 /**
  * Registers the Serwist service worker without pulling @serwist/turbopack/react
  * or patching history during the critical rendering path.
+ *
+ * Never registers on *.vercel.app — those hosts must migrate to www and drop
+ * any leftover workers that keep relative `/api/*` polls alive.
  *
  * On SW *updates* (skipWaiting + clientsClaim), reload once per build so pages
  * do not keep running against a newly claimed worker. Shares BUILD_RELOAD_KEY
@@ -27,6 +33,17 @@ export function PwaServiceWorkerRegistrar({
 
     const register = async () => {
       if (cancelled || !("serviceWorker" in navigator)) return;
+
+      if (isVercelAppHostname()) {
+        await unregisterStaleServiceWorkers();
+        if (cancelled) return;
+        const dest = new URL(
+          `${window.location.pathname}${window.location.search}${window.location.hash}`,
+          PRODUCTION_PUBLIC_SITE_URL
+        );
+        window.location.replace(dest.toString());
+        return;
+      }
 
       try {
         const { Serwist } = await import("@serwist/window");

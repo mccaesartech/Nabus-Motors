@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbFailure } from "@/lib/errors/api";
-import { requirePermission } from "@/lib/admin/auth";
+import { requireDirectMutation, requirePermission } from "@/lib/admin/auth";
 import { notifyCustomer } from "@/lib/notifications/customer-notify";
 import { notifyCustomerOrderConfirmed } from "@/lib/customer/notifications-server";
 import { formatCustomerNotificationFeedback } from "@/lib/notifications/notification-status";
@@ -34,7 +34,7 @@ export async function GET(_req: NextRequest, context: RouteContext) {
 }
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
-  const auth = await requirePermission("parts");
+  const auth = await requireDirectMutation("parts");
   if (!auth.ok) {
     return NextResponse.json({ ok: false }, { status: auth.status });
   }

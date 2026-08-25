@@ -2,15 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Shield, Settings } from "lucide-react";
+import { Shield, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AccountSectionHeader } from "@/components/account/account-section-header";
+import { BackNav } from "@/components/shared/back-nav";
+import { ROUTES } from "@/lib/routes";
 
 const SETTINGS_LINKS = [
   {
     href: "/account/settings",
-    label: "Overview",
-    icon: Settings,
+    label: "Profile",
+    icon: UserRound,
     exact: true,
   },
   {
@@ -36,7 +38,7 @@ export function AccountSettingsNav() {
             key={link.href}
             href={link.href}
             className={cn(
-              "inline-flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition-colors",
+              "inline-flex min-h-11 items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition-colors",
               active
                 ? "border-brand-purple/30 bg-brand-purple/10 text-brand-purple"
                 : "border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground"
@@ -63,12 +65,12 @@ export function AccountSettingsShell({
   return (
     <div className="space-y-8">
       <div>
-        <Link
-          href="/account"
-          className="text-sm font-medium text-brand-purple hover:underline"
-        >
-          ← Back to account
-        </Link>
+        <BackNav
+          label="Back"
+          fallbackHref={ROUTES.corporate.account}
+          preferFallback={false}
+          variant="public"
+        />
         <div className="mt-4">
           <AccountSectionHeader title={title} description={description} />
         </div>

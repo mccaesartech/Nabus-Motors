@@ -9,6 +9,9 @@ const PLATFORM_PREFIX = platformPathPrefix();
 
 /** Parent route for nested platform pages — shown in the mobile top bar. */
 export function platformMobileBackTarget(pathname: string): PlatformMobileBackTarget | null {
+  if (pathname.startsWith(platformPath("account"))) {
+    return { href: platformPath("dashboard"), label: "Dashboard" };
+  }
   if (pathname.includes("/inventory/new")) {
     return { href: platformPath("inventory"), label: "Inventory" };
   }

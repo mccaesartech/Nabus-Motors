@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { ArrowRightLeft, X } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -19,13 +20,28 @@ export function CompareFloatingBar() {
     pathname !== ROUTES.auto.compare &&
     compareCount > 0;
 
+  useEffect(() => {
+    const root = document.documentElement;
+    if (showBar) {
+      root.dataset.compareBar = "open";
+      root.style.setProperty("--compare-bar-height", "4.5rem");
+    } else {
+      delete root.dataset.compareBar;
+      root.style.setProperty("--compare-bar-height", "0px");
+    }
+    return () => {
+      delete root.dataset.compareBar;
+      root.style.setProperty("--compare-bar-height", "0px");
+    };
+  }, [showBar]);
+
   if (!showBar) return null;
 
   return (
     <div
       role="region"
       aria-label="Vehicle compare tray"
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 px-4 py-3 shadow-luxury-lg backdrop-blur-sm"
+      className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] shadow-luxury-lg backdrop-blur-sm"
     >
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 sm:gap-4">
         <div className="flex items-center gap-2 text-sm font-medium">
@@ -39,7 +55,7 @@ export function CompareFloatingBar() {
             return (
               <span
                 key={id}
-                className="inline-flex max-w-[180px] items-center gap-1 truncate rounded-md border border-border bg-muted/50 px-2 py-1 text-xs"
+                className="inline-flex max-w-[min(180px,45vw)] items-center gap-1 truncate rounded-md border border-border bg-muted/50 px-2 py-1.5 text-xs"
               >
                 <span className="truncate">
                   {vehicle ? formatVehicleName(vehicle) : id}
@@ -48,10 +64,10 @@ export function CompareFloatingBar() {
                   <button
                     type="button"
                     onClick={() => removeFromCompare(vehicle)}
-                    className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
+                    className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
                     aria-label={`Remove ${formatVehicleName(vehicle)} from compare`}
                   >
-                    <X className="size-3" />
+                    <X className="size-4" />
                   </button>
                 )}
               </span>
@@ -59,16 +75,20 @@ export function CompareFloatingBar() {
           })}
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
           <Button
             variant="ghost"
             size="sm"
             onClick={clearCompare}
-            className="text-muted-foreground"
+            className="min-h-11 flex-1 text-muted-foreground sm:flex-none"
           >
             Clear
           </Button>
-          <Button size="sm" render={<Link href={ROUTES.auto.compare} />}>
+          <Button
+            size="sm"
+            className="min-h-11 flex-1 sm:flex-none"
+            render={<Link href={ROUTES.auto.compare} />}
+          >
             Compare Now
           </Button>
         </div>

@@ -28,6 +28,8 @@ export type ActivityAction =
   | "team_group_updated"
   | "sale_updated"
   | "settings_updated"
+  | "maintenance_enabled"
+  | "maintenance_disabled"
   | "export"
   | "expense_added"
   | "freight_quote_updated"

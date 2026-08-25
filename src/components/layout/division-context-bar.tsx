@@ -31,7 +31,7 @@ export function DivisionContextBar() {
       <Container className="flex flex-wrap items-center gap-x-2 gap-y-1 py-2 text-xs text-muted-foreground">
         <FullPageLink
           href={CORPORATE_HOME}
-          className="font-medium transition-colors hover:text-foreground"
+          className="inline-flex min-h-11 items-center font-medium transition-colors hover:text-foreground"
         >
           Company Home
         </FullPageLink>

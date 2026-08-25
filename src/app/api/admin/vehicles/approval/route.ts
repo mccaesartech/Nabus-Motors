@@ -15,10 +15,16 @@ import type { DbVehicle } from "@/lib/platform/types";
 import { vehicleWriteWithOptionalFallback } from "@/lib/admin/vehicle-columns";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import {
-  countAvailableSiblings,
-  resolveRequestedSoldStatus,
+  resolveUnitSoldTransition,
 } from "@/lib/vehicles/stock-automation";
 import { maybeNotifyVehicleStockAction, refreshFleetLowStockAlert } from "@/lib/platform/vehicle-stock-notifications";
+import { recordVehicleSold } from "@/lib/platform/inventory-movements/record";
+import { normalizeStockQuantity } from "@/lib/admin/vehicle-fields";
+import { listingUnitCount } from "@/lib/vehicles/low-stock";
+import {
+  notifyPriceDropSubscribers,
+  notifyVehicleLocallyAvailable,
+} from "@/lib/vehicle-interest/server";
 
 export async function POST(req: NextRequest) {
   const auth = await requirePermission("inventory_approve");
@@ -70,7 +76,9 @@ export async function POST(req: NextRequest) {
 
   const { data: existing, error: fetchError } = await supabase
     .from("vehicles")
-    .select("id, slug, year, make, model, approval_status, pending_changes")
+    .select(
+      "id, slug, year, make, model, price, stock_quantity, approval_status, pending_changes, available_locally, local_availability_at"
+    )
     .eq("id", id)
     .maybeSingle();
 
@@ -102,6 +110,9 @@ export async function POST(req: NextRequest) {
   let approvedSoldTransition: {
     autoPreOrder: boolean;
     availableSiblings: number;
+    remainingInGroup: number;
+    unitDecremented: boolean;
+    stock_quantity: number;
     make: string;
     model: string;
     year: number;
@@ -122,28 +133,31 @@ export async function POST(req: NextRequest) {
         const make = String(pending.make ?? existing.make);
         const model = String(pending.model ?? existing.model);
         const year = Number(pending.year ?? existing.year);
-        const availableSiblings = await countAvailableSiblings(supabase, {
-          id,
-          make,
-          model,
-          year,
-        });
-        const resolved = await resolveRequestedSoldStatus(supabase, {
+        const qtyBasis =
+          pending.stock_quantity !== undefined
+            ? normalizeStockQuantity(pending.stock_quantity)
+            : listingUnitCount({ stock_quantity: existing.stock_quantity });
+        const transition = await resolveUnitSoldTransition(supabase, {
           id,
           slug: existing.slug,
           make,
           model,
           year,
+          stock_quantity: qtyBasis,
         });
-        pending.status = resolved;
+        pending.status = transition.status;
+        pending.stock_quantity = transition.stock_quantity;
         approvedSoldTransition = {
-          autoPreOrder: resolved === "pre_order",
-          availableSiblings,
+          autoPreOrder: transition.autoPreOrder,
+          availableSiblings: transition.availableSiblings,
+          remainingInGroup: transition.remainingInGroup,
+          unitDecremented: transition.unitDecremented,
+          stock_quantity: transition.stock_quantity,
           make,
           model,
           year,
         };
-        if (resolved === "pre_order") {
+        if (transition.autoPreOrder) {
           await logPlatformActivity(auth.auth, "vehicle_auto_pre_order", existing.slug, {
             id,
             make,
@@ -234,7 +248,7 @@ export async function POST(req: NextRequest) {
         year: approvedSoldTransition.year,
         make: approvedSoldTransition.make,
         model: approvedSoldTransition.model,
-        availableSiblings: approvedSoldTransition.availableSiblings,
+        availableSiblings: approvedSoldTransition.remainingInGroup,
         autoPreOrder: approvedSoldTransition.autoPreOrder,
         source: "sold",
         sourceDetail: "approval_status_change",
@@ -242,6 +256,67 @@ export async function POST(req: NextRequest) {
       await refreshFleetLowStockAlert(supabase);
     } catch (err) {
       console.error("[vehicles/approval] stock action notify failed:", err);
+    }
+
+    await recordVehicleSold(
+      supabase,
+      {
+        id: vehicle.id,
+        year: vehicle.year,
+        make: vehicle.make,
+        model: vehicle.model,
+        price: vehicle.price,
+      },
+      {
+        auth: auth.auth,
+        movementType: "vehicle_sold",
+        referenceId: `${vehicle.id}:sold:approval:${Date.now()}`,
+      }
+    );
+  }
+
+  if (action === "approve" && isEditPending) {
+    const pending = existing.pending_changes as VehiclePendingChanges;
+    const previousPrice = Number(existing.price);
+    const newPrice = Number(
+      pending.price !== undefined ? pending.price : vehicle.price
+    );
+    if (
+      pending.price !== undefined &&
+      Number.isFinite(previousPrice) &&
+      Number.isFinite(newPrice) &&
+      newPrice < previousPrice
+    ) {
+      try {
+        await notifyPriceDropSubscribers(supabase, {
+          id: vehicle.id,
+          slug: vehicle.slug,
+          make: String(vehicle.make),
+          model: String(vehicle.model),
+          year: Number(vehicle.year),
+          previousPrice,
+          newPrice,
+        });
+      } catch (err) {
+        console.error("[vehicles/approval] price-drop notify failed:", err);
+      }
+    }
+
+    const wasLocal = Boolean(existing.available_locally);
+    const nowLocal = Boolean(vehicle.available_locally);
+    if (!wasLocal && nowLocal && vehicle.local_availability_at) {
+      try {
+        await notifyVehicleLocallyAvailable(supabase, {
+          id: vehicle.id,
+          slug: vehicle.slug,
+          make: String(vehicle.make),
+          model: String(vehicle.model),
+          year: Number(vehicle.year),
+          local_availability_at: String(vehicle.local_availability_at),
+        });
+      } catch (err) {
+        console.error("[vehicles/approval] local availability notify failed:", err);
+      }
     }
   }
 

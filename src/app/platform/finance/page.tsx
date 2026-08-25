@@ -4,9 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Download, Plus, Trash2 } from "lucide-react";
 import { PageHeader, StatCard } from "@/components/platform/page-header";
+import { usePlatformSession } from "@/components/platform/platform-shell";
 import { adminLoginPath } from "@/lib/admin/paths";
 import { usePlatformCurrency } from "@/context/platform-currency-context";
 import { isAdminAuthError } from "@/lib/admin/client";
+import { canViewFinance } from "@/lib/platform/permissions";
+import { canDirectMutate } from "@/lib/platform/mutation-approval";
+import { platformPath } from "@/lib/platform/paths";
 import type { ExpenseRow } from "@/lib/platform/modules";
 import { downloadCsv } from "@/lib/platform/data";
 import { PlatformDateTime } from "@/components/platform/platform-datetime";
@@ -21,6 +25,9 @@ type FinanceSummary = {
 
 export default function FinancePage() {
   const router = useRouter();
+  const session = usePlatformSession();
+  const canMutate = session ? canDirectMutate(session.role) : false;
+  const financeVisible = session ? canViewFinance(session.role) : false;
   const { formatPrice } = usePlatformCurrency();
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
@@ -43,8 +50,15 @@ export default function FinancePage() {
   }, [router]);
 
   useEffect(() => {
+    if (session && !financeVisible) {
+      router.replace(platformPath("dashboard"));
+    }
+  }, [session, financeVisible, router]);
+
+  useEffect(() => {
+    if (!financeVisible) return;
     load();
-  }, [load]);
+  }, [load, financeVisible]);
 
   async function addExpense(e: React.FormEvent) {
     e.preventDefault();
@@ -95,6 +109,10 @@ export default function FinancePage() {
       `true-goshen-finance-${new Date().toISOString().slice(0, 10)}.csv`,
       [...lines, ...summaryLines].join("\n")
     );
+  }
+
+  if (session && !financeVisible) {
+    return null;
   }
 
   if (loading) {
@@ -163,14 +181,16 @@ export default function FinancePage() {
                         <PlatformDateTime value={expense.expense_date} mode="date" className="text-xs" />
                       </td>
                       <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() => removeExpense(expense.id)}
-                          className="text-[var(--platform-text-secondary)] hover:text-[var(--platform-error)]"
-                          aria-label="Delete expense"
-                        >
-                          <Trash2 className="size-4" />
-                        </button>
+                        {canMutate ? (
+                          <button
+                            type="button"
+                            onClick={() => removeExpense(expense.id)}
+                            className="text-[var(--platform-text-secondary)] hover:text-[var(--platform-error)]"
+                            aria-label="Delete expense"
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        ) : null}
                       </td>
                     </tr>
                   ))
@@ -180,6 +200,7 @@ export default function FinancePage() {
           </div>
         </div>
 
+        {canMutate ? (
         <form onSubmit={addExpense} className="platform-card space-y-4 rounded-xl p-5">
           <h2 className="text-sm font-semibold text-[var(--platform-text)]">Add expense</h2>
           <label className="block space-y-1.5">
@@ -218,6 +239,11 @@ export default function FinancePage() {
             Add expense
           </button>
         </form>
+        ) : (
+          <div className="platform-card rounded-xl p-5 text-sm text-[var(--platform-text-secondary)]">
+            Expense changes require Owner or Super Admin approval.
+          </div>
+        )}
       </div>
     </div>
   );

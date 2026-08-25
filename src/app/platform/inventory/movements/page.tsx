@@ -22,6 +22,8 @@ import type {
   MovementSummary,
 } from "@/lib/platform/inventory-movements/types";
 import { platformPath } from "@/lib/platform/paths";
+import { usePlatformSession } from "@/components/platform/platform-shell";
+import { canViewFinance } from "@/lib/platform/permissions";
 import { usePlatformCurrency } from "@/context/platform-currency-context";
 import { cn } from "@/lib/utils";
 
@@ -57,8 +59,15 @@ const ASSET_FILTERS: { value: MovementAssetType | "all"; label: string }[] = [
   { value: "expense", label: "Expenses" },
 ];
 
+function assetFiltersForRole(financeVisible: boolean) {
+  if (financeVisible) return ASSET_FILTERS;
+  return ASSET_FILTERS.filter((filter) => filter.value !== "sale" && filter.value !== "expense");
+}
+
 export default function InventoryMovementsPage() {
   const router = useRouter();
+  const session = usePlatformSession();
+  const financeVisible = session ? canViewFinance(session.role) : false;
   const { formatPrice } = usePlatformCurrency();
   const [period, setPeriod] = useState<MovementPeriod>("month");
   const [from, setFrom] = useState("");
@@ -76,41 +85,37 @@ export default function InventoryMovementsPage() {
   const [needsBackfill, setNeedsBackfill] = useState(false);
   const [error, setError] = useState("");
 
-  const load = useCallback(
-    async (opts?: { backfill?: boolean }) => {
-      setLoading(true);
-      setError("");
-      const params = new URLSearchParams({ period });
-      if (period === "range") {
-        if (from) params.set("from", from);
-        if (to) params.set("to", to);
-      }
-      if (assetType !== "all") params.set("asset_type", assetType);
-      if (direction !== "all") params.set("direction", direction);
-      if (opts?.backfill) params.set("backfill", "1");
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    const params = new URLSearchParams({ period });
+    if (period === "range") {
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
+    }
+    if (assetType !== "all") params.set("asset_type", assetType);
+    if (direction !== "all") params.set("direction", direction);
 
-      const res = await fetch(`/api/admin/inventory-movements?${params.toString()}`);
-      if (isAdminAuthError(res)) {
-        router.push(adminLoginPath());
-        return;
-      }
+    const res = await fetch(`/api/admin/inventory-movements?${params.toString()}`);
+    if (isAdminAuthError(res)) {
+      router.push(adminLoginPath());
+      return;
+    }
 
-      const json = (await res.json()) as MovementsResponse;
-      if (!res.ok || !json.ok) {
-        setError(json.message ?? "Failed to load movement records");
-        setLoading(false);
-        return;
-      }
-
-      setMigrationRequired(Boolean(json.migrationRequired));
-      setNeedsBackfill(Boolean(json.needsBackfill));
-      setMovements(json.movements ?? []);
-      setSummary(json.summary ?? null);
-      setBuckets(json.buckets ?? []);
+    const json = (await res.json()) as MovementsResponse;
+    if (!res.ok || !json.ok) {
+      setError(json.message ?? "Failed to load movement records");
       setLoading(false);
-    },
-    [period, from, to, assetType, direction, router]
-  );
+      return;
+    }
+
+    setMigrationRequired(Boolean(json.migrationRequired));
+    setNeedsBackfill(Boolean(json.needsBackfill));
+    setMovements(json.movements ?? []);
+    setSummary(json.summary ?? null);
+    setBuckets(json.buckets ?? []);
+    setLoading(false);
+  }, [period, from, to, assetType, direction, router]);
 
   useEffect(() => {
     void load();
@@ -118,7 +123,25 @@ export default function InventoryMovementsPage() {
 
   async function handleBackfill() {
     setBackfilling(true);
-    await load({ backfill: true });
+    setError("");
+    const res = await fetch("/api/admin/inventory-movements", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    if (isAdminAuthError(res)) {
+      router.push(adminLoginPath());
+      setBackfilling(false);
+      return;
+    }
+    const json = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string };
+    if (!res.ok || !json.ok) {
+      setError(json.message ?? "Failed to import movement history");
+      setBackfilling(false);
+      return;
+    }
+    await load();
     setBackfilling(false);
   }
 
@@ -160,7 +183,11 @@ export default function InventoryMovementsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Movement Ledger"
-        description="Trace vehicles, parts, sales revenue, and expenses — daily, weekly, monthly, or yearly."
+        description={
+          financeVisible
+            ? "Trace vehicles, parts, sales revenue, and expenses — daily, weekly, monthly, or yearly."
+            : "Trace vehicles, parts, orders, and pre-orders — daily, weekly, monthly, or yearly."
+        }
         breadcrumb="INVENTORY · Movement Ledger"
         actions={
           <>
@@ -271,7 +298,7 @@ export default function InventoryMovementsPage() {
             value={assetType}
             onChange={(e) => setAssetType(e.target.value as MovementAssetType | "all")}
           >
-            {ASSET_FILTERS.map((filter) => (
+            {assetFiltersForRole(financeVisible).map((filter) => (
               <option key={filter.value} value={filter.value}>
                 {filter.label}
               </option>
@@ -291,34 +318,46 @@ export default function InventoryMovementsPage() {
 
       {summary ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            label={`Money in (${periodLabel})`}
-            value={formatPrice(summary.totalInUsd)}
-            icon={<ArrowDownLeft className="size-4" />}
-            changeTone="positive"
-          />
-          <StatCard
-            label={`Money out (${periodLabel})`}
-            value={formatPrice(summary.totalOutUsd)}
-            icon={<ArrowUpRight className="size-4" />}
-            changeTone="negative"
-          />
-          <StatCard
-            label="Net"
-            value={formatPrice(summary.netUsd)}
-            change={`${summary.count} record${summary.count === 1 ? "" : "s"}`}
-            changeTone={summary.netUsd >= 0 ? "positive" : "negative"}
-          />
+          {financeVisible ? (
+            <>
+              <StatCard
+                label={`Money in (${periodLabel})`}
+                value={formatPrice(summary.totalInUsd)}
+                icon={<ArrowDownLeft className="size-4" />}
+                changeTone="positive"
+              />
+              <StatCard
+                label={`Money out (${periodLabel})`}
+                value={formatPrice(summary.totalOutUsd)}
+                icon={<ArrowUpRight className="size-4" />}
+                changeTone="negative"
+              />
+              <StatCard
+                label="Net"
+                value={formatPrice(summary.netUsd)}
+                change={`${summary.count} record${summary.count === 1 ? "" : "s"}`}
+                changeTone={summary.netUsd >= 0 ? "positive" : "negative"}
+              />
+            </>
+          ) : null}
           <StatCard
             label="Units in / out"
             value={`${summary.unitsIn} / ${summary.unitsOut}`}
             change="Inventory quantity"
             changeTone="neutral"
           />
+          {financeVisible ? null : (
+            <StatCard
+              label="Records"
+              value={String(summary.count)}
+              change={`${periodLabel} activity`}
+              changeTone="neutral"
+            />
+          )}
         </div>
       ) : null}
 
-      {buckets.length > 0 && period !== "day" ? (
+      {financeVisible && buckets.length > 0 && period !== "day" ? (
         <div className="platform-card overflow-hidden rounded-xl">
           <div className="border-b border-[var(--platform-border)] px-4 py-3">
             <h2 className="text-sm font-semibold text-[var(--platform-text)]">
@@ -381,8 +420,12 @@ export default function InventoryMovementsPage() {
                   <th>Type</th>
                   <th>Description</th>
                   <th>Qty</th>
-                  <th>Amount</th>
-                  <th>Running net</th>
+                  {financeVisible ? (
+                    <>
+                      <th>Amount</th>
+                      <th>Running net</th>
+                    </>
+                  ) : null}
                 </tr>
               </thead>
               <tbody>
@@ -412,8 +455,12 @@ export default function InventoryMovementsPage() {
                       {row.description}
                     </td>
                     <td className="tabular-nums">{row.quantity || "—"}</td>
-                    <td className="tabular-nums">{formatPrice(row.amount_usd)}</td>
-                    <td className="tabular-nums">{formatPrice(row.runningNetUsd)}</td>
+                    {financeVisible ? (
+                      <>
+                        <td className="tabular-nums">{formatPrice(row.amount_usd)}</td>
+                        <td className="tabular-nums">{formatPrice(row.runningNetUsd)}</td>
+                      </>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>

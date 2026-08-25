@@ -8,6 +8,8 @@ export type PlatformSessionPayload = {
   exp: number;
   /** Fingerprint of password_hash — invalidates session when password changes. */
   pwd: string;
+  /** When true, user must change password before using the platform (Edge hint). */
+  mcp?: boolean;
 };
 
 function sessionSecret(): string | null {
@@ -62,7 +64,8 @@ export async function passwordHashFingerprint(passwordHash: string): Promise<str
 export async function buildPlatformSessionCookieValue(
   userId: string,
   role: string,
-  passwordHash: string
+  passwordHash: string,
+  options?: { mustChangePassword?: boolean }
 ): Promise<string> {
   const secret = sessionSecret();
   if (!secret) {
@@ -70,7 +73,13 @@ export async function buildPlatformSessionCookieValue(
   }
   const exp = Math.floor(Date.now() / 1000) + PLATFORM_SESSION_TTL_SEC;
   const pwd = await passwordHashFingerprint(passwordHash);
-  const payload: PlatformSessionPayload = { uid: userId, role, exp, pwd };
+  const payload: PlatformSessionPayload = {
+    uid: userId,
+    role,
+    exp,
+    pwd,
+    ...(options?.mustChangePassword ? { mcp: true } : {}),
+  };
   const payloadB64 = base64UrlEncode(JSON.stringify(payload));
   const sig = await hmacSha256Hex(payloadB64, secret);
   return `${payloadB64}.${sig}`;
@@ -107,7 +116,8 @@ export async function parsePlatformSessionCookieValue(
       typeof payload.uid !== "string" ||
       typeof payload.role !== "string" ||
       typeof payload.exp !== "number" ||
-      typeof payload.pwd !== "string"
+      typeof payload.pwd !== "string" ||
+      (payload.mcp !== undefined && typeof payload.mcp !== "boolean")
     ) {
       return null;
     }

@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ExternalLink, FileText, Plus, Printer, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/platform/page-header";
+import { usePlatformSession } from "@/components/platform/platform-shell";
 import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
+import { canDirectMutate } from "@/lib/platform/mutation-approval";
 import { DOCUMENT_TYPES, type DocumentRow } from "@/lib/platform/modules";
 import { openPrintDocument } from "@/lib/platform/document-templates";
 import { PlatformDateTime } from "@/components/platform/platform-datetime";
@@ -21,6 +23,8 @@ type VehicleOption = {
 
 export default function DocumentsPage() {
   const router = useRouter();
+  const session = usePlatformSession();
+  const canMutate = session ? canDirectMutate(session.role) : false;
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [vehicles, setVehicles] = useState<VehicleOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -161,7 +165,9 @@ export default function DocumentsPage() {
         <form onSubmit={saveDocumentLink} className="platform-card space-y-4 rounded-xl p-5">
           <h2 className="text-sm font-semibold text-[var(--platform-text)]">Save document link</h2>
           <p className="text-sm text-[var(--platform-text-secondary)]">
-            Store an external URL (Google Drive, signed PDF, etc.) in the document library.
+            {canMutate
+              ? "Store an external URL (Google Drive, signed PDF, etc.) in the document library."
+              : "Saving document links requires Owner or Super Admin approval."}
           </p>
           <label className="block space-y-1.5">
             <span className="text-xs text-[var(--platform-text-secondary)]">Document URL</span>
@@ -170,9 +176,10 @@ export default function DocumentsPage() {
               value={docUrl}
               onChange={(e) => setDocUrl(e.target.value)}
               placeholder="https://..."
+              disabled={!canMutate}
             />
           </label>
-          <button type="submit" className="platform-btn-ghost w-full">
+          <button type="submit" className="platform-btn-ghost w-full" disabled={!canMutate}>
             <Plus className="size-4" />
             Save to library
           </button>
@@ -183,7 +190,8 @@ export default function DocumentsPage() {
         <div className="border-b border-[var(--platform-border)] px-4 py-3">
           <h2 className="text-sm font-semibold text-[var(--platform-text)]">Document library</h2>
         </div>
-        <table className="platform-table w-full text-left text-sm">
+        <div className="scroll-touch overflow-x-auto">
+        <table className="platform-table w-full min-w-[560px] text-left text-sm">
           <thead>
             <tr className="text-xs text-[var(--platform-text-secondary)]">
               <th className="px-4 py-3 font-medium">Title</th>
@@ -222,6 +230,7 @@ export default function DocumentsPage() {
                           <ExternalLink className="size-4" />
                         </a>
                       )}
+                      {canMutate ? (
                       <button
                         type="button"
                         onClick={() => removeDocument(doc.id)}
@@ -230,6 +239,7 @@ export default function DocumentsPage() {
                       >
                         <Trash2 className="size-4" />
                       </button>
+                      ) : null}
                     </div>
                   </td>
                 </tr>
@@ -237,6 +247,7 @@ export default function DocumentsPage() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

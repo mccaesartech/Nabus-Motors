@@ -1,6 +1,7 @@
 import "server-only";
 
 import { NextResponse } from "next/server";
+import { auditHttpStatusResponse } from "@/lib/audit/http-status";
 import { databaseAppError, type SupabaseLikeError } from "./db-errors";
 import { AppError, isAppError, kindForStatus } from "./kinds";
 import { logAppError, toAppError, type ErrorActor } from "./logger";
@@ -51,6 +52,19 @@ function respond(appError: AppError, options: FailureOptions): NextResponse {
     dbCode: appError.dbCode,
     context: options.context,
   });
+
+  try {
+    auditHttpStatusResponse({
+      status,
+      module: options.module,
+      request: options.request ?? null,
+      actorId: options.actor?.id ?? null,
+      actorRole: options.actor?.role ?? null,
+      message: appError.userMessage,
+    });
+  } catch {
+    // Audit must never break API failure responses.
+  }
 
   const body: ApiFailureBody & Record<string, unknown> = {
     ok: false,

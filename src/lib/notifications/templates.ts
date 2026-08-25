@@ -15,9 +15,17 @@ export type CustomerNotifyTemplate =
   | "staff_message"
   | "password_reset"
   | "vehicle_available_locally"
+  | "price_drop"
   | "account_deletion_scheduled"
   | "account_deletion_cancelled"
-  | "account_deletion_completed";
+  | "account_deletion_completed"
+  | "mfa_enabled"
+  | "mfa_disabled"
+  | "password_changed"
+  | "login_new_device"
+  | "login_alert"
+  | "login_attempt_failed"
+  | "account_lockout";
 
 type TemplateContent = {
   subject: string;
@@ -193,6 +201,76 @@ export function buildCustomerMessage(
         emailText: `Hi ${name},\n\nGood news — the ${vehicle} you viewed is now available in Ghana and can be purchased without shipping.\n\nView the vehicle:${vehicleUrl ? `\n${vehicleUrl}` : ""}\n\nTrue Goshen Auto`,
       };
     }
+    case "price_drop": {
+      const vehicleUrl = data.vehicleUrl?.trim() || "";
+      const oldPrice = data.oldPrice?.trim() || "";
+      const newPrice = data.newPrice?.trim() || "";
+      const pricePart =
+        oldPrice && newPrice
+          ? ` Price dropped from $${oldPrice} to $${newPrice}.`
+          : newPrice
+            ? ` New price: $${newPrice}.`
+            : "";
+      return {
+        subject: `Price drop: ${vehicle}`,
+        whatsapp: `True Goshen: Price drop on ${vehicle}.${pricePart}${vehicleUrl ? ` View: ${vehicleUrl}` : ""}`,
+        emailText: `Hi ${name},\n\nGood news — the price dropped on ${vehicle}.${pricePart}\n\nView the vehicle:${vehicleUrl ? `\n${vehicleUrl}` : ""}\n\nTrue Goshen Auto`,
+      };
+    }
+    case "mfa_enabled":
+      return {
+        subject: "Authenticator enabled on your True Goshen account",
+        whatsapp: `True Goshen: Two-factor authentication was turned on for your account. If this wasn't you, reset your password and contact support. ${accountUrl()}`,
+        emailText: `Hi ${name},\n\nTwo-factor authentication (authenticator app) was turned on for your True Goshen account.\n\nIf you did not make this change, reset your password immediately and contact support.\n\nAccount security: ${accountUrl()}\n\nTrue Goshen Company Limited`,
+      };
+    case "mfa_disabled":
+      return {
+        subject: "Authenticator removed from your True Goshen account",
+        whatsapp: `True Goshen: Two-factor authentication was turned off for your account. If this wasn't you, reset your password and contact support. ${accountUrl()}`,
+        emailText: `Hi ${name},\n\nTwo-factor authentication was turned off for your True Goshen account.\n\nIf you did not make this change, reset your password immediately and contact support.\n\nAccount security: ${accountUrl()}\n\nTrue Goshen Company Limited`,
+      };
+    case "password_changed":
+      return {
+        subject: "Your True Goshen password was changed",
+        whatsapp: `True Goshen: Your password was changed. If this wasn't you, reset it now: ${forgotPasswordUrl()}`,
+        emailText: `Hi ${name},\n\nYour True Goshen password was changed successfully.\n\nIf you did not make this change, reset your password immediately:\n${forgotPasswordUrl()}\n\nThen review active sessions in your account: ${accountUrl()}\n\nTrue Goshen Company Limited`,
+      };
+    case "login_new_device": {
+      const when = data.when?.trim() || "just now";
+      const device = data.device?.trim() || "a new device";
+      const ip = data.ip?.trim() || "";
+      return {
+        subject: "New device signed in to True Goshen",
+        whatsapp: `True Goshen: New sign-in from ${device} (${when}). If this wasn't you, change your password: ${forgotPasswordUrl()}`,
+        emailText: `Hi ${name},\n\nA new device signed in to your True Goshen account.\n\nWhen: ${when}\nDevice: ${device}${ip ? `\nIP: ${ip}` : ""}\n\nIf this was not you, change your password and review sessions:\n${forgotPasswordUrl()}\n${accountUrl()}\n\nTrue Goshen Company Limited`,
+      };
+    }
+    case "login_alert": {
+      const when = data.when?.trim() || "just now";
+      const device = data.device?.trim() || "";
+      const ip = data.ip?.trim() || "";
+      return {
+        subject: "New sign-in to your True Goshen account",
+        whatsapp: `True Goshen: Someone signed in to your account at ${when}${device ? ` from ${device}` : ""}. If this wasn't you, reset your password: ${forgotPasswordUrl()}`,
+        emailText: `Hi ${name},\n\nSomeone signed in to your True Goshen account.\n\nWhen: ${when}${device ? `\nDevice: ${device}` : ""}${ip ? `\nIP: ${ip}` : ""}\n\nIf this was not you, change your password and review sessions:\n${forgotPasswordUrl()}\n${accountUrl()}\n\nTrue Goshen Company Limited`,
+      };
+    }
+    case "login_attempt_failed": {
+      const when = data.when?.trim() || "just now";
+      const device = data.device?.trim() || "an unknown device";
+      const ip = data.ip?.trim() || "";
+      return {
+        subject: "Failed sign-in attempt on your True Goshen account",
+        whatsapp: `True Goshen: A failed sign-in was attempted on your account from ${device} (${when}). If this wasn't you, reset your password: ${forgotPasswordUrl()}`,
+        emailText: `Hi ${name},\n\nSomeone tried to sign in to your True Goshen account but did not enter the correct password.\n\nWhen: ${when}\nDevice: ${device}${ip ? `\nIP: ${ip}` : ""}\n\nIf this was not you, change your password immediately:\n${forgotPasswordUrl()}\n${accountUrl()}\n\nTrue Goshen Company Limited`,
+      };
+    }
+    case "account_lockout":
+      return {
+        subject: "True Goshen account temporarily locked",
+        whatsapp: `True Goshen: Your account was temporarily locked after too many failed sign-in attempts. Try again later, or reset your password: ${forgotPasswordUrl()}`,
+        emailText: `Hi ${name},\n\nYour True Goshen account was temporarily locked after too many failed sign-in attempts.\n\nIf this was you, wait a short time and try again, or reset your password:\n${forgotPasswordUrl()}\n\nIf this was not you, reset your password and contact support.\n\nTrue Goshen Company Limited`,
+      };
     case "account_deletion_scheduled": {
       const retentionDays = data.retentionDays?.trim() || "30";
       const scheduledDate = data.scheduledDeletionDate?.trim() || "the end of your retention period";

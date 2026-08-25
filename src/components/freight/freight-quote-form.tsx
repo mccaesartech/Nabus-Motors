@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { WhatsAppOptIn } from "@/components/forms/whatsapp-opt-in";
 import { useCustomerAuth } from "@/context/customer-auth-context";
-import { supabase } from "@/lib/supabase/client";
 import {
   CargoDescriptionFields,
   useCargoDescriptionFields,
@@ -159,16 +158,6 @@ export function FreightQuoteForm({ initialServiceType }: FreightQuoteFormProps) 
         (json.referenceCode as string | undefined) ?? `FQ-${new Date().getFullYear()}-PENDING`;
 
       let signedIn = false;
-      if (isGuest && supabase) {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
-        if (!signInError) {
-          await refreshProfile();
-          signedIn = true;
-        }
-      }
 
       setSuccess({
         referenceCode,

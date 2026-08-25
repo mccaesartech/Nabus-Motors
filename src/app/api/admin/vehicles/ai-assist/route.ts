@@ -7,6 +7,7 @@ import {
   getGeminiApiKey,
   getGeminiKeyWarning,
 } from "@/lib/ai/gemini";
+import { buildVehicleAiLabel, logAiUsage } from "@/lib/ai/usage-log";
 
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS = 12;
@@ -54,7 +55,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: { prompt?: string; action?: string; vehicle?: Partial<VehicleInput> };
+  let body: {
+    prompt?: string;
+    action?: string;
+    vehicle?: Partial<VehicleInput>;
+    vehicleId?: string;
+  };
   try {
     body = await req.json();
   } catch {
@@ -70,9 +76,29 @@ export async function POST(req: NextRequest) {
     body.action === "improve_description" || body.action === "fill_fields"
       ? body.action
       : "custom";
+  const logAction =
+    action === "improve_description"
+      ? "improve_description"
+      : action === "fill_fields"
+        ? "fill_from_photos"
+        : "ai_assist";
+  const vehicleId =
+    typeof body.vehicleId === "string" && body.vehicleId.trim()
+      ? body.vehicleId.trim()
+      : null;
+  const vehicleLabel = buildVehicleAiLabel(body.vehicle ?? {});
 
   try {
     const suggestions = await generateVehicleSuggestions(body.vehicle ?? {}, prompt, action);
+    void logAiUsage({
+      auth: auth.auth,
+      action: logAction,
+      status: "success",
+      vehicleId,
+      vehicleLabel,
+      previewSnippet: prompt,
+      metadata: { source: "ai-assist", assistAction: action },
+    });
     return NextResponse.json({
       ok: true,
       configured: true,
@@ -82,6 +108,16 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const { message, status, code } = geminiErrorToHttp(err);
     const configured = status !== 503 || code !== "INVALID_KEY";
+    void logAiUsage({
+      auth: auth.auth,
+      action: logAction,
+      status: "error",
+      vehicleId,
+      vehicleLabel,
+      previewSnippet: prompt,
+      errorMessage: message,
+      metadata: { source: "ai-assist", assistAction: action, code: code ?? null },
+    });
     return NextResponse.json(
       {
         ok: false,
