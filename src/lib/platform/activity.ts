@@ -39,7 +39,8 @@ export type ActivityAction =
   | "item_deleted"
   | "item_restored"
   | "item_permanently_deleted"
-  | "dashboard_transaction_dismissed";
+  | "dashboard_transaction_dismissed"
+  | "whatsapp_outreach_sent";
 
 export async function logPlatformActivity(
   auth: PlatformAuthContext | null,
