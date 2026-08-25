@@ -104,7 +104,7 @@ export async function loadAutomatedWhatsAppHistory(
           source: "notification_log",
         };
       })
-      .filter((row): row is WhatsAppConversationTurn => Boolean(row))
+      .filter((row): row is WhatsAppConversationTurn => row !== null)
       .reverse();
   } catch {
     return [];
