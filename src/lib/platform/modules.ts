@@ -103,6 +103,11 @@ export const SITE_SETTING_KEY_LIST = [
   "arkesel_enabled",
   "audit_log_retention_days",
   "audit_log_enabled",
+  "fx_use_live_rates",
+  "fx_manual_rates_json",
+  "fx_manual_rate_reason",
+  "fx_manual_rate_set_by",
+  "fx_manual_rate_set_at",
 ] as const;
 
 export type SiteSettingKey = (typeof SITE_SETTING_KEY_LIST)[number];
@@ -181,6 +186,11 @@ export const DEFAULT_SITE_SETTINGS: SiteSettingsMap = {
   arkesel_enabled: "true",
   audit_log_retention_days: "365",
   audit_log_enabled: "true",
+  fx_use_live_rates: "true",
+  fx_manual_rates_json: "{}",
+  fx_manual_rate_reason: "",
+  fx_manual_rate_set_by: "",
+  fx_manual_rate_set_at: "",
 };
 
 export const SITE_SETTING_KEYS: SiteSettingKey[] = [...SITE_SETTING_KEY_LIST];
