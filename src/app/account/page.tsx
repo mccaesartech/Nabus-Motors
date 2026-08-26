@@ -44,11 +44,6 @@ import { VehicleRequestsSection } from "@/components/account/vehicle-requests-se
 import { ProfileAvatarViewer } from "@/components/account/profile-avatar-viewer";
 import { LogoutConfirmDialog } from "@/components/platform/confirm-dialog";
 import { buildAccountAppointmentContext } from "@/lib/account/appointment-context";
-import {
-  buildPreorderDocumentHtml,
-  type CustomerPrintProfile,
-} from "@/lib/account/printable-documents";
-import { OrderPrintActions } from "@/components/account/order-print-actions";
 import { useCustomerNotifications } from "@/context/customer-notifications-context";
 import { useMarkCustomerNotificationsOnVisit } from "@/hooks/use-mark-customer-notifications-read";
 import { accountMessageLink } from "@/lib/customer/notification-types";
@@ -460,12 +455,6 @@ function AccountContent() {
   const pendingOrderCount = partsOrders.filter((order) => order.status === "pending").length;
   const cartItemCount = cartSummary?.item_count ?? 0;
 
-  const customerPrintProfile: CustomerPrintProfile = {
-    name: displayName,
-    email: user?.email ?? "",
-    phone: profile?.phone ?? null,
-  };
-
   const overviewInitials = (displayName || user?.email || "C")
     .split(/\s+/)
     .filter(Boolean)
@@ -670,7 +659,6 @@ function AccountContent() {
 
         <OrderHistorySection
           orders={partsOrders}
-          customer={customerPrintProfile}
           loading={dataLoading}
         />
 
@@ -796,7 +784,6 @@ function AccountContent() {
         <VehicleRequestsSection
           requests={customRequests}
           conversations={conversations}
-          customer={customerPrintProfile}
           loading={dataLoading}
           highlightedRequestId={highlightedRequestId}
         />
@@ -849,14 +836,6 @@ function AccountContent() {
                         <span className="text-xs text-muted-foreground capitalize">
                           Order: {tracked?.status ?? item.status}
                         </span>
-                        <OrderPrintActions
-                          getHtml={() =>
-                            buildPreorderDocumentHtml(item, customerPrintProfile, {
-                              orderStatus: tracked?.status ?? item.status,
-                            })
-                          }
-                          printLabel="Print request summary"
-                        />
                         <Button
                           type="button"
                           variant="outline"

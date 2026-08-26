@@ -53,7 +53,6 @@ function notesSummary(specs: ReturnType<typeof parseCustomRequestSpecs>): string
 export function VehicleRequestsSection({
   requests,
   conversations,
-  customer,
   loading,
   highlightedRequestId,
 }: VehicleRequestsSectionProps) {
@@ -239,10 +238,6 @@ export function VehicleRequestsSection({
                 )}
 
                 <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
-                  <OrderPrintActions
-                    getHtml={() => buildCustomRequestDocumentHtml(item, customer)}
-                    printLabel="Print request summary"
-                  />
                   <CustomRequestMessageTrigger
                     context={{
                       requestId: item.id,

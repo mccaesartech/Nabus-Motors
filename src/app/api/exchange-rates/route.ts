@@ -4,7 +4,8 @@ import {
   fetchLiveExchangeRates,
 } from "@/lib/currency/fetch-exchange-rates";
 
-export const revalidate = EXCHANGE_RATE_CACHE_TTL_SECONDS;
+/** Must be a literal for Next.js segment config analysis. */
+export const revalidate = 1800;
 
 const CACHE_HEADERS = {
   "Cache-Control": `public, s-maxage=${EXCHANGE_RATE_CACHE_TTL_SECONDS}, stale-while-revalidate=3600`,
