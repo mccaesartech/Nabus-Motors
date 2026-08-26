@@ -42,7 +42,6 @@ export type PlatformNavGroup = {
   label: string;
   icon: LucideIcon;
   items: PlatformNavItem[];
-  defaultExpanded?: boolean;
 };
 
 const dashboard: PlatformNavItem = {
@@ -65,7 +64,6 @@ const salesGroup: PlatformNavGroup = {
   id: "sales",
   label: "Sales",
   icon: ShoppingCart,
-  defaultExpanded: true,
   items: [
     {
       label: "Sales",

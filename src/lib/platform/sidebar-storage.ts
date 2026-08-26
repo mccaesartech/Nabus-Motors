@@ -69,20 +69,29 @@ export function getCollapsedNavGroups(): string[] {
   return readJson<string[]>(COLLAPSED_GROUPS_KEY, []);
 }
 
-export function setNavGroupCollapsed(groupId: string, collapsed: boolean): string[] {
+export function setNavGroupCollapsed(
+  groupId: string,
+  collapsed: boolean,
+  allGroupIds?: string[]
+): string[] {
   const current = getCollapsedNavGroups();
-  const next = collapsed
-    ? current.includes(groupId)
-      ? current
-      : [...current, groupId]
-    : current.filter((id) => id !== groupId);
+  let next: string[];
+
+  if (collapsed) {
+    next = current.includes(groupId) ? current : [...current, groupId];
+  } else if (current.length === 0 && allGroupIds?.length) {
+    // First expand from pristine (empty storage): persist all other groups as collapsed.
+    next = allGroupIds.filter((id) => id !== groupId);
+  } else {
+    next = current.filter((id) => id !== groupId);
+  }
+
   writeJson(COLLAPSED_GROUPS_KEY, next);
   return next;
 }
 
-export function isNavGroupCollapsed(groupId: string, defaultExpanded = true): boolean {
+export function isNavGroupCollapsed(groupId: string): boolean {
   const stored = getCollapsedNavGroups();
-  if (stored.includes(groupId)) return true;
-  if (!defaultExpanded && !stored.length) return true;
-  return false;
+  if (stored.length === 0) return true;
+  return stored.includes(groupId);
 }

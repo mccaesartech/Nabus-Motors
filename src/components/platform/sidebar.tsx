@@ -139,9 +139,7 @@ export function PlatformSidebar({
     setFavorites(getNavFavorites());
     setRecentVisits(getRecentNavVisits());
     setCollapsedGroups(
-      departments
-        .filter((g) => isNavGroupCollapsed(g.id, g.defaultExpanded !== false))
-        .map((g) => g.id)
+      departments.filter((g) => isNavGroupCollapsed(g.id)).map((g) => g.id)
     );
   }, [departments]);
 
@@ -252,10 +250,11 @@ export function PlatformSidebar({
   }
 
   function toggleGroup(groupId: string) {
+    const allGroupIds = departments.map((g) => g.id);
     const collapsedNow = !collapsedGroups.includes(groupId);
     const next = collapsedNow
-      ? setNavGroupCollapsed(groupId, true)
-      : setNavGroupCollapsed(groupId, false);
+      ? setNavGroupCollapsed(groupId, true, allGroupIds)
+      : setNavGroupCollapsed(groupId, false, allGroupIds);
     setCollapsedGroups(next);
   }
 
