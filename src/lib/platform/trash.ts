@@ -35,6 +35,13 @@ const ENTITY_TABLE: Record<TrashEntityType, string | null> = {
   preorder: "preorder_inquiries",
   support_ticket: "customer_conversations",
   admin_notification: "admin_notifications",
+  document: "documents",
+  part: "parts",
+  part_category: "parts_categories",
+  shipment: "shipment_tracking",
+  freight_quote: "freight_quote_requests",
+  appointment: "vehicle_appointments",
+  sent_email: "notification_log",
 };
 
 export type TrashListFilters = {
@@ -124,6 +131,36 @@ export function buildEntityLabel(
       const message = String(row.message ?? "").trim();
       return message ? message.slice(0, 80) : TRASH_ENTITY_LABELS.admin_notification;
     }
+    case "document":
+      return String(row.title ?? TRASH_ENTITY_LABELS.document);
+    case "part":
+      return String(row.name ?? row.sku ?? TRASH_ENTITY_LABELS.part);
+    case "part_category":
+      return String(row.name ?? TRASH_ENTITY_LABELS.part_category);
+    case "shipment": {
+      const tracking = String(row.tracking_number ?? "").trim();
+      const destination = String(row.destination ?? "").trim();
+      if (tracking && destination) return `${tracking} — ${destination}`;
+      return tracking || destination || TRASH_ENTITY_LABELS.shipment;
+    }
+    case "freight_quote": {
+      const ref = String(row.reference_code ?? "").trim();
+      const name = String(row.name ?? row.email ?? "").trim();
+      if (ref && name) return `${ref} — ${name}`;
+      return ref || name || TRASH_ENTITY_LABELS.freight_quote;
+    }
+    case "appointment": {
+      const name = String(row.name ?? row.email ?? "").trim();
+      const date = String(row.preferred_date ?? "").trim();
+      if (name && date) return `${name} — ${date}`;
+      return name || date || TRASH_ENTITY_LABELS.appointment;
+    }
+    case "sent_email": {
+      const recipient = String(row.recipient ?? "").trim();
+      const template = String(row.template ?? "").trim();
+      if (recipient && template) return `${template} → ${recipient}`;
+      return recipient || template || TRASH_ENTITY_LABELS.sent_email;
+    }
     default:
       return TRASH_ENTITY_LABELS[entityType];
   }
@@ -195,6 +232,41 @@ async function hardDeleteEntity(
   if (!table) return;
 
   await supabase.from(table).delete().eq("id", entityId);
+}
+
+function customerEmailFromTrashEntry(
+  entityId: string,
+  snapshot: Record<string, unknown>
+): string {
+  const profile = snapshot.profile as Record<string, unknown> | undefined;
+  const fromSnapshot =
+    typeof snapshot.email === "string" && snapshot.email.trim()
+      ? snapshot.email.trim()
+      : typeof profile?.email === "string" && profile.email.trim()
+        ? profile.email.trim()
+        : entityId.startsWith("email:")
+          ? entityId.slice(6)
+          : "";
+  return fromSnapshot.toLowerCase();
+}
+
+/** Remove customer soft-delete markers after permanent trash delete. */
+async function purgeCustomerPermanentDeleteMarkers(
+  supabase: SupabaseClient,
+  entityId: string,
+  snapshot: Record<string, unknown>
+) {
+  const profile = snapshot.profile as Record<string, unknown> | undefined;
+  if (profile?.id) {
+    await supabase.from("profiles").delete().eq("id", profile.id);
+  } else if (!entityId.startsWith("email:")) {
+    await supabase.from("profiles").delete().eq("id", entityId);
+  }
+
+  const email = customerEmailFromTrashEntry(entityId, snapshot);
+  if (email) {
+    await supabase.from("deleted_customer_emails").delete().eq("email", email);
+  }
 }
 
 async function restoreCustomer(
@@ -304,7 +376,8 @@ export async function softDeleteEntity(
   );
 
   if (!trash.ok) {
-    return trash;
+    await clearEntityDeleted(supabase, entityType, entityId);
+    return { ok: false, message: trash.message, status: 500 };
   }
 
   return { ok: true, trashId: trash.id, publicSlug };
@@ -636,6 +709,21 @@ export async function restoreTrashEntry(
 
   if (entityType === "customer") {
     await restoreCustomer(supabase, entityId, snapshot);
+  } else if (entityType === "sent_email") {
+    const { error: insertError } = await supabase.from("notification_log").insert({
+      id: entityId,
+      source_table: snapshot.source_table ?? null,
+      source_id: snapshot.source_id ?? null,
+      template: snapshot.template,
+      channel: snapshot.channel ?? "email",
+      status: snapshot.status,
+      recipient: snapshot.recipient,
+      detail: snapshot.detail ?? null,
+      created_at: snapshot.created_at,
+    });
+    if (insertError) {
+      return { ok: false, message: insertError.message, status: 500 };
+    }
   } else {
     await clearEntityDeleted(supabase, entityType, entityId);
 
@@ -710,10 +798,7 @@ export async function permanentlyDeleteTrashEntry(
 
   if (entityType === "customer") {
     const snapshot = (entry.snapshot ?? {}) as Record<string, unknown>;
-    const profile = snapshot.profile as Record<string, unknown> | undefined;
-    if (profile?.id) {
-      await supabase.from("profiles").delete().eq("id", profile.id);
-    }
+    await purgeCustomerPermanentDeleteMarkers(supabase, entityId, snapshot);
   } else {
     await hardDeleteEntity(supabase, entityType, entityId);
   }
