@@ -49,13 +49,15 @@ describe("listing currency helpers", () => {
     });
   });
 
-  it("shows exact listed amount when display matches listing currency", () => {
-    setExchangeRates({ GHS: 15.5 });
+  it("converts from USD with live rates even when display matches listing currency", () => {
+    setExchangeRates({ GHS: 11.18204 });
     const text = formatVehiclePrice(
       { price: 10_000, priceCurrency: "GHS", listedPrice: 155_000 },
       "GHS"
     );
-    expect(text).toContain("155");
+    // Live FX: 10_000 × 11.18204 ≈ 111,820 — not the frozen listed_price 155_000
+    expect(text).toContain("111");
+    expect(text).not.toContain("155");
   });
 
   it("converts via USD when display currency differs", () => {

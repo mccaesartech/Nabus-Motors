@@ -39,7 +39,7 @@ interface PlatformCurrencyContextValue {
   countries: readonly CountryConfig[];
   /** Format a USD-canonical amount in the platform display currency. */
   formatPrice: (usdAmount: number) => string;
-  /** Format a vehicle using listed_price when currencies match (no FX drift). */
+  /** Format a vehicle from USD canonical price using active FX rates. */
   formatVehicleListPrice: (fields: VehiclePriceFields) => string;
   /** Site setting default — also used as default listing currency for new vehicles. */
   settingsDefaultCurrency: string;

@@ -1,6 +1,6 @@
 import { BASE_CURRENCY, REFERENCE_CURRENCIES } from "./types";
 import { convertFromUsd, getActiveRates } from "./rates";
-import { formatAmount, formatUsdPrice } from "./format";
+import { formatUsdPrice } from "./format";
 
 /** Currencies available when entering a vehicle list price. */
 export const LISTING_PRICE_CURRENCIES: readonly string[] = [
@@ -82,8 +82,10 @@ export function toStoredVehiclePrice(
 
 /**
  * Format a vehicle price for a display currency.
- * When the visitor/admin currency matches the listing currency, show the exact
- * entered amount (no FX drift). Otherwise convert from the USD canonical price.
+ * Always converts from the USD canonical `price` using active FX rates so
+ * storefront cards stay in sync with the live exchange-rate feed (and the
+ * currency calculator). Exact `listedPrice` is reserved for admin form editing
+ * via `listingAmountForForm` — not for public display.
  */
 export function formatVehiclePrice(
   fields: VehiclePriceFields,
@@ -91,14 +93,5 @@ export function formatVehiclePrice(
 ): string {
   const listingCurrency = resolveListingCurrency(fields.priceCurrency);
   const display = (displayCurrency || listingCurrency).toUpperCase();
-
-  if (
-    fields.listedPrice != null &&
-    Number.isFinite(fields.listedPrice) &&
-    listingCurrency === display
-  ) {
-    return formatAmount(fields.listedPrice, display);
-  }
-
   return formatUsdPrice(fields.price || 0, display);
 }
