@@ -17,27 +17,46 @@ import { getAutoSiteUrl } from "@/lib/site-url";
 export { LETTERHEAD_SAFE_ZONE };
 
 export const PRINT_PAGE_WIDTH_PX = 794;
-/** A4 height at {@link PRINT_PAGE_WIDTH_PX} — matches letterhead PNG aspect ratio. */
-export const PRINT_PAGE_HEIGHT_PX = Math.round(
+/**
+ * A4 height at {@link PRINT_PAGE_WIDTH_PX}, floored to match the slice height
+ * html2pdf uses (`floor(canvasWidth * 297 / 210)`). Rounding up instead makes every
+ * document overshoot its last page by ~1px, which html2pdf turns into a blank page.
+ */
+export const PRINT_PAGE_HEIGHT_PX = Math.floor(
   PRINT_PAGE_WIDTH_PX * (297 / 210)
 );
 
-/** Inject stacked A4 backgrounds — page 1 full letterhead, page 2+ watermark + footer only. */
-export function injectPageBackgrounds(doc: Document): void {
-  const body = doc.body;
-  if (!body || body.querySelector(".page-backgrounds")) return;
+/** Absorbs sub-pixel layout rounding so a document never spills onto a blank page. */
+const PAGE_HEIGHT_TOLERANCE_PX = 4;
 
-  const pageHeight = PRINT_PAGE_HEIGHT_PX;
-  const root = doc.documentElement;
-  const docHeight = Math.max(
-    body.scrollHeight,
-    body.offsetHeight,
-    root?.scrollHeight ?? 0,
-    root?.offsetHeight ?? 0,
-    pageHeight
+/** Root class the document stylesheet is scoped to. */
+const DOCUMENT_SCOPE_CLASS = "tga-doc";
+const DOC = `.${DOCUMENT_SCOPE_CLASS}`;
+
+/**
+ * In-flow height of the document. The letterhead layers are absolutely positioned so
+ * they are excluded, which is what makes the page count reflect real content.
+ */
+function measureContentHeight(root: HTMLElement): number {
+  return root.getBoundingClientRect().height;
+}
+
+function pageCountForHeight(height: number): number {
+  return Math.max(
+    1,
+    Math.ceil((height - PAGE_HEIGHT_TOLERANCE_PX) / PRINT_PAGE_HEIGHT_PX)
   );
-  const pageCount = Math.max(1, Math.ceil(docHeight / pageHeight));
+}
 
+/**
+ * Stack A4 letterhead layers inside `root` — page 1 full letterhead, page 2+ footer only.
+ * Uses real `<img>` elements (not CSS background-image) so browser Print includes the
+ * chrome without requiring "Background graphics". Download/html2canvas paints the same imgs.
+ */
+function appendPageBackgrounds(root: HTMLElement, pageCount: number): void {
+  root.querySelector(".page-backgrounds")?.remove();
+
+  const doc = root.ownerDocument;
   const container = doc.createElement("div");
   container.className = "page-backgrounds";
   container.setAttribute("aria-hidden", "true");
@@ -46,19 +65,37 @@ export function injectPageBackgrounds(doc: Document): void {
     const page = doc.createElement("div");
     page.className =
       i === 0 ? "page-bg page-bg--first" : "page-bg page-bg--continuation";
-    page.style.top = `${i * pageHeight}px`;
+    page.style.top = `${i * PRINT_PAGE_HEIGHT_PX}px`;
+
+    const img = doc.createElement("img");
+    img.className = "page-bg__img";
+    img.alt = "";
+    img.decoding = "sync";
+    img.draggable = false;
+    img.src =
+      i === 0 ? LETTERHEAD_DATA_URL : LETTERHEAD_CONTINUATION_DATA_URL;
+    page.appendChild(img);
+
     container.appendChild(page);
   }
 
-  body.insertBefore(container, body.firstChild);
+  root.insertBefore(container, root.firstChild);
 }
 
-const PAGE_BACKGROUND_SCRIPT = `<script>(function(){var PAGE_H=${PRINT_PAGE_HEIGHT_PX};function inject(){var body=document.body;if(!body||body.querySelector(".page-backgrounds"))return;var h=Math.max(body.scrollHeight,body.offsetHeight,document.documentElement.scrollHeight,document.documentElement.offsetHeight,PAGE_H);var pages=Math.max(1,Math.ceil(h/PAGE_H));var c=document.createElement("div");c.className="page-backgrounds";c.setAttribute("aria-hidden","true");for(var i=0;i<pages;i++){var p=document.createElement("div");p.className=i===0?"page-bg page-bg--first":"page-bg page-bg--continuation";p.style.top=(i*PAGE_H)+"px";c.appendChild(p);}body.insertBefore(c,body.firstChild);}inject();})();</script>`;
+/** Layout pages and inject letterhead backgrounds (Print path; mirrors Download). */
+export function injectPageBackgrounds(doc: Document): void {
+  const body = doc.body;
+  if (!body) return;
+  prepareDocumentForOutput(body);
+}
 
-/** html2canvas scale — 1.0 prioritizes speed; text stays readable on A4. */
+/**
+ * html2canvas scale — 1.0 prioritizes speed and text stays readable on A4. Keep it at 1
+ * so {@link PRINT_PAGE_HEIGHT_PX} equals html2pdf's canvas page slice exactly.
+ */
 const PDF_CANVAS_SCALE = 1.0;
 /** Max wait before opening print dialog even if images are still loading. */
-const PRINT_DIALOG_MAX_WAIT_MS = 300;
+const PRINT_DIALOG_MAX_WAIT_MS = 2000;
 
 const LETTERHEAD_TOP_MM = LETTERHEAD_SAFE_ZONE.topMm;
 const LETTERHEAD_BOTTOM_MM = LETTERHEAD_SAFE_ZONE.bottomMm;
@@ -66,66 +103,87 @@ const LETTERHEAD_LEFT_MM = LETTERHEAD_SAFE_ZONE.leftMm;
 const LETTERHEAD_RIGHT_MM = LETTERHEAD_SAFE_ZONE.rightMm;
 const PRINT_BODY_PADDING = `${LETTERHEAD_TOP_MM}mm ${LETTERHEAD_RIGHT_MM}mm ${LETTERHEAD_BOTTOM_MM}mm ${LETTERHEAD_LEFT_MM}mm`;
 
-export const PRINT_STYLES = `
-  * { box-sizing: border-box; }
-  @page {
+/** Continuation pages carry footer branding only, so they need far less headroom. */
+const LETTERHEAD_CONTINUATION_TOP_MM = 20;
+const MM_TO_PX = 96 / 25.4;
+const PAGE_BOTTOM_SAFE_PX = Math.round(LETTERHEAD_BOTTOM_MM * MM_TO_PX);
+const PAGE_CONTINUATION_TOP_SAFE_PX = Math.round(
+  LETTERHEAD_CONTINUATION_TOP_MM * MM_TO_PX
+);
+/** Height available for content on a continuation page. */
+const PAGE_USABLE_HEIGHT_PX =
+  PRINT_PAGE_HEIGHT_PX - PAGE_CONTINUATION_TOP_SAFE_PX - PAGE_BOTTOM_SAFE_PX;
+/** Blocks taller than this are split into their children instead of moved whole. */
+const PAGE_UNIT_MAX_HEIGHT_PX = Math.round(PAGE_USABLE_HEIGHT_PX / 2);
+
+/**
+ * Document rules, scoped to {@link DOCUMENT_SCOPE_CLASS}. PDF capture renders the
+ * document inside the app page, so this sheet must not match app markup, and the
+ * explicit resets keep the output identical with or without the app's own CSS.
+ */
+export const DOCUMENT_STYLES = `
+  ${DOC}, ${DOC} *, ${DOC} *::before, ${DOC} *::after { box-sizing: border-box; }
+  ${DOC} h1, ${DOC} h2, ${DOC} h3, ${DOC} p,
+  ${DOC} dl, ${DOC} dt, ${DOC} dd,
+  ${DOC} table, ${DOC} th, ${DOC} td,
+  ${DOC} div, ${DOC} section, ${DOC} header, ${DOC} footer {
     margin: 0;
-    size: A4;
-  }
-  html, body {
-    overflow: visible !important;
-    height: auto !important;
-  }
-  body {
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    width: ${PRINT_PAGE_WIDTH_PX}px;
-    max-width: ${PRINT_PAGE_WIDTH_PX}px;
-    margin: 0 auto;
     padding: 0;
-    color: #111;
-    line-height: 1.35;
-    font-size: 10pt;
-    background: #fff;
   }
-  body.document {
+  ${DOC} {
     position: relative;
-    min-height: auto;
-    padding: ${PRINT_BODY_PADDING};
     display: flex;
     flex-direction: column;
+    width: ${PRINT_PAGE_WIDTH_PX}px;
+    max-width: ${PRINT_PAGE_WIDTH_PX}px;
+    height: auto;
+    min-height: auto;
+    overflow: visible;
+    margin: 0 auto;
+    padding: ${PRINT_BODY_PADDING};
+    background: #fff;
+    color: #111;
+    text-align: left;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 10pt;
+    line-height: 1.35;
   }
-  .page-backgrounds {
+  ${DOC} h1, ${DOC} h2, ${DOC} h3 { font-family: inherit; letter-spacing: normal; }
+  ${DOC} p { margin: 0 0 6px; }
+  ${DOC} strong { font-weight: 700; }
+  ${DOC} .page-backgrounds {
     position: absolute;
     top: 0;
     left: 0;
-    width: 210mm;
+    width: ${PRINT_PAGE_WIDTH_PX}px;
     z-index: 0;
     pointer-events: none;
   }
-  .page-bg {
+  ${DOC} .page-bg {
     position: absolute;
     left: 0;
-    width: 210mm;
-    height: 297mm;
-    background-repeat: no-repeat;
-    background-size: 210mm 297mm;
-    background-position: top center;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+    width: ${PRINT_PAGE_WIDTH_PX}px;
+    height: ${PRINT_PAGE_HEIGHT_PX}px;
+    overflow: hidden;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
-  .page-bg--first {
-    background-image: url("${LETTERHEAD_DATA_URL}");
+  ${DOC} .page-bg__img {
+    display: block;
+    width: ${PRINT_PAGE_WIDTH_PX}px;
+    height: ${PRINT_PAGE_HEIGHT_PX}px;
+    max-width: none;
+    object-fit: fill;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
-  .page-bg--continuation {
-    background-image: url("${LETTERHEAD_CONTINUATION_DATA_URL}");
-  }
-  .document-main {
+  ${DOC} .document-main {
     position: relative;
     z-index: 1;
     flex: 1 1 auto;
   }
-  .no-break { page-break-inside: avoid; break-inside: avoid; }
-  .doc-meta {
+  ${DOC} .no-break { page-break-inside: avoid; break-inside: avoid; }
+  ${DOC} .doc-meta {
     display: flex;
     justify-content: flex-end;
     align-items: flex-start;
@@ -133,9 +191,9 @@ export const PRINT_STYLES = `
     page-break-inside: avoid;
     break-inside: avoid;
   }
-  .doc-meta-spacer { flex: 1 1 auto; }
-  .doc-meta-block { flex: 0 0 auto; text-align: right; }
-  .doc-meta-type {
+  ${DOC} .doc-meta-spacer { flex: 1 1 auto; }
+  ${DOC} .doc-meta-block { flex: 0 0 auto; text-align: right; }
+  ${DOC} .doc-meta-type {
     margin: 0 0 2px;
     font-size: 13pt;
     font-weight: 700;
@@ -143,21 +201,21 @@ export const PRINT_STYLES = `
     color: #1e3a8a;
     line-height: 1.1;
   }
-  .doc-meta-ref {
+  ${DOC} .doc-meta-ref {
     margin: 0;
     font-size: 9pt;
     color: #374151;
     line-height: 1.3;
   }
-  .doc-meta-ref strong {
+  ${DOC} .doc-meta-ref strong {
     font-family: ui-monospace, monospace;
     color: #111;
     font-weight: 600;
   }
-  .doc-title { font-size: 14px; font-weight: 600; margin: 0 0 2px; color: #111; line-height: 1.2; }
-  .doc-subtitle { font-size: 9pt; color: #555; margin: 0 0 10px; line-height: 1.3; }
-  .section { margin-bottom: 12px; page-break-inside: auto; break-inside: auto; }
-  .section-title {
+  ${DOC} .doc-title { font-size: 14px; font-weight: 600; margin: 0 0 2px; color: #111; line-height: 1.2; }
+  ${DOC} .doc-subtitle { font-size: 9pt; color: #555; margin: 0 0 10px; line-height: 1.3; }
+  ${DOC} .section { margin-bottom: 12px; page-break-inside: auto; break-inside: auto; }
+  ${DOC} .section-title {
     font-size: 9pt;
     font-weight: 600;
     text-transform: uppercase;
@@ -169,7 +227,7 @@ export const PRINT_STYLES = `
     page-break-after: avoid;
     break-after: avoid;
   }
-  .address-row {
+  ${DOC} .address-row {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
@@ -177,13 +235,13 @@ export const PRINT_STYLES = `
     page-break-inside: avoid;
     break-inside: avoid;
   }
-  .address-col {
+  ${DOC} .address-col {
     padding: 8px 10px;
     background: #f9fafb;
     border: 1px solid #e5e7eb;
     border-radius: 6px;
   }
-  .address-label {
+  ${DOC} .address-label {
     font-size: 8pt;
     font-weight: 600;
     text-transform: uppercase;
@@ -191,12 +249,12 @@ export const PRINT_STYLES = `
     color: #6b7280;
     margin: 0 0 5px;
   }
-  .address-block { margin: 0; }
-  .address-block dt { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.03em; color: #6b7280; margin: 5px 0 0; }
-  .address-block dt:first-child { margin-top: 0; }
-  .address-block dd { margin: 1px 0 0; font-weight: 500; color: #111; font-size: 9pt; }
-  .address-name { font-size: 10pt; font-weight: 600; }
-  .meta-grid {
+  ${DOC} .address-block { margin: 0; }
+  ${DOC} .address-block dt { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.03em; color: #6b7280; margin: 5px 0 0; }
+  ${DOC} .address-block dt:first-child { margin-top: 0; }
+  ${DOC} .address-block dd { margin: 1px 0 0; font-weight: 500; color: #111; font-size: 9pt; }
+  ${DOC} .address-name { font-size: 10pt; font-weight: 600; }
+  ${DOC} .meta-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px 14px;
@@ -208,21 +266,21 @@ export const PRINT_STYLES = `
     page-break-inside: avoid;
     break-inside: avoid;
   }
-  .meta-grid dt { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.03em; color: #6b7280; margin: 0; }
-  .meta-grid dd { margin: 1px 0 0; font-weight: 500; color: #111; font-size: 9pt; }
-  .detail-table {
+  ${DOC} .meta-grid dt { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.03em; color: #6b7280; margin: 0; }
+  ${DOC} .meta-grid dd { margin: 1px 0 0; font-weight: 500; color: #111; font-size: 9pt; }
+  ${DOC} .detail-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 9pt;
   }
-  .detail-table th,
-  .detail-table td {
+  ${DOC} .detail-table th,
+  ${DOC} .detail-table td {
     text-align: left;
     padding: 4px 8px;
     border-bottom: 1px solid #f3f4f6;
     vertical-align: top;
   }
-  .detail-table th {
+  ${DOC} .detail-table th {
     width: 34%;
     font-size: 8pt;
     font-weight: 600;
@@ -232,9 +290,9 @@ export const PRINT_STYLES = `
     background: #f9fafb;
     border-right: 1px solid #f3f4f6;
   }
-  .detail-table td { color: #111; }
-  .detail-table tr { page-break-inside: auto; break-inside: auto; }
-  .message-block {
+  ${DOC} .detail-table td { color: #111; }
+  ${DOC} .detail-table tr { page-break-inside: auto; break-inside: auto; }
+  ${DOC} .message-block {
     margin-top: 0;
     padding: 8px 10px;
     background: #f9fafb;
@@ -244,19 +302,19 @@ export const PRINT_STYLES = `
     font-size: 9pt;
     line-height: 1.4;
   }
-  table.items {
+  ${DOC} table.items {
     width: 100%;
     table-layout: fixed;
     border-collapse: collapse;
     margin-bottom: 0;
     font-size: 9pt;
   }
-  table.items td:nth-child(2),
-  table.items th:nth-child(2) {
+  ${DOC} table.items td:nth-child(2),
+  ${DOC} table.items th:nth-child(2) {
     word-break: break-word;
   }
-  table.items thead { display: table-header-group; }
-  table.items th {
+  ${DOC} table.items thead { display: table-header-group; }
+  ${DOC} table.items th {
     text-align: left;
     padding: 5px 6px;
     border-bottom: 1.5px solid #1e3a8a;
@@ -268,13 +326,13 @@ export const PRINT_STYLES = `
     page-break-after: avoid;
     break-after: avoid;
   }
-  table.items td { padding: 5px 6px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
-  table.items tbody tr { page-break-inside: auto; break-inside: auto; }
-  table.items .num { text-align: right; white-space: nowrap; }
-  .item-name { font-weight: 500; line-height: 1.25; }
-  .item-detail { font-size: 8pt; color: #6b7280; margin-top: 1px; line-height: 1.2; }
-  .item-thumb,
-  .item-thumb-placeholder {
+  ${DOC} table.items td { padding: 5px 6px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+  ${DOC} table.items tbody tr { page-break-inside: auto; break-inside: auto; }
+  ${DOC} table.items .num { text-align: right; white-space: nowrap; }
+  ${DOC} .item-name { font-weight: 500; line-height: 1.25; }
+  ${DOC} .item-detail { font-size: 8pt; color: #6b7280; margin-top: 1px; line-height: 1.2; }
+  ${DOC} .item-thumb,
+  ${DOC} .item-thumb-placeholder {
     width: 32px;
     height: 32px;
     object-fit: cover;
@@ -283,8 +341,8 @@ export const PRINT_STYLES = `
     background: #f3f4f6;
     display: block;
   }
-  .item-thumb-placeholder { background: linear-gradient(135deg, #f3f4f6, #e5e7eb); }
-  .totals-box {
+  ${DOC} .item-thumb-placeholder { background: linear-gradient(135deg, #f3f4f6, #e5e7eb); }
+  ${DOC} .totals-box {
     margin: 8px 0 0 auto;
     width: min(100%, 280px);
     border: 1px solid #e5e7eb;
@@ -293,7 +351,7 @@ export const PRINT_STYLES = `
     page-break-inside: avoid;
     break-inside: avoid;
   }
-  .totals-line {
+  ${DOC} .totals-line {
     display: flex;
     justify-content: space-between;
     gap: 12px;
@@ -301,15 +359,15 @@ export const PRINT_STYLES = `
     font-size: 9pt;
     border-bottom: 1px solid #f3f4f6;
   }
-  .totals-line:last-child { border-bottom: none; }
-  .totals-line--grand {
+  ${DOC} .totals-line:last-child { border-bottom: none; }
+  ${DOC} .totals-line--grand {
     background: #eff6ff;
     border-top: 1.5px solid #1e3a8a;
     font-size: 10pt;
     font-weight: 700;
     color: #1e3a8a;
   }
-  .payment-note {
+  ${DOC} .payment-note {
     margin: 8px 0 0;
     padding: 6px 10px;
     background: #fffbeb;
@@ -321,7 +379,7 @@ export const PRINT_STYLES = `
     page-break-inside: avoid;
     break-inside: avoid;
   }
-  .empty-note {
+  ${DOC} .empty-note {
     margin: 0;
     padding: 8px 10px;
     background: #f9fafb;
@@ -330,7 +388,7 @@ export const PRINT_STYLES = `
     font-size: 9pt;
     color: #6b7280;
   }
-  .total-row {
+  ${DOC} .total-row {
     text-align: right;
     font-size: 10pt;
     font-weight: 600;
@@ -340,7 +398,7 @@ export const PRINT_STYLES = `
     page-break-inside: avoid;
     break-inside: avoid;
   }
-  .footer {
+  ${DOC} .footer {
     position: relative;
     z-index: 1;
     margin-top: auto;
@@ -353,35 +411,43 @@ export const PRINT_STYLES = `
     page-break-inside: avoid;
     break-inside: avoid;
   }
-  .footer p { margin: 0 0 3px; }
-  .footer-thanks { color: #111; }
-  .footer-terms {
+  ${DOC} .footer p { margin: 0 0 3px; }
+  ${DOC} .footer-thanks { color: #111; }
+  ${DOC} .footer-terms {
     margin: 0;
     font-size: 7.5pt;
     color: #6b7280;
     line-height: 1.35;
   }
-  .no-print { display: none !important; }
+  ${DOC} .no-print { display: none !important; }
+`;
+
+/** Page-box rules — only ever loaded into a standalone print document, never the app page. */
+const PRINT_ONLY_STYLES = `
+  @page {
+    margin: 0;
+    size: A4;
+  }
   @media print {
-    * {
+    ${DOC},
+    ${DOC} * {
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
       color-adjust: exact !important;
     }
-    img {
+    ${DOC} { width: auto; max-width: none; font-size: 9.5pt; }
+    ${DOC} .page-backgrounds,
+    ${DOC} .page-bg,
+    ${DOC} .page-bg__img {
+      display: block !important;
+      visibility: visible !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
-    body { margin: 0; padding: ${PRINT_BODY_PADDING}; width: auto; max-width: none; font-size: 9.5pt; }
-    body.document { min-height: auto; }
-    .page-backgrounds,
-    .page-bg {
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
-    .no-print { display: none !important; }
   }
 `;
+
+export const PRINT_STYLES = `${DOCUMENT_STYLES}${PRINT_ONLY_STYLES}`;
 
 export function escapeHtml(value: string): string {
   return value
@@ -556,11 +622,15 @@ function splitDocumentFooter(body: string): { main: string; footer: string } {
 }
 
 export function wrapDocument(title: string, body: string, autoPrint = false): string {
+  // autoPrint scripts are a fallback only — openPrintableDocument drives print from the
+  // parent page (CSP nonce / about:blank inheritance blocks unnonced inline scripts).
   const printScript = autoPrint
-    ? "<script>window.onload=function(){window.print();};</script>"
+    ? "<script>window.onload=function(){if(window.__tgaPrintStarted)return;window.__tgaPrintStarted=true;try{window.focus();window.print();}catch(e){}};</script>"
     : "";
   const { main, footer } = splitDocumentFooter(body);
 
+  // Letterhead backgrounds + pagination are applied by the parent (Print) or PDF stage
+  // (Download) via prepareDocumentForOutput — keep the HTML shell identical for both.
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -569,10 +639,9 @@ export function wrapDocument(title: string, body: string, autoPrint = false): st
   <title>${escapeHtml(title)} — ${escapeHtml(SITE_NAME)}</title>
   <style>${PRINT_STYLES}</style>
 </head>
-<body class="document">
+<body class="document ${DOCUMENT_SCOPE_CLASS}">
   <div class="document-main">${main}</div>
   ${footer}
-  ${PAGE_BACKGROUND_SCRIPT}
   ${printScript}
 </body>
 </html>`;
@@ -586,21 +655,86 @@ const MIN_HTML_LENGTH = 80;
 
 const PRINT_IMAGE_MAX_WAIT_MS = 1500;
 
-/** Fallback print for popup windows opened on user click (async data load). */
-const DEFERRED_PRINT_SCRIPT = `<script>(function(){var done=false;var MAX_WAIT=${PRINT_DIALOG_MAX_WAIT_MS};var IMG_WAIT=${PRINT_IMAGE_MAX_WAIT_MS};function setTitle(){try{var t=document.querySelector('title');var raw=t&&t.textContent?t.textContent.trim():'';if(raw&&!/^about:blank$/i.test(document.title)&&!/^about:blank$/i.test(raw)){document.title=raw;}else{document.title='True Goshen Invoice';}}catch(e){document.title='True Goshen Invoice';}}function go(){if(done)return;done=true;setTitle();try{window.focus();window.print();}catch(e){}}function whenImagesReady(cb){var imgs=Array.prototype.slice.call(document.images||[]);if(!imgs.length)return cb();var pending=imgs.filter(function(i){return!i.complete;});if(!pending.length)return cb();var left=pending.length,timer=setTimeout(cb,IMG_WAIT);pending.forEach(function(img){img.addEventListener('load',tick,{once:true});img.addEventListener('error',tick,{once:true});});function tick(){if(--left<=0){clearTimeout(timer);cb();}}}function start(){whenImagesReady(go);setTimeout(go,MAX_WAIT);}if(document.readyState==='complete'||document.readyState==='interactive')start();else document.addEventListener('DOMContentLoaded',start,{once:true});})();</script>`;
+type PrintableWindow = Window & { __tgaPrintStarted?: boolean };
+
+/**
+ * Read the active page CSP nonce (Next.js stamps it on framework scripts).
+ * about:blank print frames inherit the parent CSP, so inline print scripts need this.
+ */
+function getActiveCspNonce(): string | null {
+  if (typeof document === "undefined") return null;
+  try {
+    const scripts = document.querySelectorAll("script[nonce]");
+    for (const node of scripts) {
+      const el = node as HTMLScriptElement;
+      const nonce = el.nonce || el.getAttribute("nonce");
+      if (nonce) return nonce;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+/** Stamp the page CSP nonce onto inline <script> tags so print shells run under enforce CSP. */
+function stampCspNonceOnScripts(html: string): string {
+  const nonce = getActiveCspNonce();
+  if (!nonce) return html;
+  const safe = nonce.replace(/"/g, "");
+  return html.replace(/<script(?![^>]*\bnonce\s*=)/gi, `<script nonce="${safe}"`);
+}
+
+/**
+ * Fallback print script for popup/iframe documents.
+ * Honors __tgaPrintStarted so parent-driven print does not double-open the dialog.
+ * Must be nonce-stamped before document.write under production CSP.
+ */
+const DEFERRED_PRINT_SCRIPT = `<script>(function(){var done=false;var MAX_WAIT=${PRINT_DIALOG_MAX_WAIT_MS};var IMG_WAIT=${PRINT_IMAGE_MAX_WAIT_MS};function setTitle(){try{var t=document.querySelector('title');var raw=t&&t.textContent?t.textContent.trim():'';if(raw&&!/^about:blank$/i.test(document.title)&&!/^about:blank$/i.test(raw)){document.title=raw;}else{document.title='True Goshen Invoice';}}catch(e){document.title='True Goshen Invoice';}}function go(){if(done||window.__tgaPrintStarted)return;done=true;window.__tgaPrintStarted=true;setTitle();try{window.focus();window.print();}catch(e){window.__tgaPrintStarted=false;}}function whenImagesReady(cb){var imgs=Array.prototype.slice.call(document.images||[]);if(!imgs.length)return cb();var pending=imgs.filter(function(i){return!i.complete;});if(!pending.length)return cb();var left=pending.length,timer=setTimeout(cb,IMG_WAIT);pending.forEach(function(img){img.addEventListener('load',tick,{once:true});img.addEventListener('error',tick,{once:true});});function tick(){if(--left<=0){clearTimeout(timer);cb();}}}function start(){whenImagesReady(go);setTimeout(go,MAX_WAIT);}if(document.readyState==='complete'||document.readyState==='interactive')start();else document.addEventListener('DOMContentLoaded',start,{once:true});})();</script>`;
 
 function withDeferredPrintScript(html: string): string {
   if (html.includes("window.print()")) return html;
+  if (!html.includes("</body>")) return `${html}${DEFERRED_PRINT_SCRIPT}`;
   return html.replace("</body>", `${DEFERRED_PRINT_SCRIPT}</body>`);
 }
 
-function triggerSyncPrint(win: Window): void {
+function preparePrintableHtml(html: string): string {
+  return stampCspNonceOnScripts(withDeferredPrintScript(html));
+}
+
+function triggerPrintOnce(win: Window): void {
+  const target = win as PrintableWindow;
+  if (target.__tgaPrintStarted) return;
+  target.__tgaPrintStarted = true;
   try {
     win.focus();
     win.print();
   } catch {
-    /* ignore — deferred script may still run in popup windows */
+    target.__tgaPrintStarted = false;
   }
+}
+
+/** Parent-driven print after async loads — does not rely on CSP-blocked inline scripts. */
+function scheduleParentPrint(win: Window, sync: boolean): void {
+  const doc = win.document;
+  const imagesReady =
+    Array.from(doc.images ?? []).every((img) => img.complete);
+
+  // Prefer same-turn print when letterhead imgs are already decoded so the
+  // user-gesture chain stays intact (required for some Chromium iframe prints).
+  if (sync && imagesReady) {
+    triggerPrintOnce(win);
+    return;
+  }
+
+  let finished = false;
+  const run = () => {
+    if (finished) return;
+    finished = true;
+    triggerPrintOnce(win);
+  };
+
+  void waitForDocumentImages(doc, PRINT_IMAGE_MAX_WAIT_MS).then(run);
+  setTimeout(run, PRINT_DIALOG_MAX_WAIT_MS);
 }
 
 function validatePrintableHtml(html: string): PrintableDocumentResult | null {
@@ -632,8 +766,9 @@ function createHiddenPrintIframe(): {
 } | null {
   const iframe = document.createElement("iframe");
   iframe.setAttribute("title", "Print document");
-  // Full-width off-screen frame (same layout as PDF render) — 0×0 iframes break print.
-  iframe.style.cssText = `position:fixed;left:-10000px;top:0;width:${PRINT_PAGE_WIDTH_PX}px;border:0;visibility:hidden;overflow:visible;`;
+  // Full-width off-screen frame (same layout as PDF render) — 0×0 / visibility:hidden
+  // frames fail to open the print dialog in Chromium under some CSP layouts.
+  iframe.style.cssText = `position:fixed;left:-10000px;top:0;width:${PRINT_PAGE_WIDTH_PX}px;height:${PRINT_PAGE_HEIGHT_PX}px;border:0;opacity:0;pointer-events:none;overflow:hidden;`;
   document.body.appendChild(iframe);
 
   const win = iframe.contentWindow;
@@ -644,6 +779,11 @@ function createHiddenPrintIframe(): {
   }
 
   return { iframe, win, doc };
+}
+
+function sizePrintIframe(iframe: HTMLIFrameElement, doc: Document): void {
+  const height = Math.max(measureDocumentHeight(doc), PRINT_PAGE_HEIGHT_PX);
+  iframe.style.height = `${height}px`;
 }
 
 function scheduleIframeCleanup(iframe: HTMLIFrameElement, win: Window): void {
@@ -659,6 +799,7 @@ type WritePrintTargetOptions = {
   /** Print synchronously from the click handler (iframe / cached data). */
   syncPrint?: boolean;
   win?: Window | null;
+  iframe?: HTMLIFrameElement | null;
 };
 
 function writeHtmlToPrintTarget(
@@ -670,16 +811,22 @@ function writeHtmlToPrintTarget(
   const invalid = validatePrintableHtml(html);
   if (invalid) return invalid;
 
-  const { syncPrint = false, win = null } = options;
-  const printHtml = syncPrint ? html : withDeferredPrintScript(html);
+  const { syncPrint = false, win = null, iframe = null } = options;
+  // Always prepare nonce-stamped deferred print as backup; parent still drives print
+  // because production CSP blocks unnonced inline scripts in inherited about:blank docs.
+  const printHtml = preparePrintableHtml(html);
   doc.open();
   doc.write(printHtml);
   doc.close();
   doc.title = extractDocumentTitle(html);
   injectPageBackgrounds(doc);
 
-  if (syncPrint && win) {
-    triggerSyncPrint(win);
+  if (iframe) {
+    sizePrintIframe(iframe, doc);
+  }
+
+  if (win) {
+    scheduleParentPrint(win, syncPrint);
   }
 
   return { ok: true, method };
@@ -693,12 +840,13 @@ function printViaHiddenIframe(html: string): boolean {
   const result = writeHtmlToPrintTarget(target.doc, html, "iframe", {
     syncPrint: true,
     win: target.win,
+    iframe: target.iframe,
   });
   return result.ok;
 }
 
 function printViaBlobPopup(html: string): boolean {
-  const printHtml = withDeferredPrintScript(html);
+  const printHtml = preparePrintableHtml(html);
   const blob = new Blob([printHtml], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
 
@@ -709,7 +857,35 @@ function printViaBlobPopup(html: string): boolean {
   }
 
   const revoke = () => URL.revokeObjectURL(url);
-  win.addEventListener("load", revoke, { once: true });
+  let armed = false;
+  const armPrint = () => {
+    if (armed) return;
+    armed = true;
+    try {
+      const doc = win.document;
+      if (doc?.body) injectPageBackgrounds(doc);
+    } catch {
+      /* blob edge cases */
+    }
+    scheduleParentPrint(win, false);
+  };
+
+  win.addEventListener(
+    "load",
+    () => {
+      armPrint();
+      revoke();
+    },
+    { once: true }
+  );
+  // If load already fired (cached blob), print immediately.
+  if (win.document?.readyState === "complete") {
+    armPrint();
+  }
+  setTimeout(() => {
+    armPrint();
+    revoke();
+  }, PRINT_DIALOG_MAX_WAIT_MS + 50);
   setTimeout(revoke, 60_000);
 
   try {
@@ -790,6 +966,7 @@ export function beginPrintSession(): PrintSession {
         writeHtmlToPrintTarget(iframeTarget.doc, html, "iframe", {
           syncPrint: false,
           win: iframeTarget.win,
+          iframe: iframeTarget.iframe,
         }),
       cancel: () => iframeTarget.iframe.remove(),
     };
@@ -834,9 +1011,12 @@ function isInlineImage(img: HTMLImageElement): boolean {
 }
 
 /** Wait for document images (logo, thumbnails) before PDF capture. */
-function waitForDocumentImages(doc: Document, maxWaitMs = PRINT_IMAGE_MAX_WAIT_MS): Promise<void> {
+function waitForDocumentImages(
+  root: ParentNode,
+  maxWaitMs = PRINT_IMAGE_MAX_WAIT_MS
+): Promise<void> {
   return new Promise((resolve) => {
-    const imgs = Array.from(doc.images);
+    const imgs = Array.from(root.querySelectorAll("img"));
     if (imgs.length === 0) {
       resolve();
       return;
@@ -866,13 +1046,11 @@ function waitForDocumentImages(doc: Document, maxWaitMs = PRINT_IMAGE_MAX_WAIT_M
 }
 
 /** Replace slow external thumbnails with placeholders so html2canvas never blocks. */
-function replaceExternalImagesForPdf(doc: Document): void {
-  for (const img of Array.from(doc.images)) {
+function replaceExternalImagesForPdf(root: HTMLElement): void {
+  for (const img of Array.from(root.querySelectorAll("img"))) {
     if (isInlineImage(img)) continue;
-    const placeholder = doc.createElement("div");
-    placeholder.className = img.className.includes("item-thumb")
-      ? "item-thumb-placeholder"
-      : "item-thumb-placeholder";
+    const placeholder = root.ownerDocument.createElement("div");
+    placeholder.className = "item-thumb-placeholder";
     placeholder.setAttribute("aria-hidden", "true");
     img.replaceWith(placeholder);
   }
@@ -902,68 +1080,228 @@ function measureDocumentHeight(doc: Document): number {
   );
 }
 
+/** A block that must not be split across a page boundary. */
+type PageUnit = {
+  el: HTMLElement;
+  /** Height that has to stay on one page (whole block, or head + first row for long tables). */
+  keepHeight: number;
+  /** Insert filler above the block so it starts `offsetPx` lower. */
+  push: (offsetPx: number) => void;
+};
+
+function pushWithSpacer(el: HTMLElement): (offsetPx: number) => void {
+  return (offsetPx) => {
+    const doc = el.ownerDocument;
+
+    // A <div> is not renderable inside <tbody>, so rows need a filler row instead.
+    if (el instanceof HTMLTableRowElement) {
+      const spacerRow = doc.createElement("tr");
+      spacerRow.setAttribute("aria-hidden", "true");
+      const cell = doc.createElement("td");
+      cell.colSpan = Math.max(1, el.cells.length);
+      cell.style.cssText = `height:${offsetPx}px;padding:0;border:0;background:transparent;`;
+      spacerRow.appendChild(cell);
+      el.parentNode?.insertBefore(spacerRow, el);
+      return;
+    }
+
+    const spacer = doc.createElement("div");
+    spacer.setAttribute("aria-hidden", "true");
+    spacer.style.cssText = `display:block;width:100%;height:${offsetPx}px;`;
+    el.parentNode?.insertBefore(spacer, el);
+  };
+}
+
+function tablePageUnits(table: HTMLTableElement): PageUnit[] {
+  const rows = Array.from(table.querySelectorAll("tbody > tr")) as HTMLTableRowElement[];
+  if (rows.length === 0) {
+    return [
+      {
+        el: table,
+        keepHeight: table.getBoundingClientRect().height,
+        push: pushWithSpacer(table),
+      },
+    ];
+  }
+
+  // Keep the column headings with at least one row, then break between rows.
+  const headHeight = table.tHead?.getBoundingClientRect().height ?? 0;
+  const units: PageUnit[] = [
+    {
+      el: table,
+      keepHeight: headHeight + rows[0].getBoundingClientRect().height,
+      push: pushWithSpacer(table),
+    },
+  ];
+
+  for (const row of rows.slice(1)) {
+    units.push({
+      el: row,
+      keepHeight: row.getBoundingClientRect().height,
+      push: pushWithSpacer(row),
+    });
+  }
+
+  return units;
+}
+
+function collectPageUnits(parent: Element, depth = 0): PageUnit[] {
+  const units: PageUnit[] = [];
+
+  for (const child of Array.from(parent.children)) {
+    const el = child as HTMLElement;
+    if (el.classList.contains("page-backgrounds")) continue;
+    if (el.tagName === "STYLE" || el.tagName === "SCRIPT") continue;
+
+    const keepHeight = el.getBoundingClientRect().height;
+    if (keepHeight <= 0) continue;
+
+    const splittable =
+      keepHeight > PAGE_UNIT_MAX_HEIGHT_PX && el.children.length > 0 && depth < 3;
+    if (!splittable) {
+      units.push({ el, keepHeight, push: pushWithSpacer(el) });
+      continue;
+    }
+
+    if (el instanceof HTMLTableElement) {
+      units.push(...tablePageUnits(el));
+      continue;
+    }
+
+    units.push(...collectPageUnits(el, depth + 1));
+  }
+
+  return units;
+}
+
+/**
+ * Push `unit` down if it would land on the letterhead footer art or in a continuation
+ * page's top margin. Returns true when filler was inserted (positions changed).
+ */
+function placePageUnit(root: HTMLElement, unit: PageUnit): boolean {
+  const top = unit.el.getBoundingClientRect().top - root.getBoundingClientRect().top;
+  const page = Math.max(0, Math.floor(top / PRINT_PAGE_HEIGHT_PX));
+  const pageTop = page * PRINT_PAGE_HEIGHT_PX;
+  const pageBottom = pageTop + PRINT_PAGE_HEIGHT_PX - PAGE_BOTTOM_SAFE_PX;
+
+  // Page 1 gets its headroom from the document padding; later pages need it added here.
+  if (page > 0) {
+    const contentTop = pageTop + PAGE_CONTINUATION_TOP_SAFE_PX;
+    if (top < contentTop - PAGE_HEIGHT_TOLERANCE_PX) {
+      unit.push(Math.round(contentTop - top));
+      return true;
+    }
+  }
+
+  if (top + unit.keepHeight <= pageBottom + PAGE_HEIGHT_TOLERANCE_PX) return false;
+
+  const nextContentTop =
+    pageTop + PRINT_PAGE_HEIGHT_PX + PAGE_CONTINUATION_TOP_SAFE_PX;
+  unit.push(Math.round(nextContentTop - top));
+  return true;
+}
+
+/**
+ * Break the staged document onto whole A4 pages and lock its height to an exact page
+ * multiple, so html2pdf's `ceil(canvasHeight / pageHeight)` can never invent a page.
+ */
+function layoutDocumentPages(root: HTMLElement): number {
+  try {
+    const main = root.querySelector(".document-main") ?? root;
+    for (const unit of collectPageUnits(main)) {
+      // A single re-check settles the case where the first nudge lands the block
+      // in the next page's top margin.
+      if (placePageUnit(root, unit)) placePageUnit(root, unit);
+    }
+  } catch {
+    // Pagination is best effort — a failure just means plain fixed-height slicing.
+  }
+
+  const pageCount = pageCountForHeight(measureContentHeight(root));
+  root.style.height = `${pageCount * PRINT_PAGE_HEIGHT_PX}px`;
+  root.style.overflow = "hidden";
+  return pageCount;
+}
+
+/**
+ * Shared Print + Download prep: paginate content onto A4 slices, then inject letterhead
+ * `<img>` layers so both outputs use the same HTML layout and page art (Print does not
+ * rely on CSS background-image / "Background graphics").
+ */
+function prepareDocumentForOutput(root: HTMLElement): number {
+  root.querySelector(".page-backgrounds")?.remove();
+  const pageCount = layoutDocumentPages(root);
+  appendPageBackgrounds(root, pageCount);
+  return pageCount;
+}
+
+/**
+ * Stage the document in the app page rather than an iframe. html2pdf re-parents a clone
+ * of the element it is given into this document, which leaves an iframe's `<head>`
+ * stylesheet behind — the document then rasterizes with none of its own CSS.
+ */
+function createPdfStage(html: string): { stage: HTMLElement; root: HTMLElement } {
+  const parsed = new DOMParser().parseFromString(stripPrintScripts(html), "text/html");
+
+  const stage = document.createElement("div");
+  stage.setAttribute("aria-hidden", "true");
+  stage.style.cssText = `position:fixed;left:-10000px;top:0;width:${PRINT_PAGE_WIDTH_PX}px;pointer-events:none;`;
+
+  const styles = document.createElement("style");
+  styles.textContent = DOCUMENT_STYLES;
+  stage.appendChild(styles);
+
+  const root = document.createElement("div");
+  root.className = parsed.body.className || `document ${DOCUMENT_SCOPE_CLASS}`;
+  for (let node = parsed.body.firstChild; node; node = parsed.body.firstChild) {
+    root.appendChild(document.adoptNode(node));
+  }
+
+  stage.appendChild(root);
+  document.body.appendChild(stage);
+  return { stage, root };
+}
+
 async function htmlToPdfBlob(html: string): Promise<Blob> {
-  const iframe = document.createElement("iframe");
-  iframe.setAttribute("title", "PDF render");
-  iframe.style.cssText = `position:fixed;left:-10000px;top:0;width:${PRINT_PAGE_WIDTH_PX}px;border:0;visibility:hidden;overflow:visible;`;
-  document.body.appendChild(iframe);
+  const { stage, root } = createPdfStage(html);
 
   try {
-    const win = iframe.contentWindow;
-    const doc = iframe.contentDocument ?? win?.document;
-    if (!win || !doc) throw new Error("Render frame unavailable");
+    replaceExternalImagesForPdf(root);
+    await waitForDocumentImages(root);
 
-    const cleanHtml = stripPrintScripts(html);
-
-    await new Promise<void>((resolve) => {
-      const onLoad = () => resolve();
-      win.addEventListener("load", onLoad, { once: true });
-      doc.open();
-      doc.write(cleanHtml);
-      doc.close();
-      if (doc.readyState === "complete") {
-        win.removeEventListener("load", onLoad);
-        resolve();
-      }
-    });
-
-    replaceExternalImagesForPdf(doc);
-    injectPageBackgrounds(doc);
-    await waitForDocumentImages(doc);
-
-    const bodyHeight = measureDocumentHeight(doc);
-    iframe.style.height = `${bodyHeight}px`;
+    const pageCount = prepareDocumentForOutput(root);
+    const totalHeight = pageCount * PRINT_PAGE_HEIGHT_PX;
 
     const html2pdf = await loadHtml2Pdf();
     const pdfOptions = {
       margin: [0, 0, 0, 0],
       filename: "document.pdf",
       image: { type: "jpeg", quality: 0.92 },
+      enableLinks: false,
       html2canvas: {
         scale: PDF_CANVAS_SCALE,
         useCORS: true,
         allowTaint: true,
         logging: false,
+        backgroundColor: "#ffffff",
         width: PRINT_PAGE_WIDTH_PX,
         windowWidth: PRINT_PAGE_WIDTH_PX,
-        height: bodyHeight,
-        windowHeight: bodyHeight,
+        height: totalHeight,
+        windowHeight: totalHeight,
         scrollX: 0,
         scrollY: 0,
       },
-      pagebreak: {
-        mode: ["css", "legacy"],
-        avoid: [".doc-meta", ".totals-box", ".payment-note"],
-      },
+      // Page breaks are already baked into the staged DOM; the plugin would double them.
+      pagebreak: { mode: [], before: [], after: [], avoid: [] },
       jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
     };
 
-    return html2pdf()
+    return await html2pdf()
       .set(pdfOptions as never)
-      .from(doc.body)
+      .from(root)
       .outputPdf("blob");
   } finally {
-    iframe.remove();
+    stage.remove();
   }
 }
 

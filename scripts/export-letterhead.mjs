@@ -35,7 +35,7 @@ function isBrandPixel(r, g, b, a) {
   return b >= 60 && r <= 120;
 }
 
-(data, width, y, predicate) {
+function rowScore(data, width, y, predicate) {
   let hits = 0;
   const offset = y * width * 4;
   for (let x = 0; x < width; x++) {
@@ -57,10 +57,14 @@ function detectSafeZone(raw, width, height) {
   }
 
   let footerStartPx = Math.round(height * 0.85);
+  let inFooter = false;
   for (let y = height - 1; y >= scanFooterFrom; y--) {
     const brand = rowScore(raw, width, y, isBrandPixel);
     if (brand >= brandThreshold) {
+      inFooter = true;
       footerStartPx = y;
+    } else if (inFooter) {
+      // Left the footer band while scanning upward — keep the top of that band.
       break;
     }
   }
@@ -77,6 +81,7 @@ function detectSafeZone(raw, width, height) {
   return {
     topPx,
     bottomPx,
+    headerEndPx,
     footerStartPx,
     topMm: Math.max(46, Math.min(topMm, 52)),
     bottomMm: Math.max(40, Math.min(bottomMm, 48)),
@@ -85,6 +90,56 @@ function detectSafeZone(raw, width, height) {
     width,
     height,
   };
+}
+
+async function whiteRect(width, height) {
+  return sharp({
+    create: {
+      width,
+      height: Math.max(1, height),
+      channels: 4,
+      background: { r: 255, g: 255, b: 255, alpha: 1 },
+    },
+  })
+    .png()
+    .toBuffer();
+}
+
+/** Pixels reserved for footer art — matches LETTERHEAD_SAFE_ZONE.bottomMm. */
+function footerKeepPx(zone) {
+  return Math.max(
+    1,
+    Math.round((zone.bottomMm / A4_HEIGHT_MM) * zone.height)
+  );
+}
+
+/**
+ * Page-1 letterhead: keep header + footer, erase the center TG watermark by
+ * whitening the body band between the header safe edge and the footer keep zone.
+ */
+async function removeCenterWatermark(fullPngBuffer, zone) {
+  const bodyTop = zone.topPx;
+  const bodyBottom = Math.max(bodyTop + 1, zone.height - footerKeepPx(zone));
+  const bodyHeight = Math.max(1, bodyBottom - bodyTop);
+  const whiteBody = await whiteRect(zone.width, bodyHeight);
+
+  return sharp(fullPngBuffer)
+    .composite([{ input: whiteBody, top: bodyTop, left: 0 }])
+    .png()
+    .toBuffer();
+}
+
+/**
+ * Continuation pages: footer branding only (no header, no center watermark).
+ */
+async function buildContinuationPng(fullPngBuffer, zone) {
+  const clearHeight = Math.max(1, zone.height - footerKeepPx(zone));
+  const whiteAboveFooter = await whiteRect(zone.width, clearHeight);
+
+  return sharp(fullPngBuffer)
+    .composite([{ input: whiteAboveFooter, top: 0, left: 0 }])
+    .png()
+    .toBuffer();
 }
 
 async function renderPdfPage() {
@@ -99,34 +154,15 @@ async function renderPdfPage() {
   return canvas.toBuffer("image/png");
 }
 
-async function buildContinuationPng(fullPngBuffer, zone) {
-  const whiteHeader = await sharp({
-    create: {
-      width: zone.width,
-      height: zone.topPx,
-      channels: 4,
-      background: { r: 255, g: 255, b: 255, alpha: 1 },
-    },
-  })
-    .png()
-    .toBuffer();
-
-  return sharp(fullPngBuffer)
-    .composite([{ input: whiteHeader, top: 0, left: 0 }])
-    .png()
-    .toBuffer();
-}
-
 async function main() {
   if (!fs.existsSync(pdfPath)) throw new Error(`Letterhead PDF not found: ${pdfPath}`);
   console.log("Rendering letterhead page 1...");
-  const pngBuffer = await renderPdfPage();
-  fs.writeFileSync(pngPath, pngBuffer);
+  const renderedBuffer = await renderPdfPage();
 
-  const meta = await sharp(pngBuffer).metadata();
+  const meta = await sharp(renderedBuffer).metadata();
   const width = meta.width ?? WIDTH;
   const height = meta.height ?? 0;
-  const { data: raw } = await sharp(pngBuffer).ensureAlpha().raw().toBuffer({
+  const { data: raw } = await sharp(renderedBuffer).ensureAlpha().raw().toBuffer({
     resolveWithObject: true,
   });
 
@@ -135,6 +171,13 @@ async function main() {
   console.log(
     `Safe zone: top ${zone.topMm}mm (${zone.topPx}px), bottom ${zone.bottomMm}mm, left/right ${zone.leftMm}mm`
   );
+  const keep = Math.round((zone.bottomMm / A4_HEIGHT_MM) * height);
+  console.log(
+    `Watermark clear: y ${zone.topPx}→${height - keep} (keep footer ${keep}px / ${zone.bottomMm}mm)`
+  );
+
+  const pngBuffer = await removeCenterWatermark(renderedBuffer, zone);
+  fs.writeFileSync(pngPath, pngBuffer);
 
   const continuationBuffer = await buildContinuationPng(pngBuffer, zone);
   fs.writeFileSync(continuationPath, continuationBuffer);

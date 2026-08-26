@@ -524,3 +524,8 @@ a:focus:not(:focus-visible),
 [role="button"]:focus:not(:focus-visible) {
   outline: none;
 }
+
+/* html2pdf stages its capture in a full-viewport transparent overlay; never let it eat clicks. */
+.html2pdf__overlay {
+  pointer-events: none !important;
+}
