@@ -806,6 +806,51 @@ type WritePrintTargetOptions = {
   iframe?: HTMLIFrameElement | null;
 };
 
+type PreparedPrintDocument = {
+  stage: HTMLElement;
+  root: HTMLElement;
+  title: string;
+};
+
+/**
+ * Stage + paginate in the app document (same pipeline as Download) so Print inherits
+ * identical letterhead layers and scoped CSS — iframe `<head>` styles alone are unreliable.
+ */
+function preparePrintDocumentStage(html: string): PreparedPrintDocument | null {
+  const invalid = validatePrintableHtml(html);
+  if (invalid) return null;
+
+  const { stage, root } = createPdfStage(html);
+  replaceExternalImagesForPdf(root);
+  prepareDocumentForOutput(root);
+  return { stage, root, title: extractDocumentTitle(html) };
+}
+
+/** Mount a prepared root into a print target — styles live next to content, not in `<head>`. */
+function mountPreparedDocumentInPrintTarget(
+  doc: Document,
+  preparedRoot: HTMLElement,
+  title: string
+): void {
+  doc.open();
+  doc.write(
+    `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>${escapeHtml(title)}</title></head><body></body></html>`
+  );
+  doc.close();
+  doc.title = title;
+  doc.body.style.cssText = "margin:0;padding:0;background:#fff;";
+
+  const wrapper = doc.createElement("div");
+  wrapper.style.cssText = `width:${PRINT_PAGE_WIDTH_PX}px;margin:0 auto;padding:0;`;
+
+  const styleEl = doc.createElement("style");
+  styleEl.textContent = PRINT_STYLES;
+  wrapper.appendChild(styleEl);
+  wrapper.appendChild(doc.importNode(preparedRoot, true));
+
+  doc.body.replaceChildren(wrapper);
+}
+
 function writeHtmlToPrintTarget(
   doc: Document,
   html: string,
@@ -815,29 +860,26 @@ function writeHtmlToPrintTarget(
   const invalid = validatePrintableHtml(html);
   if (invalid) return invalid;
 
+  const prepared = preparePrintDocumentStage(html);
+  if (!prepared) return invalid;
+
   const { win = null, iframe = null } = options;
-  // Always prepare nonce-stamped deferred print as backup; parent still drives print
-  // because production CSP blocks unnonced inline scripts in inherited about:blank docs.
-  const printHtml = preparePrintableHtml(html);
-  doc.open();
-  doc.write(printHtml);
-  doc.close();
-  doc.title = extractDocumentTitle(html);
 
-  const body = doc.body;
-  if (body) {
-    prepareDocumentForOutput(body);
+  try {
+    mountPreparedDocumentInPrintTarget(doc, prepared.root, prepared.title);
+
+    if (iframe) {
+      sizePrintIframe(iframe, doc);
+    }
+
+    if (win) {
+      scheduleParentPrint(win);
+    }
+
+    return { ok: true, method };
+  } finally {
+    prepared.stage.remove();
   }
-
-  if (iframe) {
-    sizePrintIframe(iframe, doc);
-  }
-
-  if (win) {
-    scheduleParentPrint(win);
-  }
-
-  return { ok: true, method };
 }
 
 function printViaHiddenIframe(html: string): boolean {
@@ -853,53 +895,25 @@ function printViaHiddenIframe(html: string): boolean {
 }
 
 function printViaBlobPopup(html: string): boolean {
-  const printHtml = preparePrintableHtml(html);
-  const blob = new Blob([printHtml], { type: "text/html;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-
-  const win = window.open(url, "_blank");
-  if (!win) {
-    URL.revokeObjectURL(url);
-    return false;
-  }
-
-  const revoke = () => URL.revokeObjectURL(url);
-  let armed = false;
-  const armPrint = () => {
-    if (armed) return;
-    armed = true;
-    try {
-      const doc = win.document;
-      const body = doc?.body;
-      if (body) prepareDocumentForOutput(body);
-    } catch {
-      /* blob edge cases */
-    }
-    scheduleParentPrint(win);
-  };
-
-  win.addEventListener(
-    "load",
-    () => {
-      armPrint();
-      revoke();
-    },
-    { once: true }
-  );
-  // If load already fired (cached blob), print immediately.
-  if (win.document?.readyState === "complete") {
-    armPrint();
-  }
-  setTimeout(() => {
-    armPrint();
-    revoke();
-  }, PRINT_DIALOG_MAX_WAIT_MS + 50);
-  setTimeout(revoke, 60_000);
+  const win = window.open("about:blank", "_blank");
+  if (!win) return false;
 
   try {
     win.opener = null;
   } catch {
     /* ignore */
+  }
+
+  const doc = win.document;
+  if (!doc) {
+    win.close();
+    return false;
+  }
+
+  const result = writeHtmlToPrintTarget(doc, html, "popup", { win });
+  if (!result.ok) {
+    win.close();
+    return false;
   }
 
   return true;
