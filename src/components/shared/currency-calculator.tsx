@@ -270,13 +270,19 @@ export function CurrencyCalculator({
             : "Fetching exchange rates..."}
         </p>
         {updatedLabel ? <p>Rates updated: {updatedLabel}</p> : null}
-        {ratesMeta?.provider && ratesLoaded && !ratesStale ? (
+        {ratesMeta?.provider && ratesLoaded && !ratesStale && !ratesMeta.displayOverride?.active ? (
           <p>
             Source:{" "}
             {ratesMeta.provider === "exchangerate-api"
               ? "ExchangeRate-API"
               : ratesMeta.provider}
             . Listings convert from canonical USD with this same rate.
+          </p>
+        ) : null}
+        {ratesMeta?.displayOverride?.active ? (
+          <p className="font-medium text-amber-700" role="status">
+            Rate set by admin — storefront prices use your manual USD to GHS rate, not the live
+            market feed.
           </p>
         ) : null}
         {ratesStale ? (

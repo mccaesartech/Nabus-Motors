@@ -327,6 +327,12 @@ export default function PlatformMessagesPage() {
     });
   }, []);
 
+  const mergeConversation = useCallback((updated: CustomerConversation) => {
+    setConversations((prev) =>
+      prev.map((conv) => (conv.id === updated.id ? updated : conv))
+    );
+  }, []);
+
   useCustomerChatRealtime({
     conversationId: selected?.id ?? null,
     viewer: "staff",
@@ -351,7 +357,11 @@ export default function PlatformMessagesPage() {
     }
     setQueueTab("mine");
     setSelectedId(conversationId);
-    await loadConversations();
+    if (json.conversation) {
+      mergeConversation(json.conversation as CustomerConversation);
+    } else {
+      await loadConversations();
+    }
     await loadMessages(conversationId);
   }
 
@@ -375,7 +385,11 @@ export default function PlatformMessagesPage() {
     }
     setCloseNote("");
     setQueueTab("closed");
-    await loadConversations();
+    if (json.conversation) {
+      mergeConversation(json.conversation as CustomerConversation);
+    } else {
+      await loadConversations();
+    }
   }
 
   async function reassignTicket(conversationId: string, assignTo: string) {
@@ -393,13 +407,27 @@ export default function PlatformMessagesPage() {
       return;
     }
     setReassignTo("");
-    await loadConversations();
+    if (json.conversation) {
+      mergeConversation(json.conversation as CustomerConversation);
+    } else {
+      await loadConversations();
+    }
   }
 
   async function deleteTickets(ids: string[]) {
     if (ids.length === 0) return;
     setDeleting(true);
     setSaveError(null);
+    const idSet = new Set(ids);
+    const snapshot = conversations;
+    setConversations((prev) => prev.filter((conv) => !idSet.has(conv.id)));
+    if (selectedId && idSet.has(selectedId)) {
+      setSelectedId(null);
+      setMessages([]);
+    }
+    setDeleteTarget(null);
+    setBulkDeleteConfirm(false);
+
     const res = await fetch("/api/admin/customer-messages", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
@@ -408,6 +436,7 @@ export default function PlatformMessagesPage() {
     const json = await res.json().catch(() => ({}));
     setDeleting(false);
     if (!res.ok) {
+      setConversations(snapshot);
       setSaveError(json.message ?? "Could not delete ticket(s).");
       setToast(json.message ?? "Could not delete ticket(s).");
       setToastVariant("warning");
@@ -422,12 +451,6 @@ export default function PlatformMessagesPage() {
       for (const id of deleted) next.delete(id);
       return next;
     });
-    if (selectedId && deleted.has(selectedId)) {
-      setSelectedId(null);
-      setMessages([]);
-    }
-    setDeleteTarget(null);
-    setBulkDeleteConfirm(false);
     setToast(
       json.message ??
         (deleted.size === 1
@@ -435,7 +458,6 @@ export default function PlatformMessagesPage() {
           : `${deleted.size} tickets moved to trash.`)
     );
     setToastVariant("success");
-    await loadConversations();
   }
 
   function toggleSelected(id: string) {

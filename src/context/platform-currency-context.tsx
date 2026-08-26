@@ -48,6 +48,7 @@ interface PlatformCurrencyContextValue {
   ratesStale: boolean;
   /** Metadata from the shared /api/exchange-rates feed. */
   ratesMeta: ExchangeRatesMeta;
+  refreshRates: () => Promise<void>;
 }
 
 const PlatformCurrencyContext =
@@ -115,7 +116,8 @@ export function PlatformCurrencyProvider({
   );
   const [currency, setCurrencyState] = useState<string>(settingsDefault);
   const [hydrated, setHydrated] = useState(false);
-  const { ratesLoaded, ratesStale, meta: ratesMeta } = useExchangeRates();
+  const { ratesLoaded, ratesStale, meta: ratesMeta, refetch: refreshRates } =
+    useExchangeRates();
 
   useEffect(() => {
     const initial = resolveInitialPlatformPreferences(settingsDefault);
@@ -166,6 +168,7 @@ export function PlatformCurrencyProvider({
       ratesLoaded,
       ratesStale,
       ratesMeta,
+      refreshRates,
     }),
     [
       displayCountry,
@@ -175,6 +178,7 @@ export function PlatformCurrencyProvider({
       ratesLoaded,
       ratesMeta,
       ratesStale,
+      refreshRates,
       setCountry,
       setCurrency,
       settingsDefault,

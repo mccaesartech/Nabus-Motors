@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { setExchangeRates } from "@/lib/currency/rates";
+import type { DisplayOverrideMeta } from "@/lib/currency/display-override";
 import type { ExchangeRateSource } from "@/lib/currency/types";
 
 export type ExchangeRatesMeta = {
@@ -11,6 +12,7 @@ export type ExchangeRatesMeta = {
   rateDate: string | null;
   provider: string | null;
   error: string | null;
+  displayOverride: DisplayOverrideMeta | null;
 };
 
 type ExchangeRatesApiResponse = {
@@ -21,10 +23,10 @@ type ExchangeRatesApiResponse = {
   rateDate?: string;
   provider?: string;
   error?: string;
+  displayOverride?: DisplayOverrideMeta | null;
 };
 
 type UseExchangeRatesOptions = {
-  /** Defer fetch until browser idle — used on the public storefront. */
   defer?: boolean;
 };
 
@@ -35,6 +37,7 @@ const DEFAULT_META: ExchangeRatesMeta = {
   rateDate: null,
   provider: "fallback",
   error: null,
+  displayOverride: null,
 };
 
 export function useExchangeRates(options: UseExchangeRatesOptions = {}) {
@@ -43,32 +46,35 @@ export function useExchangeRates(options: UseExchangeRatesOptions = {}) {
   const [ratesStale, setRatesStale] = useState(false);
   const [meta, setMeta] = useState<ExchangeRatesMeta>(DEFAULT_META);
 
+  const loadRates = useCallback(async () => {
+    try {
+      const res = await fetch("/api/exchange-rates");
+      const data = (await res.json()) as ExchangeRatesApiResponse;
+      if (!data.rates) return;
+      setExchangeRates(data.rates);
+      setRatesStale(data.stale === true);
+      setMeta({
+        source: data.source ?? "fallback",
+        stale: data.stale === true,
+        fetchedAt: data.fetchedAt ?? null,
+        rateDate: data.rateDate ?? null,
+        provider: data.provider ?? data.source ?? null,
+        error: data.error ?? null,
+        displayOverride: data.displayOverride ?? null,
+      });
+      setRatesLoaded(true);
+    } catch {
+      setRatesStale(true);
+      setRatesLoaded(true);
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
-
-    const loadRates = () => {
-      fetch("/api/exchange-rates")
-        .then((res) => res.json())
-        .then((data: ExchangeRatesApiResponse) => {
-          if (cancelled || !data.rates) return;
-          setExchangeRates(data.rates);
-          setRatesStale(data.stale === true);
-          setMeta({
-            source: data.source ?? "fallback",
-            stale: data.stale === true,
-            fetchedAt: data.fetchedAt ?? null,
-            rateDate: data.rateDate ?? null,
-            provider: data.provider ?? data.source ?? null,
-            error: data.error ?? null,
-          });
-          setRatesLoaded(true);
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setRatesStale(true);
-            setRatesLoaded(true);
-          }
-        });
+    const run = () => {
+      void loadRates().then(() => {
+        if (cancelled) return;
+      });
     };
 
     let idleId: number | undefined;
@@ -76,12 +82,12 @@ export function useExchangeRates(options: UseExchangeRatesOptions = {}) {
 
     if (defer) {
       if (typeof window.requestIdleCallback === "function") {
-        idleId = window.requestIdleCallback(loadRates, { timeout: 1500 });
+        idleId = window.requestIdleCallback(run, { timeout: 1500 });
       } else {
-        timerId = setTimeout(loadRates, 100);
+        timerId = setTimeout(run, 100);
       }
     } else {
-      loadRates();
+      run();
     }
 
     return () => {
@@ -89,7 +95,7 @@ export function useExchangeRates(options: UseExchangeRatesOptions = {}) {
       if (idleId !== undefined) window.cancelIdleCallback(idleId);
       if (timerId !== undefined) clearTimeout(timerId);
     };
-  }, [defer]);
+  }, [defer, loadRates]);
 
-  return { ratesLoaded, ratesStale, meta };
+  return { ratesLoaded, ratesStale, meta, refetch: loadRates };
 }

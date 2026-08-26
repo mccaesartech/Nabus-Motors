@@ -160,12 +160,53 @@ export default function LeadsPage() {
     lead: UnifiedLead,
     updates: { status?: string; follow_up_notes?: string; source?: string }
   ) {
-    await fetch("/api/admin/inquiries/update", {
+    const typeKey = lead.type as keyof InquiryData;
+    const snapshot = inquiries;
+    setInquiries((prev) => {
+      if (!prev) return prev;
+      const rows = prev[typeKey];
+      if (!rows) return prev;
+      return {
+        ...prev,
+        [typeKey]: rows.map((row) => {
+          if (String(row.id) !== lead.id) return row;
+          const next = { ...row } as Record<string, unknown>;
+          if (updates.status !== undefined) next.status = updates.status;
+          if (updates.source !== undefined) next.source = updates.source;
+          if (updates.follow_up_notes !== undefined) {
+            if (lead.type === "order") next.notes = updates.follow_up_notes;
+            else next.follow_up_notes = updates.follow_up_notes;
+          }
+          return next;
+        }),
+      };
+    });
+
+    const res = await fetch("/api/admin/inquiries/update", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type: lead.type, id: lead.id, ...updates }),
     });
-    load();
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json.ok === false) {
+      setInquiries(snapshot);
+      setToastError(true);
+      setToast(json.message ?? "Could not update lead.");
+      return;
+    }
+    if (json.record) {
+      setInquiries((prev) => {
+        if (!prev) return prev;
+        const rows = prev[typeKey];
+        if (!rows) return prev;
+        return {
+          ...prev,
+          [typeKey]: rows.map((row) =>
+            String(row.id) === lead.id ? (json.record as Record<string, unknown>) : row
+          ),
+        };
+      });
+    }
   }
 
   async function deleteLeads(targets: UnifiedLead[]) {

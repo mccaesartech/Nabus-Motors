@@ -97,17 +97,27 @@ export default function CustomersPage() {
   }
 
   async function deleteCustomer(customer: AdminCustomerListItem) {
+    const snapshot = customers;
+    setCustomers((prev) => prev.filter((c) => c.id !== customer.id));
+    if (expandedId === customer.id) setExpandedId(null);
+    setDetailById((prev) => {
+      if (!(customer.id in prev)) return prev;
+      const next = { ...prev };
+      delete next[customer.id];
+      return next;
+    });
+    setDeleteTarget(null);
+
     const res = await fetch(`/api/admin/customers/${encodeURIComponent(customer.id)}`, {
       method: "DELETE",
     });
     const json = await res.json();
     if (!res.ok) {
+      setCustomers(snapshot);
       setSuccessMessage(json.message ?? "Could not delete customer.");
       throw new Error(json.message ?? "Could not delete customer.");
     }
-    setDeleteTarget(null);
     setSuccessMessage(json.message ?? "Customer removed from the directory.");
-    await load(search, showDeleted, showSignUps);
   }
 
   if (loading) {

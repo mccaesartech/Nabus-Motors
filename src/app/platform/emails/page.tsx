@@ -177,6 +177,25 @@ export default function PlatformEmailsPage() {
       ids.length === 1 ? "Moving email record to trash…" : `Moving ${ids.length} records to trash…`
     );
 
+    const idSet = new Set(ids);
+    const snapshotSent = sentItems;
+    const snapshotReceived = receivedItems;
+    const snapshotTotal = total;
+    if (tab === "sent") {
+      setSentItems((prev) => prev.filter((row) => !idSet.has(row.id)));
+    } else {
+      setReceivedItems((prev) => prev.filter((row) => !idSet.has(row.id)));
+    }
+    setTotal((prev) => Math.max(0, prev - idSet.size));
+    if (selectedId && idSet.has(selectedId)) closeDetail();
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of idSet) next.delete(id);
+      return next;
+    });
+    setDeleteTargetId(null);
+    setBulkDeleteConfirm(false);
+
     const res = await fetch("/api/admin/emails", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
@@ -184,40 +203,23 @@ export default function PlatformEmailsPage() {
     });
     const json = await res.json().catch(() => ({}));
     setDeleting(false);
-    setDeleteTargetId(null);
-    setBulkDeleteConfirm(false);
 
     if (!res.ok) {
+      setSentItems(snapshotSent);
+      setReceivedItems(snapshotReceived);
+      setTotal(snapshotTotal);
       setToastError(true);
       setToast(json.message ?? "Could not delete email record(s).");
       return;
     }
 
-    const deleted = new Set<string>(
-      Array.isArray(json.deletedIds) ? json.deletedIds.map(String) : ids
-    );
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      for (const id of deleted) next.delete(id);
-      return next;
-    });
-    if (selectedId && deleted.has(selectedId)) {
-      closeDetail();
-    }
-    if (tab === "sent") {
-      setSentItems((prev) => prev.filter((row) => !deleted.has(row.id)));
-    } else {
-      setReceivedItems((prev) => prev.filter((row) => !deleted.has(row.id)));
-    }
-    setTotal((prev) => Math.max(0, prev - deleted.size));
     setToastError(Boolean(json.failed?.length));
     setToast(
       json.message ??
-        (deleted.size === 1
+        (ids.length === 1
           ? "Email record moved to trash."
-          : `${deleted.size} records moved to trash.`)
+          : `${ids.length} records moved to trash.`)
     );
-    await loadList();
   }
 
   function toggleSelected(id: string) {

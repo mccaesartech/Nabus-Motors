@@ -137,14 +137,35 @@ export function LeadInquiryDetail({ type, id }: LeadInquiryDetailProps) {
     follow_up_notes?: string;
   }) {
     if (!inquiry) return;
+    const snapshot = inquiry;
+    const snapshotNotes = notes;
+    setInquiry((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev } as InquiryRecord;
+      if (updates.status !== undefined) next.status = updates.status;
+      if (updates.source !== undefined) next.source = updates.source;
+      if (updates.follow_up_notes !== undefined) next.follow_up_notes = updates.follow_up_notes;
+      return next;
+    });
+    if (updates.follow_up_notes !== undefined) setNotes(updates.follow_up_notes);
     setSaving(true);
-    await fetch("/api/admin/inquiries/update", {
+    const res = await fetch("/api/admin/inquiries/update", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type, id, ...updates }),
     });
+    const json = await res.json().catch(() => ({}));
     setSaving(false);
-    void load();
+    if (!res.ok || json.ok === false) {
+      setInquiry(snapshot);
+      setNotes(snapshotNotes);
+      return;
+    }
+    if (json.record) {
+      const row = json.record as InquiryRecord;
+      setInquiry(row);
+      if (updates.follow_up_notes !== undefined) setNotes(str(row.follow_up_notes));
+    }
   }
 
   async function handleDelete() {

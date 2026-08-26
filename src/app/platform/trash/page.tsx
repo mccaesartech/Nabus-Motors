@@ -138,6 +138,23 @@ export default function TrashPage() {
   async function restoreItem(id: string, vehicleStatus?: string) {
     setToast("Restoring…");
     setItems((prev) => prev.filter((item) => item.id !== id));
+    setTotal((prev) => Math.max(0, prev - 1));
+    setSummary((prev) =>
+      prev
+        ? {
+            ...prev,
+            total: Math.max(0, prev.total - 1),
+            byType: (() => {
+              const item = items.find((row) => row.id === id);
+              if (!item) return prev.byType;
+              const next = { ...prev.byType };
+              next[item.entity_type] = Math.max(0, (next[item.entity_type] ?? 0) - 1);
+              if (next[item.entity_type] === 0) delete next[item.entity_type];
+              return next;
+            })(),
+          }
+        : prev
+    );
     setRestoreTarget(null);
     setSelectedIds((prev) => {
       if (!prev.has(id)) return prev;
@@ -154,7 +171,6 @@ export default function TrashPage() {
     const json = await parseAdminResponse(res);
     if (res.ok && json.ok !== false) {
       setToast("Item restored.");
-      void load();
     } else {
       setToast(adminErrorMessage(json, "Could not restore item."));
       void load();
@@ -164,6 +180,23 @@ export default function TrashPage() {
   async function permanentlyDelete(id: string) {
     setToast("Deleting…");
     setItems((prev) => prev.filter((item) => item.id !== id));
+    setTotal((prev) => Math.max(0, prev - 1));
+    setSummary((prev) =>
+      prev
+        ? {
+            ...prev,
+            total: Math.max(0, prev.total - 1),
+            byType: (() => {
+              const item = items.find((row) => row.id === id);
+              if (!item) return prev.byType;
+              const next = { ...prev.byType };
+              next[item.entity_type] = Math.max(0, (next[item.entity_type] ?? 0) - 1);
+              if (next[item.entity_type] === 0) delete next[item.entity_type];
+              return next;
+            })(),
+          }
+        : prev
+    );
     setDeleteTarget(null);
     setSelectedIds((prev) => {
       if (!prev.has(id)) return prev;
@@ -178,7 +211,6 @@ export default function TrashPage() {
     const json = await parseAdminResponse(res);
     if (res.ok && json.ok !== false) {
       setToast("Item permanently deleted.");
-      void load();
     } else {
       setToast(adminErrorMessage(json, "Could not delete item."));
       void load();

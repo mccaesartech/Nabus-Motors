@@ -8,7 +8,7 @@ export default function PlatformCurrencyToolsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Currency & exchange rates"
-        description="Convert amounts with the same USD mid-market feed used for storefront prices. Manual rates apply to a single document only."
+        description="Convert amounts and see the live USD to GHS rate used on the storefront. Owner and Super Admin can set a manual display rate when needed."
         breadcrumb="Tools / Currency"
       />
       <CurrencyExchangePanel />

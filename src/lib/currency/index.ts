@@ -21,6 +21,7 @@ export {
 export {
   FX_MARKET_DISCLAIMER,
   FX_MANUAL_LABEL,
+  FX_ADMIN_OVERRIDE_LABEL,
   fxDisplayKind,
   rateSourceLabel,
   formatUsdGhsRateLine,

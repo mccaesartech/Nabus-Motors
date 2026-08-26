@@ -5,6 +5,8 @@ export const FX_MARKET_DISCLAIMER =
 
 export const FX_MANUAL_LABEL = "Manual Exchange Rate";
 
+export const FX_ADMIN_OVERRIDE_LABEL = "Rate set by admin";
+
 export type FxDisplayKind = "live" | "cached" | "fallback" | "manual";
 
 export function fxDisplayKind(input: {
@@ -22,10 +24,13 @@ export function rateSourceLabel(input: {
   source?: ExchangeRateSource | string | null;
   stale?: boolean;
   isManual?: boolean;
+  isAdminDisplayOverride?: boolean;
   providerName?: string | null;
 }): string {
   const kind = fxDisplayKind(input);
-  if (kind === "manual") return FX_MANUAL_LABEL;
+  if (kind === "manual") {
+    return input.isAdminDisplayOverride ? FX_ADMIN_OVERRIDE_LABEL : FX_MANUAL_LABEL;
+  }
   if (kind === "fallback") return "Emergency fallback (not live market)";
   if (kind === "cached") return "Cached last-good rate (not live market)";
   return input.providerName

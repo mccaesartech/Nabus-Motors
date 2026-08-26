@@ -37,6 +37,6 @@ export async function POST(req: Request) {
     fetchedAt: payload.fetchedAt,
     rateDate: payload.rateDate,
     provider: payload.provider,
-    error: payload.error,
+    displayOverride: payload.displayOverride,
   });
 }

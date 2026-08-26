@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { EXCHANGE_RATE_CACHE_TTL_SECONDS } from "@/lib/currency/fetch-exchange-rates-constants";
 import { getServerExchangeRates } from "@/lib/currency/server-rates";
 
-/** Must be a literal for Next.js segment config analysis. */
 export const revalidate = 1800;
 
 const CACHE_HEADERS = {
@@ -15,6 +14,7 @@ export async function GET() {
   return NextResponse.json(
     {
       rates: payload.rates,
+      liveRates: payload.liveRates,
       ratesFromGhs: payload.ratesFromGhs,
       source: payload.source,
       stale: payload.stale,
@@ -22,6 +22,7 @@ export async function GET() {
       rateDate: payload.rateDate,
       provider: payload.provider,
       error: payload.error,
+      displayOverride: payload.displayOverride,
     },
     { headers: CACHE_HEADERS }
   );

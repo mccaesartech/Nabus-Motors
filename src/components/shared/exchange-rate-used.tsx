@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  FX_ADMIN_OVERRIDE_LABEL,
   FX_MARKET_DISCLAIMER,
   formatUsdGhsRateLine,
   formatUpdatedAt,
@@ -22,10 +23,13 @@ export function ExchangeRateUsed({
   className,
 }: ExchangeRateUsedProps) {
   const ghsPerUsd = getActiveRates().GHS ?? 0;
-  const updated = ratesMeta?.rateDate || ratesMeta?.fetchedAt;
+  const updated = ratesMeta?.fetchedAt || ratesMeta?.rateDate;
+  const overrideActive = ratesMeta?.displayOverride?.active === true;
   const sourceLabel = rateSourceLabel({
     source: ratesMeta?.source,
     stale: ratesStale ?? ratesMeta?.stale,
+    isManual: overrideActive,
+    isAdminDisplayOverride: overrideActive,
     providerName:
       ratesMeta?.provider === "exchangerate-api" || !ratesMeta?.provider
         ? "ExchangeRate-API"
@@ -41,6 +45,7 @@ export function ExchangeRateUsed({
       {formatUsdGhsRateLine(ghsPerUsd)}
       {updated ? ` · Last updated ${formatUpdatedAt(updated)}` : ""}
       {` · ${sourceLabel}. `}
+      {overrideActive ? `${FX_ADMIN_OVERRIDE_LABEL} — not the live market rate. ` : null}
       {FX_MARKET_DISCLAIMER}
     </p>
   );
