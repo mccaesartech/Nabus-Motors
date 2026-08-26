@@ -14,7 +14,10 @@ import {
   formatVehiclePrice,
   type VehiclePriceFields,
 } from "@/lib/currency";
-import { setExchangeRates } from "@/lib/currency/rates";
+import {
+  useExchangeRates,
+  type ExchangeRatesMeta,
+} from "@/hooks/use-exchange-rates";
 import {
   COUNTRY_CODES,
   COUNTRIES,
@@ -41,6 +44,10 @@ interface PlatformCurrencyContextValue {
   /** Site setting default — also used as default listing currency for new vehicles. */
   settingsDefaultCurrency: string;
   ratesLoaded: boolean;
+  /** True when live FX API failed and fallback rates are in use. */
+  ratesStale: boolean;
+  /** Metadata from the shared /api/exchange-rates feed. */
+  ratesMeta: ExchangeRatesMeta;
 }
 
 const PlatformCurrencyContext =
@@ -108,7 +115,7 @@ export function PlatformCurrencyProvider({
   );
   const [currency, setCurrencyState] = useState<string>(settingsDefault);
   const [hydrated, setHydrated] = useState(false);
-  const [ratesLoaded, setRatesLoaded] = useState(false);
+  const { ratesLoaded, ratesStale, meta: ratesMeta } = useExchangeRates();
 
   useEffect(() => {
     const initial = resolveInitialPlatformPreferences(settingsDefault);
@@ -116,25 +123,6 @@ export function PlatformCurrencyProvider({
     setCurrencyState(initial.currency);
     setHydrated(true);
   }, [settingsDefault]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    fetch("/api/exchange-rates")
-      .then((res) => res.json())
-      .then((data: { rates?: Record<string, number> }) => {
-        if (cancelled || !data.rates) return;
-        setExchangeRates(data.rates);
-        setRatesLoaded(true);
-      })
-      .catch(() => {
-        if (!cancelled) setRatesLoaded(true);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const setCountry = useCallback((next: CountryCode) => {
     const config = getCountryConfig(next);
@@ -176,6 +164,8 @@ export function PlatformCurrencyProvider({
       formatVehicleListPrice,
       settingsDefaultCurrency: settingsDefault,
       ratesLoaded,
+      ratesStale,
+      ratesMeta,
     }),
     [
       displayCountry,
@@ -183,6 +173,8 @@ export function PlatformCurrencyProvider({
       formatPrice,
       formatVehicleListPrice,
       ratesLoaded,
+      ratesMeta,
+      ratesStale,
       setCountry,
       setCurrency,
       settingsDefault,

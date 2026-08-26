@@ -27,7 +27,7 @@ import {
   vehicleInquiryTypeLabel,
   type InquiryDetailType,
 } from "@/lib/platform/lead-detail";
-import { customerProfileIdForOrder } from "@/lib/platform/orders-admin";
+import { customerProfileIdForOrder } from "@/lib/platform/order-profile";
 import { platformPath } from "@/lib/platform/paths";
 import { LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS } from "@/lib/platform/types";
 

@@ -14,7 +14,7 @@ export function getActiveRates(): ExchangeRateMap {
   return liveRates ?? getStaticFallbackRates();
 }
 
-/** Env-overridable fallbacks used before live rates load or when API omits a code. */
+/** Env-overridable fallbacks — used only when the live FX API is down or omits a code. */
 export function getStaticFallbackRates(): ExchangeRateMap {
   return {
     USD: 1,
@@ -179,4 +179,19 @@ export function convertFromUsd(
   const rate = rates[target];
   if (!rate || rate <= 0) return usdAmount;
   return usdAmount * rate;
+}
+
+/** Units of `toCurrency` per 1 unit of `fromCurrency` (via USD pivot). */
+export function getCrossRate(
+  fromCurrency: string,
+  toCurrency: string,
+  rates = getActiveRates()
+): number {
+  const from = (fromCurrency || BASE_CURRENCY).toUpperCase();
+  const to = (toCurrency || BASE_CURRENCY).toUpperCase();
+  if (from === to) return 1;
+  const fromRate = rates[from];
+  const toRate = rates[to];
+  if (!fromRate || fromRate <= 0 || !toRate || toRate <= 0) return 1;
+  return toRate / fromRate;
 }

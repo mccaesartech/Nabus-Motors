@@ -2,7 +2,6 @@
 
 import { Package } from "lucide-react";
 import Link from "next/link";
-import type { CustomerPrintProfile } from "@/lib/account/printable-documents";
 import type { PartsOrderSummary } from "@/lib/parts/cart-types";
 import { ROUTES } from "@/lib/routes";
 import { AccountSectionHeader } from "@/components/account/account-section-header";
@@ -12,14 +11,12 @@ import { isRecentOrder } from "@/lib/account/types";
 
 type OrderHistorySectionProps = {
   orders: PartsOrderSummary[];
-  customer: CustomerPrintProfile;
   loading: boolean;
   highlightRecent?: boolean;
 };
 
 export function OrderHistorySection({
   orders,
-  customer,
   loading,
   highlightRecent = true,
 }: OrderHistorySectionProps) {
@@ -49,7 +46,6 @@ export function OrderHistorySection({
             <li key={order.id}>
               <OrderCard
                 order={order}
-                customer={customer}
                 highlight={order.id === recentOrderId}
                 defaultExpanded={order.id === recentOrderId}
               />

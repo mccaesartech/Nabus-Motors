@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbFailure } from "@/lib/errors/api";
 import { requireDirectMutation, requirePermission } from "@/lib/admin/auth";
+import { getServerExchangeRates } from "@/lib/currency/server-rates";
 import { notifyCustomer } from "@/lib/notifications/customer-notify";
 import { notifyCustomerOrderConfirmed } from "@/lib/customer/notifications-server";
 import { formatCustomerNotificationFeedback } from "@/lib/notifications/notification-status";
@@ -25,7 +26,8 @@ export async function GET(_req: NextRequest, context: RouteContext) {
   }
 
   const { id } = await context.params;
-  const order = await fetchAdminOrderDetail(supabase, id);
+  const { rates } = await getServerExchangeRates();
+  const order = await fetchAdminOrderDetail(supabase, id, { rates });
   if (!order) {
     return NextResponse.json({ ok: false, message: "Order not found" }, { status: 404 });
   }
@@ -47,8 +49,9 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   const { id } = await context.params;
   const body = await req.json();
   const action = String(body.action ?? "");
+  const { rates } = await getServerExchangeRates();
 
-  const existing = await fetchAdminOrderDetail(supabase, id);
+  const existing = await fetchAdminOrderDetail(supabase, id, { rates });
   if (!existing) {
     return NextResponse.json({ ok: false, message: "Order not found" }, { status: 404 });
   }
@@ -117,7 +120,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       auth.auth
     );
 
-    const order = await fetchAdminOrderDetail(supabase, id);
+    const order = await fetchAdminOrderDetail(supabase, id, { rates });
     const feedback = formatCustomerNotificationFeedback(notificationResult, {
       savedPrefix: "Order confirmed",
     });
@@ -205,7 +208,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       auth.auth
     );
 
-    const order = await fetchAdminOrderDetail(supabase, id);
+    const order = await fetchAdminOrderDetail(supabase, id, { rates });
     const feedback = formatCustomerNotificationFeedback(notificationResult, {
       savedPrefix: "Order updated",
     });
@@ -218,6 +221,6 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     });
   }
 
-  const order = await fetchAdminOrderDetail(supabase, id);
+  const order = await fetchAdminOrderDetail(supabase, id, { rates });
   return NextResponse.json({ ok: true, order });
 }

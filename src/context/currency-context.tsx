@@ -14,7 +14,10 @@ import {
   formatVehiclePrice,
   type VehiclePriceFields,
 } from "@/lib/currency";
-import { setExchangeRates } from "@/lib/currency/rates";
+import {
+  useExchangeRates,
+  type ExchangeRatesMeta,
+} from "@/hooks/use-exchange-rates";
 import {
   COUNTRY_CODES,
   COUNTRIES,
@@ -38,9 +41,15 @@ interface CurrencyContextValue {
   country: CountryCode;
   setCountry: (country: CountryCode) => void;
   countries: readonly CountryConfig[];
+  /** Admin-configured default from site_settings.default_currency_display. */
+  settingsDefaultCurrency: string;
   formatPrice: (usdAmount: number) => string;
   formatVehicleListPrice: (fields: VehiclePriceFields) => string;
   ratesLoaded: boolean;
+  /** True when live FX API failed and fallback rates are in use. */
+  ratesStale: boolean;
+  /** Metadata from the shared /api/exchange-rates feed. */
+  ratesMeta: ExchangeRatesMeta;
 }
 
 const CurrencyContext = createContext<CurrencyContextValue | null>(null);
@@ -96,49 +105,28 @@ function persistPreferences(country: CountryCode, currency: string) {
   }
 }
 
-export function CurrencyProvider({ children }: { children: React.ReactNode }) {
+export function CurrencyProvider({
+  children,
+  settingsDefaultCurrency = DEFAULT_DISPLAY_CURRENCY,
+}: {
+  children: React.ReactNode;
+  settingsDefaultCurrency?: string;
+}) {
+  const settingsDefault = (
+    settingsDefaultCurrency || DEFAULT_DISPLAY_CURRENCY
+  ).toUpperCase();
   const [country, setCountryState] = useState<CountryCode>(DEFAULT_COUNTRY);
   const [currency, setCurrencyState] = useState<string>(DEFAULT_CURRENCY);
   const [hydrated, setHydrated] = useState(false);
-  const [ratesLoaded, setRatesLoaded] = useState(false);
+  const { ratesLoaded, ratesStale, meta: ratesMeta } = useExchangeRates({
+    defer: true,
+  });
 
   useEffect(() => {
     const initial = resolveInitialPreferences();
     setCountryState(initial.country);
     setCurrencyState(initial.currency);
     setHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadRates = () => {
-      fetch("/api/exchange-rates")
-        .then((res) => res.json())
-        .then((data: { rates?: Record<string, number> }) => {
-          if (cancelled || !data.rates) return;
-          setExchangeRates(data.rates);
-          setRatesLoaded(true);
-        })
-        .catch(() => {
-          if (!cancelled) setRatesLoaded(true);
-        });
-    };
-
-    let idleId: number | undefined;
-    let timerId: ReturnType<typeof setTimeout> | undefined;
-
-    if (typeof window.requestIdleCallback === "function") {
-      idleId = window.requestIdleCallback(loadRates, { timeout: 3000 });
-    } else {
-      timerId = setTimeout(loadRates, 150);
-    }
-
-    return () => {
-      cancelled = true;
-      if (idleId !== undefined) window.cancelIdleCallback(idleId);
-      if (timerId !== undefined) clearTimeout(timerId);
-    };
   }, []);
 
   const setCountry = useCallback((next: CountryCode) => {
@@ -175,9 +163,12 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
       country: displayCountry,
       setCountry,
       countries: COUNTRIES,
+      settingsDefaultCurrency: settingsDefault,
       formatPrice,
       formatVehicleListPrice,
       ratesLoaded,
+      ratesStale,
+      ratesMeta,
     }),
     [
       displayCountry,
@@ -185,8 +176,11 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
       formatPrice,
       formatVehicleListPrice,
       ratesLoaded,
+      ratesMeta,
+      ratesStale,
       setCountry,
       setCurrency,
+      settingsDefault,
     ]
   );
 

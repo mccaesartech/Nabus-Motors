@@ -90,7 +90,7 @@ function InsightCard({
   return (
     <article
       className={cn(
-        "platform-dashboard-card platform-insight-card min-w-0 max-w-full overflow-x-clip rounded-xl p-3 sm:p-5",
+        "platform-card platform-insight-card min-w-0 max-w-full overflow-x-clip rounded-xl p-3 sm:p-5",
         className
       )}
     >

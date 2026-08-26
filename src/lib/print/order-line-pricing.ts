@@ -1,4 +1,5 @@
 import { formatPlatformPrice } from "@/lib/currency";
+import type { ExchangeRateMap } from "@/lib/currency/rates";
 
 export type ResolvedOrderLinePricing = {
   quantity: number;
@@ -12,7 +13,8 @@ export type ResolvedOrderLinePricing = {
 export function resolveOrderLinePricing(
   quantity: unknown,
   unitPriceUsd: unknown,
-  lineTotalUsd?: unknown
+  lineTotalUsd?: unknown,
+  rates?: ExchangeRateMap
 ): ResolvedOrderLinePricing {
   const qty = Math.max(1, Math.floor(Number(quantity) || 1));
   const unitRaw = Number(unitPriceUsd);
@@ -32,8 +34,8 @@ export function resolveOrderLinePricing(
   }
 
   const unitPriceLabel =
-    unitUsd > 0 ? formatPlatformPrice(unitUsd) : lineUsd > 0 ? formatPlatformPrice(lineUsd / qty) : "—";
-  const lineTotalLabel = lineUsd > 0 ? formatPlatformPrice(lineUsd) : unitUsd > 0 ? formatPlatformPrice(unitUsd * qty) : "—";
+    unitUsd > 0 ? formatPlatformPrice(unitUsd, rates) : lineUsd > 0 ? formatPlatformPrice(lineUsd / qty, rates) : "—";
+  const lineTotalLabel = lineUsd > 0 ? formatPlatformPrice(lineUsd, rates) : unitUsd > 0 ? formatPlatformPrice(unitUsd * qty, rates) : "—";
 
   return {
     quantity: qty,

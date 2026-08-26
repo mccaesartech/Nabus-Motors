@@ -30,6 +30,7 @@ import {
 } from "@/lib/admin/client";
 import { DEFAULT_SITE_SETTINGS, type SiteSettingKey } from "@/lib/platform/modules";
 import { formatPlatformDateTime } from "@/lib/platform/datetime";
+import { platformPath } from "@/lib/platform/paths";
 
 type SettingsMeta = {
   publicSiteUrl: string;
@@ -420,7 +421,13 @@ export default function SettingsPage() {
               </select>
               <p className="mt-1.5 text-xs text-[var(--platform-text-secondary)]">
                 Controls platform/admin money display only. Public visitors choose their own
-                currency in the site UI — this setting never overrides them.
+                currency in the site UI — this setting never overrides them.{" "}
+                <Link
+                  href={platformPath("tools/currency")}
+                  className="font-medium text-[var(--platform-accent)] hover:underline"
+                >
+                  Open currency converter
+                </Link>
               </p>
             </Field>
             <Field

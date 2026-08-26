@@ -118,8 +118,9 @@ export function CustomerInvoicePrintButton({
     }
 
     setFetching(true);
-    void ensureCustomer()
+    void fetchCustomerForPrint(customerId)
       .then((detail) => {
+        setResolvedCustomer(detail);
         const result = session.complete(buildCustomerInvoiceDocumentHtml(detail));
         if (!result.ok) setActionError(result.error);
       })
@@ -252,7 +253,7 @@ export function OrderInvoicePrintButton({
     }
 
     setFetching(true);
-    void ensureOrder()
+    void fetchOrderForPrint(orderId)
       .then((detail) => {
         const result = session.complete(buildAdminOrderDocumentHtml(detail));
         if (!result.ok) setActionError(result.error);
@@ -364,7 +365,7 @@ export function PreorderInvoicePrintButton({
     }
 
     setFetching(true);
-    void ensurePreorder()
+    void fetchPreorderForPrint(preorderId)
       .then((detail) => {
         const result = session.complete(buildAdminPreorderDocumentHtml(detail));
         if (!result.ok) setActionError(result.error);

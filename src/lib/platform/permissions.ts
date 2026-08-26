@@ -324,6 +324,8 @@ export function permissionForPath(pathname: string): PlatformPermission | null {
   if (pathname.startsWith(`${PLATFORM_PREFIX}/account`)) return null;
 
   if (pathname.startsWith(`${PLATFORM_PREFIX}/finance`)) return "finance";
+  // FX calculator — any authenticated platform user (same rates as price displays).
+  if (pathname.startsWith(`${PLATFORM_PREFIX}/tools`)) return null;
   if (pathname.startsWith(`${PLATFORM_PREFIX}/freight`)) return "freight";
   if (pathname.startsWith(`${PLATFORM_PREFIX}/parts`)) return "parts";
   if (pathname.startsWith(`${PLATFORM_PREFIX}/appointments`)) return "leads";
@@ -364,6 +366,7 @@ export function navPermissionForHref(href: string): PlatformPermission {
     customers: "customers",
     sales: "sales",
     finance: "finance",
+    tools: "dashboard",
     leads: "leads",
     appointments: "leads",
     tracking: "leads",

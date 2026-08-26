@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatPlatformPrice } from "@/lib/currency";
+import { getStaticFallbackRates, type ExchangeRateMap } from "@/lib/currency/rates";
 
 export type AdminCustomerListItem = {
   id: string;
@@ -421,9 +422,10 @@ export async function deleteAdminCustomer(
 export async function fetchAdminCustomerDetail(
   supabase: SupabaseClient,
   id: string,
-  options?: { includeDeleted?: boolean }
+  options?: { includeDeleted?: boolean; rates?: ExchangeRateMap }
 ): Promise<AdminCustomerDetail | null> {
   const includeDeleted = options?.includeDeleted ?? false;
+  const rates = options?.rates ?? getStaticFallbackRates();
   const decodedId = decodeURIComponent(id);
   const isEmailKey = decodedId.startsWith("email:");
 
@@ -587,7 +589,7 @@ export async function fetchAdminCustomerDetail(
     recentOrders: partsOrderRows.map((order) => ({
       id: order.id,
       status: order.status,
-      totalLabel: formatPlatformPrice(Number(order.total_usd) || 0),
+      totalLabel: formatPlatformPrice(Number(order.total_usd) || 0, rates),
       itemCount: order.parts_order_items?.length ?? 0,
       createdAt: order.created_at,
     })),

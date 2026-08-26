@@ -29,10 +29,8 @@ import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
 import { platformPath } from "@/lib/platform/paths";
 import { ORDER_STATUS_OPTIONS } from "@/lib/platform/types";
-import {
-  customerProfileIdForOrder,
-  type AdminOrderDetail,
-} from "@/lib/platform/orders-admin";
+import { customerProfileIdForOrder } from "@/lib/platform/order-profile";
+import type { AdminOrderDetail } from "@/lib/platform/orders-admin";
 import { seedCachedOrder } from "@/lib/print/pdf-cache";
 import { formatPlatformDateTime } from "@/lib/platform/datetime";
 import type { NotificationFeedbackVariant } from "@/lib/notifications/notification-status";

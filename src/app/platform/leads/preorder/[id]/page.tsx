@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { ExternalLink, FileText, Mail, MessageSquare, Phone, RotateCcw, Trash2, User } from "lucide-react";
 import { WhatsAppAssistAction } from "@/components/platform/whatsapp-assist-dialog";
-import { customerProfileIdForOrder } from "@/lib/platform/orders-admin";
+import { customerProfileIdForOrder } from "@/lib/platform/order-profile";
 import { PageHeader } from "@/components/platform/page-header";
 import { PlatformPrintButton, PrintableRecord } from "@/components/platform/printable-record";
 import { buildAdminPreorderDocumentHtml } from "@/lib/platform/printable-documents";

@@ -12,6 +12,7 @@
   --platform-success: #16a34a;
   --platform-warning: #d97706;
   --platform-error: #dc2626;
+  --platform-card-shadow-hover: 0 4px 16px rgba(76, 29, 149, 0.08);
 
   background-color: var(--platform-bg);
   color: var(--platform-text);
@@ -410,11 +411,7 @@
     transform 0.2s ease;
 }
 
-.platform-stat-card:hover {
-  border-color: #c4b5fd;
-}
-
-/* Dashboard cards — subtle lift on hover */
+/* Interactive cards — subtle elevation on pointer hover (links/buttons only) */
 .platform-dashboard-card {
   background-color: var(--platform-card);
   border: 1px solid var(--platform-border);
@@ -424,10 +421,18 @@
     transform 0.2s ease;
 }
 
-.platform-dashboard-card:hover {
-  border-color: #c4b5fd;
-  box-shadow: 0 4px 16px rgba(76, 29, 149, 0.08);
-  transform: translateY(-1px);
+@media (hover: hover) {
+  a.platform-dashboard-card:hover,
+  button.platform-dashboard-card:hover:not(:disabled) {
+    border-color: #c4b5fd;
+    box-shadow: var(--platform-card-shadow-hover);
+    transform: translateY(-1px);
+  }
+
+  button.platform-stat-card:hover:not(:disabled) {
+    border-color: #c4b5fd;
+    box-shadow: var(--platform-card-shadow-hover);
+  }
 }
 
 button.platform-dashboard-card:disabled {
@@ -622,6 +627,11 @@ button.platform-dashboard-card:disabled:hover {
   .platform-progress-ring {
     animation: none;
     transition: none;
+  }
+
+  a.platform-dashboard-card:hover,
+  button.platform-dashboard-card:hover:not(:disabled) {
+    transform: none;
   }
 }
 

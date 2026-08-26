@@ -5,6 +5,7 @@ import { ChevronDown, Search } from "lucide-react";
 import {
   countryOptionLabel,
   countryTriggerLabel,
+  countryForCurrency,
   getCountryConfig,
 } from "@/lib/countries";
 import { useCurrency } from "@/context/currency-context";
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { CountryFlag } from "@/components/shared/country-flag";
+import { CurrencyDefaultOption } from "@/components/shared/currency-default-option";
 import { cn } from "@/lib/utils";
 
 interface CountrySelectorProps {
@@ -27,7 +29,8 @@ export function CountrySelector({
   className,
   compact = false,
 }: CountrySelectorProps) {
-  const { country, setCountry, countries } = useCurrency();
+  const { country, setCountry, countries, ratesStale, settingsDefaultCurrency } =
+    useCurrency();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -73,7 +76,12 @@ export function CountrySelector({
           triggerSizing,
           className
         )}
-        aria-label="Country and currency"
+        aria-label={
+          ratesStale ? "Country and currency (approximate rates)" : "Country and currency"
+        }
+        title={
+          ratesStale ? "Exchange rates are approximate — live feed unavailable" : undefined
+        }
       >
         <span className="flex min-w-0 items-center gap-1.5 truncate text-left">
           <CountryFlag
@@ -108,7 +116,18 @@ export function CountrySelector({
             />
           </div>
         </div>
-        <div className="max-h-64 overflow-y-auto p-1">
+        <div className="p-1">
+          <CurrencyDefaultOption
+            settingsDefaultCurrency={settingsDefaultCurrency}
+            currentCountry={country}
+            onSelect={() => {
+              setCountry(countryForCurrency(settingsDefaultCurrency));
+              setOpen(false);
+              setQuery("");
+            }}
+          />
+        </div>
+        <div className="max-h-64 overflow-y-auto p-1 pt-0">
           {filtered.length === 0 ? (
             <p className="px-2 py-3 text-center text-xs text-muted-foreground">
               No countries match your search

@@ -8,11 +8,6 @@ import { useCurrency } from "@/context/currency-context";
 import { orderStatusLabel } from "@/lib/parts/order-labels";
 import type { PartsOrderSummary } from "@/lib/parts/cart-types";
 import { orderReferenceId } from "@/lib/account/types";
-import {
-  buildOrderDocumentHtml,
-  type CustomerPrintProfile,
-} from "@/lib/account/printable-documents";
-import { OrderPrintActions } from "@/components/account/order-print-actions";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -73,14 +68,12 @@ function OrderItemRow({ item }: OrderItemRowProps) {
 
 type OrderCardProps = {
   order: PartsOrderSummary;
-  customer: CustomerPrintProfile;
   defaultExpanded?: boolean;
   highlight?: boolean;
 };
 
 export function OrderCard({
   order,
-  customer,
   defaultExpanded = false,
   highlight = false,
 }: OrderCardProps) {
@@ -125,9 +118,6 @@ export function OrderCard({
           >
             {orderStatusLabel(order.status)}
           </span>
-          <OrderPrintActions
-            getHtml={() => buildOrderDocumentHtml(order, customer)}
-          />
         </div>
       </div>
 

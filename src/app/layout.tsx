@@ -15,6 +15,7 @@ import { CustomerNotificationsProvider } from "@/context/customer-notifications-
 import { PartsCartProvider } from "@/context/parts-cart-context";
 import { buildCacheRecoveryInlineScript } from "@/lib/cache-recovery-inline-script";
 import { CUSTOMER_PWA, PWA_BACKGROUND_COLOR, PWA_THEME_COLOR } from "@/lib/pwa/constants";
+import { getSiteSettings } from "@/lib/platform/site-settings-server";
 import { DEFAULT_SITE_CONTENT } from "@/lib/site-content/defaults";
 import { getPublicSiteUrl } from "@/lib/site-url";
 import "./globals.css";
@@ -94,6 +95,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const nonce = (await headers()).get("x-nonce") ?? undefined;
+  const settings = await getSiteSettings();
 
   return (
     <html lang="en" className={`${inter.variable} light h-full`} suppressHydrationWarning>
@@ -111,7 +113,7 @@ export default async function RootLayout({
       <body className="flex min-h-full flex-col font-sans">
         <SkipToContent />
         <DeferredChunkReloadHandler />
-        <CurrencyProvider>
+        <CurrencyProvider settingsDefaultCurrency={settings.default_currency_display}>
           <CustomerAuthProvider>
             <CustomerNotificationsProvider>
               <PartsCartProvider>

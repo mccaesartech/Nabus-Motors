@@ -8,55 +8,57 @@ import {
   isPdfGenerationInFlight,
 } from "@/lib/print/pdf-cache";
 import {
+  LETTERHEAD_CONTINUATION_DATA_URL,
   LETTERHEAD_DATA_URL,
-  LETTERHEAD_PNG_PATH,
+  LETTERHEAD_SAFE_ZONE,
 } from "@/lib/print/letterhead-data";
 import { getAutoSiteUrl } from "@/lib/site-url";
 
-/** Body safe zone (mm) tuned to True Goshen letterhead header/footer bands. */
-export const LETTERHEAD_SAFE_ZONE = {
-  topMm: 46,
-  bottomMm: 42,
-  leftMm: 16,
-  rightMm: 16,
-} as const;
+export { LETTERHEAD_SAFE_ZONE };
 
-function escapeAttr(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+export const PRINT_PAGE_WIDTH_PX = 794;
+/** A4 height at {@link PRINT_PAGE_WIDTH_PX} — matches letterhead PNG aspect ratio. */
+export const PRINT_PAGE_HEIGHT_PX = Math.round(
+  PRINT_PAGE_WIDTH_PX * (297 / 210)
+);
+
+/** Inject stacked A4 backgrounds — page 1 full letterhead, page 2+ watermark + footer only. */
+export function injectPageBackgrounds(doc: Document): void {
+  const body = doc.body;
+  if (!body || body.querySelector(".page-backgrounds")) return;
+
+  const pageHeight = PRINT_PAGE_HEIGHT_PX;
+  const root = doc.documentElement;
+  const docHeight = Math.max(
+    body.scrollHeight,
+    body.offsetHeight,
+    root?.scrollHeight ?? 0,
+    root?.offsetHeight ?? 0,
+    pageHeight
+  );
+  const pageCount = Math.max(1, Math.ceil(docHeight / pageHeight));
+
+  const container = doc.createElement("div");
+  container.className = "page-backgrounds";
+  container.setAttribute("aria-hidden", "true");
+
+  for (let i = 0; i < pageCount; i++) {
+    const page = doc.createElement("div");
+    page.className =
+      i === 0 ? "page-bg page-bg--first" : "page-bg page-bg--continuation";
+    page.style.top = `${i * pageHeight}px`;
+    container.appendChild(page);
+  }
+
+  body.insertBefore(container, body.firstChild);
 }
 
-function getLetterheadAssetUrl(): string {
-  return `${getAutoSiteUrl()}${LETTERHEAD_PNG_PATH}`;
-}
-
-function printLetterheadMarkup(): string {
-  const src = escapeAttr(LETTERHEAD_DATA_URL);
-  const urlFallback = escapeAttr(getLetterheadAssetUrl());
-
-  return `
-    <img
-      class="letterhead-bg"
-      src="${src}"
-      data-fallback-src="${urlFallback}"
-      alt=""
-      aria-hidden="true"
-      width="1240"
-      height="1753"
-      onerror="if(!this.dataset.retried){this.dataset.retried='1';this.src=this.dataset.fallbackSrc;}"
-    />
-  `;
-}
+const PAGE_BACKGROUND_SCRIPT = `<script>(function(){var PAGE_H=${PRINT_PAGE_HEIGHT_PX};function inject(){var body=document.body;if(!body||body.querySelector(".page-backgrounds"))return;var h=Math.max(body.scrollHeight,body.offsetHeight,document.documentElement.scrollHeight,document.documentElement.offsetHeight,PAGE_H);var pages=Math.max(1,Math.ceil(h/PAGE_H));var c=document.createElement("div");c.className="page-backgrounds";c.setAttribute("aria-hidden","true");for(var i=0;i<pages;i++){var p=document.createElement("div");p.className=i===0?"page-bg page-bg--first":"page-bg page-bg--continuation";p.style.top=(i*PAGE_H)+"px";c.appendChild(p);}body.insertBefore(c,body.firstChild);}inject();})();</script>`;
 
 /** html2canvas scale — 1.0 prioritizes speed; text stays readable on A4. */
 const PDF_CANVAS_SCALE = 1.0;
 /** Max wait before opening print dialog even if images are still loading. */
 const PRINT_DIALOG_MAX_WAIT_MS = 300;
-
-export const PRINT_PAGE_WIDTH_PX = 794;
 
 const LETTERHEAD_TOP_MM = LETTERHEAD_SAFE_ZONE.topMm;
 const LETTERHEAD_BOTTOM_MM = LETTERHEAD_SAFE_ZONE.bottomMm;
@@ -87,22 +89,35 @@ export const PRINT_STYLES = `
   }
   body.document {
     position: relative;
-    min-height: 297mm;
+    min-height: auto;
     padding: ${PRINT_BODY_PADDING};
     display: flex;
     flex-direction: column;
   }
-  .letterhead-bg {
-    position: fixed;
+  .page-backgrounds {
+    position: absolute;
     top: 0;
     left: 0;
     width: 210mm;
-    height: 297mm;
-    object-fit: fill;
     z-index: 0;
     pointer-events: none;
+  }
+  .page-bg {
+    position: absolute;
+    left: 0;
+    width: 210mm;
+    height: 297mm;
+    background-repeat: no-repeat;
+    background-size: 210mm 297mm;
+    background-position: top center;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+  .page-bg--first {
+    background-image: url("${LETTERHEAD_DATA_URL}");
+  }
+  .page-bg--continuation {
+    background-image: url("${LETTERHEAD_CONTINUATION_DATA_URL}");
   }
   .document-main {
     position: relative;
@@ -159,6 +174,8 @@ export const PRINT_STYLES = `
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
     margin-bottom: 10px;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
   .address-col {
     padding: 8px 10px;
@@ -188,6 +205,8 @@ export const PRINT_STYLES = `
     background: #f9fafb;
     border-radius: 6px;
     border: 1px solid #e5e7eb;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
   .meta-grid dt { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.03em; color: #6b7280; margin: 0; }
   .meta-grid dd { margin: 1px 0 0; font-weight: 500; color: #111; font-size: 9pt; }
@@ -318,6 +337,8 @@ export const PRINT_STYLES = `
     padding: 8px 6px;
     border-top: 1.5px solid #1e3a8a;
     margin-top: 4px;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
   .footer {
     position: relative;
@@ -329,6 +350,8 @@ export const PRINT_STYLES = `
     text-align: center;
     line-height: 1.35;
     flex-shrink: 0;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
   .footer p { margin: 0 0 3px; }
   .footer-thanks { color: #111; }
@@ -350,9 +373,9 @@ export const PRINT_STYLES = `
       print-color-adjust: exact !important;
     }
     body { margin: 0; padding: ${PRINT_BODY_PADDING}; width: auto; max-width: none; font-size: 9.5pt; }
-    body.document { min-height: 297mm; }
-    .letterhead-bg {
-      position: fixed;
+    body.document { min-height: auto; }
+    .page-backgrounds,
+    .page-bg {
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
@@ -547,9 +570,9 @@ export function wrapDocument(title: string, body: string, autoPrint = false): st
   <style>${PRINT_STYLES}</style>
 </head>
 <body class="document">
-  ${printLetterheadMarkup()}
   <div class="document-main">${main}</div>
   ${footer}
+  ${PAGE_BACKGROUND_SCRIPT}
   ${printScript}
 </body>
 </html>`;
@@ -563,11 +586,21 @@ const MIN_HTML_LENGTH = 80;
 
 const PRINT_IMAGE_MAX_WAIT_MS = 1500;
 
-const FAST_PRINT_SCRIPT = `<script>(function(){var done=false;var MAX_WAIT=${PRINT_DIALOG_MAX_WAIT_MS};var IMG_WAIT=${PRINT_IMAGE_MAX_WAIT_MS};function setTitle(){try{var t=document.querySelector('title');var raw=t&&t.textContent?t.textContent.trim():'';if(raw&&!/^about:blank$/i.test(document.title)&&!/^about:blank$/i.test(raw)){document.title=raw;}else{document.title='True Goshen Invoice';}}catch(e){document.title='True Goshen Invoice';}}function go(){if(done)return;done=true;setTitle();try{window.focus();window.print();}catch(e){}}function whenImagesReady(cb){var imgs=Array.prototype.slice.call(document.images||[]);if(!imgs.length)return cb();var pending=imgs.filter(function(i){return!i.complete;});if(!pending.length)return cb();var left=pending.length,timer=setTimeout(cb,IMG_WAIT);pending.forEach(function(img){img.addEventListener('load',done,{once:true});img.addEventListener('error',done,{once:true});});function done(){if(--left<=0){clearTimeout(timer);cb();}}}function start(){whenImagesReady(function(){setTimeout(go,50);});setTimeout(go,MAX_WAIT);}if(document.readyState==='complete'||document.readyState==='interactive')start();else document.addEventListener('DOMContentLoaded',start,{once:true});})();</script>`;
+/** Fallback print for popup windows opened on user click (async data load). */
+const DEFERRED_PRINT_SCRIPT = `<script>(function(){var done=false;var MAX_WAIT=${PRINT_DIALOG_MAX_WAIT_MS};var IMG_WAIT=${PRINT_IMAGE_MAX_WAIT_MS};function setTitle(){try{var t=document.querySelector('title');var raw=t&&t.textContent?t.textContent.trim():'';if(raw&&!/^about:blank$/i.test(document.title)&&!/^about:blank$/i.test(raw)){document.title=raw;}else{document.title='True Goshen Invoice';}}catch(e){document.title='True Goshen Invoice';}}function go(){if(done)return;done=true;setTitle();try{window.focus();window.print();}catch(e){}}function whenImagesReady(cb){var imgs=Array.prototype.slice.call(document.images||[]);if(!imgs.length)return cb();var pending=imgs.filter(function(i){return!i.complete;});if(!pending.length)return cb();var left=pending.length,timer=setTimeout(cb,IMG_WAIT);pending.forEach(function(img){img.addEventListener('load',tick,{once:true});img.addEventListener('error',tick,{once:true});});function tick(){if(--left<=0){clearTimeout(timer);cb();}}}function start(){whenImagesReady(go);setTimeout(go,MAX_WAIT);}if(document.readyState==='complete'||document.readyState==='interactive')start();else document.addEventListener('DOMContentLoaded',start,{once:true});})();</script>`;
 
-function withAutoPrintScript(html: string): string {
+function withDeferredPrintScript(html: string): string {
   if (html.includes("window.print()")) return html;
-  return html.replace("</body>", `${FAST_PRINT_SCRIPT}</body>`);
+  return html.replace("</body>", `${DEFERRED_PRINT_SCRIPT}</body>`);
+}
+
+function triggerSyncPrint(win: Window): void {
+  try {
+    win.focus();
+    win.print();
+  } catch {
+    /* ignore — deferred script may still run in popup windows */
+  }
 }
 
 function validatePrintableHtml(html: string): PrintableDocumentResult | null {
@@ -599,8 +632,8 @@ function createHiddenPrintIframe(): {
 } | null {
   const iframe = document.createElement("iframe");
   iframe.setAttribute("title", "Print document");
-  iframe.style.cssText =
-    "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
+  // Full-width off-screen frame (same layout as PDF render) — 0×0 iframes break print.
+  iframe.style.cssText = `position:fixed;left:-10000px;top:0;width:${PRINT_PAGE_WIDTH_PX}px;border:0;visibility:hidden;overflow:visible;`;
   document.body.appendChild(iframe);
 
   const win = iframe.contentWindow;
@@ -622,19 +655,32 @@ function scheduleIframeCleanup(iframe: HTMLIFrameElement, win: Window): void {
   setTimeout(cleanup, 60_000);
 }
 
+type WritePrintTargetOptions = {
+  /** Print synchronously from the click handler (iframe / cached data). */
+  syncPrint?: boolean;
+  win?: Window | null;
+};
+
 function writeHtmlToPrintTarget(
   doc: Document,
   html: string,
-  method: "iframe" | "popup"
+  method: "iframe" | "popup",
+  options: WritePrintTargetOptions = {}
 ): PrintableDocumentResult {
   const invalid = validatePrintableHtml(html);
   if (invalid) return invalid;
 
-  const printHtml = withAutoPrintScript(html);
+  const { syncPrint = false, win = null } = options;
+  const printHtml = syncPrint ? html : withDeferredPrintScript(html);
   doc.open();
   doc.write(printHtml);
   doc.close();
   doc.title = extractDocumentTitle(html);
+  injectPageBackgrounds(doc);
+
+  if (syncPrint && win) {
+    triggerSyncPrint(win);
+  }
 
   return { ok: true, method };
 }
@@ -644,12 +690,15 @@ function printViaHiddenIframe(html: string): boolean {
   if (!target) return false;
 
   scheduleIframeCleanup(target.iframe, target.win);
-  const result = writeHtmlToPrintTarget(target.doc, html, "iframe");
+  const result = writeHtmlToPrintTarget(target.doc, html, "iframe", {
+    syncPrint: true,
+    win: target.win,
+  });
   return result.ok;
 }
 
 function printViaBlobPopup(html: string): boolean {
-  const printHtml = withAutoPrintScript(html);
+  const printHtml = withDeferredPrintScript(html);
   const blob = new Blob([printHtml], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
 
@@ -681,52 +730,72 @@ export type PrintSession =
     }
   | { ok: false; error: string };
 
+const PRINT_LOADING_HTML = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8" /><title>Loading…</title>
+<style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;color:#374151;}</style>
+</head><body><p>Loading document…</p></body></html>`;
+
 /**
  * Reserve a print target synchronously on user click (before any await).
+ * Prefers a popup window so print still works after async fetches.
  * Call complete() after async data loads, or cancel() on failure.
  */
 export function beginPrintSession(): PrintSession {
+  const win = window.open("about:blank", "_blank");
+  if (win) {
+    try {
+      win.opener = null;
+    } catch {
+      /* ignore */
+    }
+
+    const loadingDoc = win.document;
+    if (loadingDoc) {
+      loadingDoc.open();
+      loadingDoc.write(PRINT_LOADING_HTML);
+      loadingDoc.close();
+    }
+
+    return {
+      ok: true,
+      method: "popup",
+      complete: (html) => {
+        const doc = win.document;
+        if (!doc) {
+          win.close();
+          return { ok: false, error: "Print window unavailable." };
+        }
+        return writeHtmlToPrintTarget(doc, html, "popup", {
+          syncPrint: false,
+          win,
+        });
+      },
+      cancel: () => {
+        try {
+          win.close();
+        } catch {
+          /* ignore */
+        }
+      },
+    };
+  }
+
   const iframeTarget = createHiddenPrintIframe();
   if (iframeTarget) {
     scheduleIframeCleanup(iframeTarget.iframe, iframeTarget.win);
     return {
       ok: true,
       method: "iframe",
-      complete: (html) => writeHtmlToPrintTarget(iframeTarget.doc, html, "iframe"),
+      complete: (html) =>
+        writeHtmlToPrintTarget(iframeTarget.doc, html, "iframe", {
+          syncPrint: false,
+          win: iframeTarget.win,
+        }),
       cancel: () => iframeTarget.iframe.remove(),
     };
   }
 
-  const win = window.open("about:blank", "_blank");
-  if (!win) {
-    return { ok: false, error: "Allow popups or try Download." };
-  }
-
-  try {
-    win.opener = null;
-  } catch {
-    /* ignore */
-  }
-
-  return {
-    ok: true,
-    method: "popup",
-    complete: (html) => {
-      const doc = win.document;
-      if (!doc) {
-        win.close();
-        return { ok: false, error: "Print window unavailable." };
-      }
-      return writeHtmlToPrintTarget(doc, html, "popup");
-    },
-    cancel: () => {
-      try {
-        win.close();
-      } catch {
-        /* ignore */
-      }
-    },
-  };
+  return { ok: false, error: "Allow popups or try Download." };
 }
 
 /** Open the browser print dialog immediately — never waits for PDF generation. */
@@ -738,10 +807,8 @@ export function openPrintableDocument(html: string): PrintableDocumentResult {
   const invalid = validatePrintableHtml(html);
   if (invalid) return invalid;
 
-  const printHtml = withAutoPrintScript(html);
-
-  // Hidden iframe avoids about:blank in browser print headers/footers.
-  if (printViaHiddenIframe(printHtml)) {
+  // Hidden iframe + synchronous print keeps the user-gesture chain intact.
+  if (printViaHiddenIframe(html)) {
     return { ok: true, method: "iframe" };
   }
 
@@ -805,11 +872,8 @@ function replaceExternalImagesForPdf(doc: Document): void {
     const placeholder = doc.createElement("div");
     placeholder.className = img.className.includes("item-thumb")
       ? "item-thumb-placeholder"
-      : "letterhead-bg-fallback";
+      : "item-thumb-placeholder";
     placeholder.setAttribute("aria-hidden", "true");
-    if (img.className.includes("letterhead-bg")) {
-      placeholder.style.cssText = "width:210mm;height:297mm;background:#fff;";
-    }
     img.replaceWith(placeholder);
   }
 }
@@ -864,6 +928,7 @@ async function htmlToPdfBlob(html: string): Promise<Blob> {
     });
 
     replaceExternalImagesForPdf(doc);
+    injectPageBackgrounds(doc);
     await waitForDocumentImages(doc);
 
     const bodyHeight = measureDocumentHeight(doc);

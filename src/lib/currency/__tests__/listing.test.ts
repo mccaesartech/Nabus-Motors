@@ -1,11 +1,34 @@
 import { describe, expect, it } from "vitest";
-import { setExchangeRates } from "@/lib/currency/rates";
+import { getCrossRate, setExchangeRates } from "@/lib/currency/rates";
 import {
+  buildRatesFromGhs,
+  mergeLiveRates,
+} from "@/lib/currency/fetch-exchange-rates";
+import {
+  convertBetweenCurrencies,
   convertToUsd,
   formatVehiclePrice,
   listingAmountForForm,
   toStoredVehiclePrice,
 } from "@/lib/currency/listing";
+
+describe("live exchange rate helpers", () => {
+  it("buildRatesFromGhs converts USD-base rates to GHS anchor", () => {
+    const fromGhs = buildRatesFromGhs({ USD: 1, GHS: 10, EUR: 0.9 });
+    expect(fromGhs.GHS).toBe(1);
+    expect(fromGhs.USD).toBeCloseTo(0.1);
+    expect(fromGhs.EUR).toBeCloseTo(0.09);
+  });
+
+  it("mergeLiveRates overlays API values on fallbacks", () => {
+    const merged = mergeLiveRates({ GHS: 11.18, EUR: 0.86, NGN: 1350 });
+    expect(merged.USD).toBe(1);
+    expect(merged.GHS).toBe(11.18);
+    expect(merged.EUR).toBe(0.86);
+    expect(merged.NGN).toBe(1350);
+    expect(merged.GBP).toBeGreaterThan(0);
+  });
+});
 
 describe("listing currency helpers", () => {
   it("converts GHS listing amounts to USD for storage", () => {
@@ -58,5 +81,12 @@ describe("listing currency helpers", () => {
   it("convertToUsd divides by rate", () => {
     setExchangeRates({ GHS: 10 });
     expect(convertToUsd(1000, "GHS")).toBe(100);
+  });
+
+  it("convertBetweenCurrencies pivots through USD", () => {
+    setExchangeRates({ GHS: 10, EUR: 0.9 });
+    expect(convertBetweenCurrencies(1000, "GHS", "EUR")).toBeCloseTo(90);
+    expect(getCrossRate("GHS", "EUR")).toBeCloseTo(0.09);
+    expect(getCrossRate("USD", "GHS")).toBe(10);
   });
 });

@@ -29,7 +29,7 @@ export function AccountDashboardTiles({ tiles, className }: AccountDashboardTile
           <a
             key={tile.id}
             href={tile.href}
-            className="group relative flex min-h-[5.5rem] flex-col items-center justify-center gap-2 rounded-xl border border-brand-purple/20 bg-card px-3 py-4 text-center shadow-luxury transition-all hover:border-brand-purple/40 hover:bg-brand-purple/5 active:scale-[0.98] sm:min-h-[6.5rem] sm:px-4"
+            className="group relative flex min-h-[5.5rem] flex-col items-center justify-center gap-2 rounded-xl border border-brand-purple/20 bg-card px-3 py-4 text-center shadow-luxury transition-all hover:border-brand-purple/40 hover:bg-brand-purple/5 hover:shadow-luxury-lg active:scale-[0.98] sm:min-h-[6.5rem] sm:px-4"
           >
             {tile.badge != null && tile.badge > 0 && (
               <span className="absolute right-2 top-2 flex min-w-5 items-center justify-center rounded-full bg-brand-purple px-1.5 py-0.5 text-[10px] font-bold text-white">

@@ -13,6 +13,8 @@ export const footerCompanyLinks: FooterNavLink[] = [
   { href: ROUTES.auto.home, label: "Auto Division" },
   { href: ROUTES.corporate.freight, label: "Freight & Clearing" },
   { href: ROUTES.auto.spareParts, label: "Spare Parts" },
+  { href: ROUTES.auto.financing, label: "Financing" },
+  { href: ROUTES.auto.currencyConverter, label: "Currency Converter" },
   { href: ROUTES.corporate.shippingConsultation, label: "Shipping Consultation" },
 ];
 

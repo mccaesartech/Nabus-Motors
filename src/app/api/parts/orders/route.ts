@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { formatPlatformPrice } from "@/lib/currency";
+import { getServerExchangeRates } from "@/lib/currency/server-rates";
 import { getCustomerFromAuthHeader } from "@/lib/customer/auth";
 import { resolveCartCheckoutCustomer } from "@/lib/customer/contact-account";
 import { insertRow, jsonError, jsonOk } from "@/lib/inquiries/server";
@@ -257,8 +258,10 @@ export async function POST(req: NextRequest) {
       return jsonError("Could not submit order. Please try again.", 500);
     }
 
+    const { rates } = await getServerExchangeRates();
+
     const summaryLines = orderItems.map((item) => {
-      const unitLabel = formatPlatformPrice(Number(item.unit_price_usd) || 0);
+      const unitLabel = formatPlatformPrice(Number(item.unit_price_usd) || 0, rates);
       if (item.item_type === "vehicle") {
         const label = item.item_intent === "pre_order" ? "Pre-order" : "Buy";
         return `• ${item.part_name} (${label}) @ ${unitLabel}`;
@@ -280,7 +283,7 @@ export async function POST(req: NextRequest) {
       subject: `${orderLabel} — ${orderItems.length} item(s)`,
       message: [
         `Order ID: ${order.id}`,
-        `Total: ${formatPlatformPrice(totalUsd)}`,
+        `Total: ${formatPlatformPrice(totalUsd, rates)}`,
         "",
         ...summaryLines,
         notes?.trim() ? `\nNotes: ${notes.trim()}` : null,
@@ -315,7 +318,7 @@ export async function POST(req: NextRequest) {
         intent: item.item_intent,
         quantity: item.quantity,
       })),
-    });
+    }, { rates });
 
     if (vehicleOrderItems.length > 0) {
       for (const item of vehicleOrderItems) {

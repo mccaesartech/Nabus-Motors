@@ -5,6 +5,7 @@ import { ChevronDown, Search } from "lucide-react";
 import {
   countryOptionLabel,
   countryTriggerLabel,
+  countryForCurrency,
   getCountryConfig,
 } from "@/lib/countries";
 import { usePlatformCurrency } from "@/context/platform-currency-context";
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { CountryFlag } from "@/components/shared/country-flag";
+import { CurrencyDefaultOption } from "@/components/shared/currency-default-option";
 import { cn } from "@/lib/utils";
 
 type PlatformCurrencySelectorProps = {
@@ -25,7 +27,13 @@ type PlatformCurrencySelectorProps = {
 export function PlatformCurrencySelector({
   className,
 }: PlatformCurrencySelectorProps) {
-  const { country, setCountry, countries } = usePlatformCurrency();
+  const {
+    country,
+    setCountry,
+    countries,
+    ratesStale,
+    settingsDefaultCurrency,
+  } = usePlatformCurrency();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -55,7 +63,8 @@ export function PlatformCurrencySelector({
           "inline-flex h-9 max-w-[4.5rem] items-center justify-between gap-1 rounded-md border border-[var(--platform-border)] bg-[var(--platform-card)] px-1.5 text-xs text-[var(--platform-text)] transition-colors outline-none hover:border-[#c4b5fd] focus-visible:border-[var(--platform-accent)] focus-visible:ring-2 focus-visible:ring-[rgba(139,92,246,0.25)] sm:max-w-[11rem] sm:gap-1.5 sm:px-2.5",
           className
         )}
-        aria-label="Display currency"
+        aria-label={ratesStale ? "Display currency (approximate rates)" : "Display currency"}
+        title={ratesStale ? "Exchange rates are approximate — live feed unavailable" : undefined}
       >
         <span className="flex min-w-0 items-center gap-1.5 truncate text-left">
           <CountryFlag code={selected.code} className="h-3.5 w-[1.3125rem]" />
@@ -85,7 +94,18 @@ export function PlatformCurrencySelector({
             />
           </div>
         </div>
-        <div className="max-h-64 overflow-y-auto p-1">
+        <div className="p-1">
+          <CurrencyDefaultOption
+            settingsDefaultCurrency={settingsDefaultCurrency}
+            currentCountry={country}
+            onSelect={() => {
+              setCountry(countryForCurrency(settingsDefaultCurrency));
+              setOpen(false);
+              setQuery("");
+            }}
+          />
+        </div>
+        <div className="max-h-64 overflow-y-auto p-1 pt-0">
           {filtered.length === 0 ? (
             <p className="px-2 py-3 text-center text-xs text-muted-foreground">
               No countries match your search

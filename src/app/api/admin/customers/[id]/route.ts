@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiFailure } from "@/lib/errors/api";
 import { canDeleteCustomer, requireAdmin, requirePermission } from "@/lib/admin/auth";
+import { getServerExchangeRates } from "@/lib/currency/server-rates";
 import { logPlatformActivity } from "@/lib/platform/activity";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { deleteAdminCustomer, fetchAdminCustomerDetail } from "@/lib/platform/customers-admin";
@@ -25,10 +26,12 @@ export async function GET(_req: NextRequest, context: RouteContext) {
   }
 
   const showDeleted = canDeleteCustomer(auth.auth);
+  const { rates } = await getServerExchangeRates();
 
   try {
     const customer = await fetchAdminCustomerDetail(supabase, id, {
       includeDeleted: showDeleted,
+      rates,
     });
     if (!customer) {
       return NextResponse.json({ ok: false, message: "Customer not found." }, { status: 404 });
@@ -67,7 +70,8 @@ export async function DELETE(_req: NextRequest, context: RouteContext) {
   }
 
   try {
-    const customer = await fetchAdminCustomerDetail(supabase, id, { includeDeleted: false });
+    const { rates } = await getServerExchangeRates();
+    const customer = await fetchAdminCustomerDetail(supabase, id, { includeDeleted: false, rates });
     if (!customer) {
       return NextResponse.json({ ok: false, message: "Customer not found." }, { status: 404 });
     }

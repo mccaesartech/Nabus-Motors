@@ -36,7 +36,7 @@ type FinancingPageClientProps = {
 };
 
 export function FinancingPageClient({ hero }: FinancingPageClientProps) {
-  const { currency } = useCurrency();
+  const { currency, ratesLoaded } = useCurrency();
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [income, setIncome] = useState("");
@@ -50,7 +50,7 @@ export function FinancingPageClient({ hero }: FinancingPageClientProps) {
       `${formatUsdPrice(INCOME_TIER_USD[2], currency)} - ${formatUsdPrice(INCOME_TIER_USD[3], currency)}`,
       `Over ${formatUsdPrice(INCOME_TIER_USD[3], currency)}`,
     ],
-    [currency]
+    [currency, ratesLoaded]
   );
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {

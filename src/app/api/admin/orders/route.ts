@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/admin/auth";
+import { getServerExchangeRates } from "@/lib/currency/server-rates";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { fetchAdminOrders } from "@/lib/platform/orders-admin";
 
@@ -14,6 +15,7 @@ export async function GET() {
     return NextResponse.json({ ok: true, orders: [] });
   }
 
-  const orders = await fetchAdminOrders(supabase);
+  const { rates } = await getServerExchangeRates();
+  const orders = await fetchAdminOrders(supabase, { rates });
   return NextResponse.json({ ok: true, orders });
 }

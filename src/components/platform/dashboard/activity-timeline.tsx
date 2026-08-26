@@ -222,7 +222,7 @@ export function ActivityTimeline({
       icon={<Activity className="size-4 shrink-0 text-[var(--platform-accent)]" aria-hidden />}
       className="min-w-0 max-w-full"
     >
-      <div className="platform-dashboard-card min-w-0 max-w-full overflow-hidden rounded-xl">
+      <div className="platform-card min-w-0 max-w-full overflow-hidden rounded-xl">
         {loading ? (
           <div className="space-y-0 divide-y divide-[var(--platform-border)]">
             {Array.from({ length: 5 }).map((_, i) => (

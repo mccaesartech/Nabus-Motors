@@ -171,7 +171,7 @@ export function AttentionCenter({
       </div>
 
       {items.length === 0 ? (
-        <div className="platform-dashboard-card rounded-xl">
+        <div className="platform-card rounded-xl">
           <EmptyState
             title="All clear"
             description="No urgent issues or pending tasks right now. You're on top of things."

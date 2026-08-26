@@ -3,6 +3,7 @@ import { insertRow, jsonError, jsonOk } from "@/lib/inquiries/server";
 import { isValidUuid } from "@/lib/inquiries/uuid";
 import { formatVehicleName } from "@/lib/format";
 import { formatPlatformPrice } from "@/lib/currency";
+import { getServerExchangeRates } from "@/lib/currency/server-rates";
 import { getCustomerFromAuthHeader } from "@/lib/customer/auth";
 import { resolvePreorderAccount, linkCustomerPreordersByEmail, waitForCustomerProfile } from "@/lib/customer/preorder-account";
 import { createServerSupabase } from "@/lib/supabase/server";
@@ -199,6 +200,7 @@ export async function POST(req: NextRequest) {
     const vehicleLabel = title ?? "this vehicle";
     const accountCreated = Boolean(userId && !authUser);
     const inquiryId = inserted?.id ? String(inserted.id) : undefined;
+    const { rates } = await getServerExchangeRates();
 
     const adminSupabase = createAdminSupabase();
     if (inquiryId && adminSupabase) {
@@ -213,7 +215,7 @@ export async function POST(req: NextRequest) {
         link: preorderLeadsLink(inquiryId),
         totalUsd: priceUsd || null,
         registrationId,
-      });
+      }, { rates });
 
       if (resolvedVehicleId) {
         await recordVehicleInterest(adminSupabase, {
@@ -254,7 +256,7 @@ export async function POST(req: NextRequest) {
       console.error("[preorder] notifyCustomer failed:", notifyError);
     }
 
-    const downPaymentLabel = formatPlatformPrice(downPayment);
+    const downPaymentLabel = formatPlatformPrice(downPayment, rates);
 
     const successMessage = registrationId
       ? `Pre-order submitted for ${vehicleLabel}. 25% down payment: ${downPaymentLabel}. Track it in your account (${registrationId}).`

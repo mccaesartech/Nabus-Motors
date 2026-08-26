@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireDirectMutation, requirePermission } from "@/lib/admin/auth";
+import { getServerExchangeRates } from "@/lib/currency/server-rates";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { fetchPreorderInquiries } from "@/lib/platform/data";
 import { fetchAdminOrders } from "@/lib/platform/orders-admin";
@@ -31,6 +32,7 @@ export async function GET(req: NextRequest) {
   };
 
   const want = (key: string) => type === "all" || type === key;
+  const { rates } = await getServerExchangeRates();
 
   const [
     contact,
@@ -47,7 +49,7 @@ export async function GET(req: NextRequest) {
     want("appraisal") ? fetchTable("appraisal_requests") : Promise.resolve([]),
     want("vehicle") ? fetchTable("vehicle_inquiries") : Promise.resolve([]),
     want("preorder") ? fetchPreorderInquiries(supabase) : Promise.resolve([]),
-    want("order") ? fetchAdminOrders(supabase) : Promise.resolve([]),
+    want("order") ? fetchAdminOrders(supabase, { rates }) : Promise.resolve([]),
     want("newsletter")
       ? fetchTable("newsletter_subscribers", "subscribed_at")
       : Promise.resolve([]),

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatPlatformPrice } from "@/lib/currency";
+import { getStaticFallbackRates, type ExchangeRateMap } from "@/lib/currency/rates";
 import { notDeletedFilter } from "@/lib/platform/trash-types";
 
 export type AdminOrderItem = {
@@ -76,7 +77,7 @@ type OrderItemRow = {
   item_intent: string | null;
 };
 
-function mapItem(row: OrderItemRow): AdminOrderItem {
+function mapItem(row: OrderItemRow, rates: ExchangeRateMap): AdminOrderItem {
   const unitPriceUsd = Number(row.unit_price_usd) || 0;
   const quantity = Number(row.quantity) || 1;
   return {
@@ -89,8 +90,8 @@ function mapItem(row: OrderItemRow): AdminOrderItem {
     sku: row.sku,
     quantity,
     unitPriceUsd,
-    unitPriceLabel: formatPlatformPrice(unitPriceUsd),
-    lineTotalLabel: formatPlatformPrice(unitPriceUsd * quantity),
+    unitPriceLabel: formatPlatformPrice(unitPriceUsd, rates),
+    lineTotalLabel: formatPlatformPrice(unitPriceUsd * quantity, rates),
     itemIntent:
       row.item_intent === "pre_order" || row.item_intent === "buy"
         ? row.item_intent
@@ -98,7 +99,11 @@ function mapItem(row: OrderItemRow): AdminOrderItem {
   };
 }
 
-function mapSummary(row: OrderRow, items: AdminOrderItem[]): AdminOrderSummary {
+function mapSummary(
+  row: OrderRow,
+  items: AdminOrderItem[],
+  rates: ExchangeRateMap
+): AdminOrderSummary {
   const totalUsd = Number(row.total_usd) || 0;
   return {
     id: row.id,
@@ -108,7 +113,7 @@ function mapSummary(row: OrderRow, items: AdminOrderItem[]): AdminOrderSummary {
     phone: row.phone,
     status: row.status,
     totalUsd,
-    totalLabel: formatPlatformPrice(totalUsd),
+    totalLabel: formatPlatformPrice(totalUsd, rates),
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -172,8 +177,9 @@ async function fetchOrderAppointment(
 
 export async function fetchAdminOrders(
   supabase: SupabaseClient,
-  limit = 100
+  options: { limit?: number; rates?: ExchangeRateMap } = {}
 ): Promise<AdminOrderSummary[]> {
+  const { limit = 100, rates = getStaticFallbackRates() } = options;
   const listSelect = `
     id, user_id, email, name, phone, status, total_usd, notes, created_at, updated_at,
     parts_order_items (
@@ -208,16 +214,18 @@ export async function fetchAdminOrders(
 
   return (data ?? []).map((row) => {
     const items = ((row as { parts_order_items?: OrderItemRow[] }).parts_order_items ?? []).map(
-      mapItem
+      (item) => mapItem(item, rates)
     );
-    return mapSummary(row as OrderRow, items);
+    return mapSummary(row as OrderRow, items, rates);
   });
 }
 
 export async function fetchAdminOrderDetail(
   supabase: SupabaseClient,
-  id: string
+  id: string,
+  options: { rates?: ExchangeRateMap } = {}
 ): Promise<AdminOrderDetail | null> {
+  const { rates = getStaticFallbackRates() } = options;
   const baseSelect = `
     id, user_id, email, name, phone, status, total_usd, notes, created_at, updated_at,
     parts_order_items (
@@ -253,18 +261,15 @@ export async function fetchAdminOrderDetail(
   }
 
   const rawItems = ((data as { parts_order_items?: OrderItemRow[] }).parts_order_items ?? []).map(
-    mapItem
+    (item) => mapItem(item, rates)
   );
   const items = await attachVehicleImages(supabase, rawItems);
   const appointment = await fetchOrderAppointment(supabase, id);
 
   return {
-    ...mapSummary(data as OrderRow, items),
+    ...mapSummary(data as OrderRow, items, rates),
     items,
     appointment,
   };
 }
 
-export function customerProfileIdForOrder(order: Pick<AdminOrderDetail, "userId" | "email">): string {
-  return order.userId ?? `email:${order.email.trim().toLowerCase()}`;
-}

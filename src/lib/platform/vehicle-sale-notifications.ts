@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatPlatformPrice } from "@/lib/currency";
+import { getStaticFallbackRates, type ExchangeRateMap } from "@/lib/currency/rates";
 import { platformPath } from "@/lib/platform/paths";
 import { getSiteSettings } from "@/lib/platform/site-settings-server";
 import { notifyStaffNewOrder } from "@/lib/platform/staff-order-notify";
@@ -20,7 +21,10 @@ export type CartOrderStaffInput = {
   totalUsd: number;
 };
 
-export function buildCartOrderStaffContent(input: CartOrderStaffInput): {
+export function buildCartOrderStaffContent(
+  input: CartOrderStaffInput,
+  rates?: ExchangeRateMap
+): {
   notificationType: string;
   title: string;
   message: string;
@@ -37,7 +41,7 @@ export function buildCartOrderStaffContent(input: CartOrderStaffInput): {
     })
     .join(", ");
   const ref = input.orderId.slice(0, 8).toUpperCase();
-  const total = formatPlatformPrice(input.totalUsd);
+  const total = formatPlatformPrice(input.totalUsd, rates);
   const contact = [input.customerName, input.customerEmail, input.customerPhone?.trim()]
     .filter(Boolean)
     .join(" · ");
@@ -73,9 +77,11 @@ export function buildCartOrderStaffContent(input: CartOrderStaffInput): {
 /** Notify staff for any cart checkout (parts, vehicles, or mixed). One alert per order. */
 export async function notifyCartOrderToStaff(
   supabase: SupabaseClient,
-  input: CartOrderStaffInput
+  input: CartOrderStaffInput,
+  options: { rates?: ExchangeRateMap } = {}
 ): Promise<void> {
-  const { notificationType, title, message } = buildCartOrderStaffContent(input);
+  const rates = options.rates ?? getStaticFallbackRates();
+  const { notificationType, title, message } = buildCartOrderStaffContent(input, rates);
   const settings = await getSiteSettings();
   const hasPreOrderVehicle = input.items.some(
     (item) => item.itemType === "vehicle" && item.intent === "pre_order"
@@ -122,7 +128,10 @@ export type VehicleSaleNotificationInput = {
   registrationId?: string | null;
 };
 
-function buildSaleMessage(input: VehicleSaleNotificationInput): string {
+function buildSaleMessage(
+  input: VehicleSaleNotificationInput,
+  rates?: ExchangeRateMap
+): string {
   const vehicles = input.vehicleTitles.join(", ") || "vehicle";
   const contact = [input.customerName, input.customerEmail, input.customerPhone?.trim()]
     .filter(Boolean)
@@ -133,7 +142,7 @@ function buildSaleMessage(input: VehicleSaleNotificationInput): string {
     input.referenceId.slice(0, 8).toUpperCase();
   const total =
     input.totalUsd != null && input.totalUsd > 0
-      ? ` · ${formatPlatformPrice(input.totalUsd)}`
+      ? ` · ${formatPlatformPrice(input.totalUsd, rates)}`
       : "";
   return `${kindLabel}: ${vehicles} — ${contact} (ref ${ref})${total}. Please attend to this customer promptly.`;
 }
@@ -149,10 +158,12 @@ function buildSaleTitle(input: VehicleSaleNotificationInput): string {
 /** Target owner + leads-enabled team in the bell, email, and SMS. */
 export async function notifyVehicleSaleToLeadsTeam(
   supabase: SupabaseClient,
-  input: VehicleSaleNotificationInput
+  input: VehicleSaleNotificationInput,
+  options: { rates?: ExchangeRateMap } = {}
 ): Promise<void> {
+  const rates = options.rates ?? getStaticFallbackRates();
   const title = buildSaleTitle(input);
-  const message = buildSaleMessage(input);
+  const message = buildSaleMessage(input, rates);
   const notificationType = input.kind === "buy" ? "vehicle_order" : "preorder";
 
   const settings = await getSiteSettings();

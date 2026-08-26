@@ -16,6 +16,7 @@ import {
   type CustomerNotificationPayload,
 } from "@/lib/notifications/notification-status";
 import { generateCustomerPasswordResetLink } from "@/lib/customer/password-reset";
+import { getServerExchangeRates } from "@/lib/currency/server-rates";
 import {
   notifyVehicleSaleToLeadsTeam,
   preorderLeadsLink,
@@ -197,6 +198,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (inquiryId && adminSupabase) {
+      const { rates } = await getServerExchangeRates();
       await notifyVehicleSaleToLeadsTeam(adminSupabase, {
         kind: "pre_order",
         customerName: trimmedName,
@@ -207,7 +209,7 @@ export async function POST(req: NextRequest) {
         sourceTable: "preorder_inquiries",
         link: preorderLeadsLink(inquiryId),
         registrationId: referenceCode,
-      });
+      }, { rates });
     }
 
     let passwordResetUrl: string | undefined;

@@ -1,6 +1,8 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getServerExchangeRates } from "@/lib/currency/server-rates";
+import type { ExchangeRateMap } from "@/lib/currency/rates";
 import { fetchAdminCustomerDetail } from "@/lib/platform/customers-admin";
 import { fetchAdminOrderDetail } from "@/lib/platform/orders-admin";
 import { paymentStatusLabel, vehicleTitleFromRow, type PreorderInquiryRow } from "@/lib/platform/preorder";
@@ -66,9 +68,10 @@ async function loadPreorderFocus(
 
 async function loadOrderFocus(
   supabase: SupabaseClient,
-  id: string
+  id: string,
+  rates: ExchangeRateMap
 ): Promise<{ focus: Record<string, unknown>; label: string } | null> {
-  const order = await fetchAdminOrderDetail(supabase, id);
+  const order = await fetchAdminOrderDetail(supabase, id, { rates });
   if (!order) return null;
   return {
     label: `Cart order · ${id.slice(0, 8).toUpperCase()}`,
@@ -219,7 +222,8 @@ async function loadFocusRecord(
   supabase: SupabaseClient,
   contextType: WhatsAppAssistContextType | undefined,
   contextId: string | undefined,
-  inquiryType: string | undefined
+  inquiryType: string | undefined,
+  rates: ExchangeRateMap
 ): Promise<{ focus: Record<string, unknown> | null; label: string | null }> {
   if (!contextType || !contextId) {
     return { focus: null, label: null };
@@ -229,7 +233,7 @@ async function loadFocusRecord(
     case "preorder":
       return (await loadPreorderFocus(supabase, contextId)) ?? { focus: null, label: null };
     case "order":
-      return (await loadOrderFocus(supabase, contextId)) ?? { focus: null, label: null };
+      return (await loadOrderFocus(supabase, contextId, rates)) ?? { focus: null, label: null };
     case "quote":
       return (await loadQuoteFocus(supabase, contextId)) ?? { focus: null, label: null };
     case "shipment":
@@ -257,9 +261,10 @@ export async function loadWhatsAppCustomerFacts(
   let registrationId: string | null = null;
   let whatsappOptIn: boolean | null = null;
   let accountCreatedAt: string | null = null;
+  const { rates } = await getServerExchangeRates();
 
   if (input.customerId?.trim()) {
-    const customer = await fetchAdminCustomerDetail(supabase, input.customerId.trim());
+    const customer = await fetchAdminCustomerDetail(supabase, input.customerId.trim(), { rates });
     if (customer) {
       name = name ?? customer.name;
       email = email ?? customer.email;
@@ -274,7 +279,8 @@ export async function loadWhatsAppCustomerFacts(
     supabase,
     input.contextType,
     input.contextId,
-    input.inquiryType
+    input.inquiryType,
+    rates
   );
 
   let preorders: Array<Record<string, unknown>> = [];
@@ -283,7 +289,7 @@ export async function loadWhatsAppCustomerFacts(
   let shipments: Array<Record<string, unknown>> = [];
 
   if (input.customerId?.trim()) {
-    const customer = await fetchAdminCustomerDetail(supabase, input.customerId.trim());
+    const customer = await fetchAdminCustomerDetail(supabase, input.customerId.trim(), { rates });
     if (customer) {
       preorders = customer.recentPreorders.map((p) =>
         compactRecord({

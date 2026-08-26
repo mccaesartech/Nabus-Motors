@@ -10,12 +10,7 @@ import {
   CustomRequestBookVisitLink,
   CustomRequestMessageTrigger,
 } from "@/components/account/custom-request-message-panel";
-import { OrderPrintActions } from "@/components/account/order-print-actions";
 import type { CustomerConversation, CustomerInquirySummary } from "@/lib/customer/types";
-import {
-  buildCustomRequestDocumentHtml,
-  type CustomerPrintProfile,
-} from "@/lib/account/printable-documents";
 import {
   customRequestStatusLabel,
   formatBudgetRangeGhs,
@@ -27,7 +22,6 @@ import { cn } from "@/lib/utils";
 type VehicleRequestsSectionProps = {
   requests: CustomerInquirySummary[];
   conversations: CustomerConversation[];
-  customer: CustomerPrintProfile;
   loading: boolean;
   highlightedRequestId?: string | null;
 };
