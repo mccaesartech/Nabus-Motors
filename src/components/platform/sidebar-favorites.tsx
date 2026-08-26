@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Clock, Star } from "lucide-react";
+import { ChevronDown, ChevronRight, Clock, Star } from "lucide-react";
 import type { PlatformNavItem } from "@/lib/platform/nav";
 import type { RecentNavVisit } from "@/lib/platform/sidebar-storage";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,8 @@ type SidebarFavoritesProps = {
   recentVisits: RecentNavVisit[];
   navItems: PlatformNavItem[];
   collapsed: boolean;
+  recentCollapsed: boolean;
+  onToggleRecent: () => void;
   onNavigate: () => void;
   isActive: (href: string) => boolean;
 };
@@ -20,11 +22,11 @@ export function SidebarFavorites({
   recentVisits,
   navItems,
   collapsed,
+  recentCollapsed,
+  onToggleRecent,
   onNavigate,
   isActive,
 }: SidebarFavoritesProps) {
-  if (collapsed) return null;
-
   const favorites = favoriteHrefs
     .map((href) => navItems.find((item) => item.href === href))
     .filter((item): item is PlatformNavItem => Boolean(item));
@@ -35,10 +37,11 @@ export function SidebarFavorites({
     .slice(0, 5);
 
   if (favorites.length === 0 && recent.length === 0) return null;
+  if (collapsed && recent.length === 0) return null;
 
   return (
     <div className="space-y-3 border-t border-[var(--platform-border)] px-2 pt-3">
-      {favorites.length > 0 && (
+      {!collapsed && favorites.length > 0 && (
         <div>
           <p className="flex items-center gap-1.5 px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--platform-text-secondary)]">
             <Star className="size-3" aria-hidden />
@@ -67,28 +70,51 @@ export function SidebarFavorites({
 
       {recent.length > 0 && (
         <div>
-          <p className="flex items-center gap-1.5 px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--platform-text-secondary)]">
-            <Clock className="size-3" aria-hidden />
-            Recently visited
-          </p>
-          <ul className="space-y-0.5">
-            {recent.map((item) => {
-              const Icon = item.icon;
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    onClick={onNavigate}
-                    data-active={isActive(item.href)}
-                    className={cn("platform-sidebar-link py-2")}
-                  >
-                    <Icon className="size-4 shrink-0" aria-hidden />
-                    <span className="truncate">{item.label}</span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+          {!collapsed ? (
+            <button
+              type="button"
+              onClick={onToggleRecent}
+              aria-expanded={!recentCollapsed}
+              className={cn(
+                "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] transition-colors",
+                "text-[var(--platform-text-secondary)] hover:text-[var(--platform-text)]"
+              )}
+            >
+              <Clock className="size-3.5 shrink-0" aria-hidden />
+              <span className="min-w-0 flex-1 truncate">Recently visited</span>
+              {recentCollapsed ? (
+                <ChevronRight className="size-3.5 shrink-0" aria-hidden />
+              ) : (
+                <ChevronDown className="size-3.5 shrink-0" aria-hidden />
+              )}
+            </button>
+          ) : null}
+
+          {(!recentCollapsed || collapsed) && (
+            <ul
+              className={cn("space-y-0.5", !collapsed && !recentCollapsed && "mt-0.5")}
+              role="group"
+              aria-label="Recently visited"
+            >
+              {recent.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      onClick={onNavigate}
+                      data-active={isActive(item.href)}
+                      className={cn("platform-sidebar-link py-2", collapsed && "justify-center px-2")}
+                      title={collapsed ? item.label : undefined}
+                    >
+                      <Icon className="size-4 shrink-0" aria-hidden />
+                      {!collapsed && <span className="truncate">{item.label}</span>}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       )}
     </div>

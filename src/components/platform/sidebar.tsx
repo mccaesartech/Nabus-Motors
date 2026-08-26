@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 const TEAM_CHAT_HREF = platformPath("team-chat");
 const EMAILS_HREF = platformPath("emails");
 const TRASH_HREF = platformPath("trash");
+const RECENT_GROUP_ID = "recent";
 const UNREAD_POLL_MS = 45_000;
 
 type PlatformSidebarProps = {
@@ -138,8 +139,13 @@ export function PlatformSidebar({
   useEffect(() => {
     setFavorites(getNavFavorites());
     setRecentVisits(getRecentNavVisits());
+    const departmentCollapsed = departments
+      .filter((g) => isNavGroupCollapsed(g.id))
+      .map((g) => g.id);
     setCollapsedGroups(
-      departments.filter((g) => isNavGroupCollapsed(g.id)).map((g) => g.id)
+      isNavGroupCollapsed(RECENT_GROUP_ID)
+        ? [...departmentCollapsed, RECENT_GROUP_ID]
+        : departmentCollapsed
     );
   }, [departments]);
 
@@ -250,7 +256,7 @@ export function PlatformSidebar({
   }
 
   function toggleGroup(groupId: string) {
-    const allGroupIds = departments.map((g) => g.id);
+    const allGroupIds = [...departments.map((g) => g.id), RECENT_GROUP_ID];
     const collapsedNow = !collapsedGroups.includes(groupId);
     const next = collapsedNow
       ? setNavGroupCollapsed(groupId, true, allGroupIds)
@@ -494,6 +500,8 @@ export function PlatformSidebar({
             recentVisits={recentVisits}
             navItems={navItems}
             collapsed={collapsed}
+            recentCollapsed={collapsedGroups.includes(RECENT_GROUP_ID)}
+            onToggleRecent={() => toggleGroup(RECENT_GROUP_ID)}
             onNavigate={onMobileClose}
             isActive={isActive}
           />
