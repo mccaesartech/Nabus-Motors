@@ -424,18 +424,34 @@ export const DOCUMENT_STYLES = `
 
 /** Page-box rules — only ever loaded into a standalone print document, never the app page. */
 const PRINT_ONLY_STYLES = `
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: ${PRINT_PAGE_WIDTH_PX}px;
+    background: #fff;
+  }
   @page {
     margin: 0;
     size: A4;
   }
   @media print {
+    html, body {
+      width: ${PRINT_PAGE_WIDTH_PX}px !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
     ${DOC},
     ${DOC} * {
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
       color-adjust: exact !important;
     }
-    ${DOC} { width: auto; max-width: none; font-size: 9.5pt; }
+    /* Keep the same fixed A4 width + typography as PDF capture — changing these
+       after prepareDocumentForOutput() reflows content and misaligns letterhead. */
+    ${DOC} {
+      width: ${PRINT_PAGE_WIDTH_PX}px !important;
+      max-width: ${PRINT_PAGE_WIDTH_PX}px !important;
+    }
     ${DOC} .page-backgrounds,
     ${DOC} .page-bg,
     ${DOC} .page-bg__img {
@@ -713,19 +729,9 @@ function triggerPrintOnce(win: Window): void {
   }
 }
 
-/** Parent-driven print after async loads — does not rely on CSP-blocked inline scripts. */
-function scheduleParentPrint(win: Window, sync: boolean): void {
+/** Parent-driven print after letterhead layers decode — does not rely on CSP-blocked inline scripts. */
+function scheduleParentPrint(win: Window): void {
   const doc = win.document;
-  const imagesReady =
-    Array.from(doc.images ?? []).every((img) => img.complete);
-
-  // Prefer same-turn print when letterhead imgs are already decoded so the
-  // user-gesture chain stays intact (required for some Chromium iframe prints).
-  if (sync && imagesReady) {
-    triggerPrintOnce(win);
-    return;
-  }
-
   let finished = false;
   const run = () => {
     if (finished) return;
@@ -796,8 +802,6 @@ function scheduleIframeCleanup(iframe: HTMLIFrameElement, win: Window): void {
 }
 
 type WritePrintTargetOptions = {
-  /** Print synchronously from the click handler (iframe / cached data). */
-  syncPrint?: boolean;
   win?: Window | null;
   iframe?: HTMLIFrameElement | null;
 };
@@ -811,7 +815,7 @@ function writeHtmlToPrintTarget(
   const invalid = validatePrintableHtml(html);
   if (invalid) return invalid;
 
-  const { syncPrint = false, win = null, iframe = null } = options;
+  const { win = null, iframe = null } = options;
   // Always prepare nonce-stamped deferred print as backup; parent still drives print
   // because production CSP blocks unnonced inline scripts in inherited about:blank docs.
   const printHtml = preparePrintableHtml(html);
@@ -819,14 +823,18 @@ function writeHtmlToPrintTarget(
   doc.write(printHtml);
   doc.close();
   doc.title = extractDocumentTitle(html);
-  injectPageBackgrounds(doc);
+
+  const body = doc.body;
+  if (body) {
+    prepareDocumentForOutput(body);
+  }
 
   if (iframe) {
     sizePrintIframe(iframe, doc);
   }
 
   if (win) {
-    scheduleParentPrint(win, syncPrint);
+    scheduleParentPrint(win);
   }
 
   return { ok: true, method };
@@ -838,7 +846,6 @@ function printViaHiddenIframe(html: string): boolean {
 
   scheduleIframeCleanup(target.iframe, target.win);
   const result = writeHtmlToPrintTarget(target.doc, html, "iframe", {
-    syncPrint: true,
     win: target.win,
     iframe: target.iframe,
   });
@@ -863,11 +870,12 @@ function printViaBlobPopup(html: string): boolean {
     armed = true;
     try {
       const doc = win.document;
-      if (doc?.body) injectPageBackgrounds(doc);
+      const body = doc?.body;
+      if (body) prepareDocumentForOutput(body);
     } catch {
       /* blob edge cases */
     }
-    scheduleParentPrint(win, false);
+    scheduleParentPrint(win);
   };
 
   win.addEventListener(
@@ -942,7 +950,6 @@ export function beginPrintSession(): PrintSession {
           return { ok: false, error: "Print window unavailable." };
         }
         return writeHtmlToPrintTarget(doc, html, "popup", {
-          syncPrint: false,
           win,
         });
       },
@@ -964,7 +971,6 @@ export function beginPrintSession(): PrintSession {
       method: "iframe",
       complete: (html) =>
         writeHtmlToPrintTarget(iframeTarget.doc, html, "iframe", {
-          syncPrint: false,
           win: iframeTarget.win,
           iframe: iframeTarget.iframe,
         }),
@@ -1010,7 +1016,7 @@ function isInlineImage(img: HTMLImageElement): boolean {
   return src.startsWith("data:") || src.startsWith("blob:");
 }
 
-/** Wait for document images (logo, thumbnails) before PDF capture. */
+/** Wait for document images (letterhead layers, thumbnails) before print/PDF capture. */
 function waitForDocumentImages(
   root: ParentNode,
   maxWaitMs = PRINT_IMAGE_MAX_WAIT_MS
@@ -1022,26 +1028,31 @@ function waitForDocumentImages(
       return;
     }
 
-    const pending = imgs.filter((img) => !img.complete);
-    if (pending.length === 0) {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
       resolve();
-      return;
-    }
-
-    let left = pending.length;
-    const timer = window.setTimeout(resolve, maxWaitMs);
-
-    const done = () => {
-      if (--left <= 0) {
-        window.clearTimeout(timer);
-        resolve();
-      }
     };
 
-    for (const img of pending) {
-      img.addEventListener("load", done, { once: true });
-      img.addEventListener("error", done, { once: true });
-    }
+    const timer = window.setTimeout(finish, maxWaitMs);
+
+    void Promise.all(
+      imgs.map(async (img) => {
+        if (img.complete && img.naturalWidth > 0) {
+          await img.decode?.().catch(() => undefined);
+          return;
+        }
+        await new Promise<void>((done) => {
+          img.addEventListener("load", () => done(), { once: true });
+          img.addEventListener("error", () => done(), { once: true });
+        });
+        await img.decode?.().catch(() => undefined);
+      })
+    ).finally(() => {
+      window.clearTimeout(timer);
+      finish();
+    });
   });
 }
 
@@ -1205,7 +1216,31 @@ function placePageUnit(root: HTMLElement, unit: PageUnit): boolean {
  * Break the staged document onto whole A4 pages and lock its height to an exact page
  * multiple, so html2pdf's `ceil(canvasHeight / pageHeight)` can never invent a page.
  */
+function clearPaginationSpacers(root: HTMLElement): void {
+  for (const node of Array.from(root.querySelectorAll('[aria-hidden="true"]'))) {
+    const el = node as HTMLElement;
+    if (
+      el.classList.contains("page-backgrounds") ||
+      el.tagName === "STYLE" ||
+      el.tagName === "SCRIPT"
+    ) {
+      continue;
+    }
+    if (el.style.height && /^\d+px$/.test(el.style.height)) {
+      el.remove();
+      continue;
+    }
+    if (el instanceof HTMLTableRowElement && el.cells.length === 1) {
+      el.remove();
+    }
+  }
+}
+
 function layoutDocumentPages(root: HTMLElement): number {
+  root.style.height = "auto";
+  root.style.overflow = "visible";
+  clearPaginationSpacers(root);
+
   try {
     const main = root.querySelector(".document-main") ?? root;
     for (const unit of collectPageUnits(main)) {
@@ -1228,10 +1263,20 @@ function layoutDocumentPages(root: HTMLElement): number {
  * `<img>` layers so both outputs use the same HTML layout and page art (Print does not
  * rely on CSS background-image / "Background graphics").
  */
-function prepareDocumentForOutput(root: HTMLElement): number {
+export function prepareDocumentForOutput(root: HTMLElement): number {
   root.querySelector(".page-backgrounds")?.remove();
-  const pageCount = layoutDocumentPages(root);
+  let pageCount = layoutDocumentPages(root);
   appendPageBackgrounds(root, pageCount);
+
+  // Spacers can add height that bumps the page count — settle before locking art layers.
+  const settled = pageCountForHeight(measureContentHeight(root));
+  if (settled > pageCount) {
+    root.querySelector(".page-backgrounds")?.remove();
+    pageCount = settled;
+    root.style.height = `${pageCount * PRINT_PAGE_HEIGHT_PX}px`;
+    appendPageBackgrounds(root, pageCount);
+  }
+
   return pageCount;
 }
 
