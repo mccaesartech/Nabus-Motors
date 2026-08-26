@@ -15,6 +15,7 @@ import {
   loadWhatsAppCustomerFacts,
 } from "@/lib/whatsapp-assist/context";
 import type {
+  WhatsAppConversationTurn,
   WhatsAppSuggestRequest,
   WhatsAppSuggestResult,
 } from "@/lib/whatsapp-assist/types";
