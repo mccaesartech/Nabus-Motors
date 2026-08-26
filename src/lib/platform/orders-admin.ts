@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatPlatformPrice } from "@/lib/currency";
 import { getStaticFallbackRates, type ExchangeRateMap } from "@/lib/currency/rates";
+import { ratesByEntityId, loadFxSnapshot } from "@/lib/currency/snapshot-server";
+import { ratesMapFromSnapshot, type FxSnapshot } from "@/lib/currency/snapshot";
 import { notDeletedFilter } from "@/lib/platform/trash-types";
 
 export type AdminOrderItem = {
@@ -48,6 +50,7 @@ export type AdminOrderSummary = {
 export type AdminOrderDetail = AdminOrderSummary & {
   items: AdminOrderItem[];
   appointment: AdminOrderAppointment | null;
+  fxSnapshot?: FxSnapshot | null;
 };
 
 type OrderRow = {
@@ -212,11 +215,14 @@ export async function fetchAdminOrders(
     return [];
   }
 
-  return (data ?? []).map((row) => {
-    const items = ((row as { parts_order_items?: OrderItemRow[] }).parts_order_items ?? []).map(
-      (item) => mapItem(item, rates)
-    );
-    return mapSummary(row as OrderRow, items, rates);
+  const rows = (data ?? []) as Array<OrderRow & { parts_order_items?: OrderItemRow[] }>;
+  const ids = rows.map((row) => row.id);
+  const snapshotRates = await ratesByEntityId("parts_order", ids, rates, supabase);
+
+  return rows.map((row) => {
+    const orderRates = snapshotRates.get(row.id) ?? rates;
+    const items = (row.parts_order_items ?? []).map((item) => mapItem(item, orderRates));
+    return mapSummary(row, items, orderRates);
   });
 }
 
@@ -260,16 +266,20 @@ export async function fetchAdminOrderDetail(
     return null;
   }
 
+  const snapshot = await loadFxSnapshot("parts_order", id, supabase);
+  const orderRates = snapshot ? ratesMapFromSnapshot(snapshot) : rates;
+
   const rawItems = ((data as { parts_order_items?: OrderItemRow[] }).parts_order_items ?? []).map(
-    (item) => mapItem(item, rates)
+    (item) => mapItem(item, orderRates)
   );
   const items = await attachVehicleImages(supabase, rawItems);
   const appointment = await fetchOrderAppointment(supabase, id);
 
   return {
-    ...mapSummary(data as OrderRow, items, rates),
+    ...mapSummary(data as OrderRow, items, orderRates),
     items,
     appointment,
+    fxSnapshot: snapshot,
   };
 }
 

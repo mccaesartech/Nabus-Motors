@@ -1,5 +1,3 @@
-import { BASE_CURRENCY } from "./types";
-
 /** Units of target currency per 1 USD */
 export type ExchangeRateMap = Record<string, number>;
 
@@ -173,29 +171,3 @@ const STATIC_FALLBACK_RATES: ExchangeRateMap = {
   YER: 250,
   ZMW: 27,
 };
-
-export function convertFromUsd(
-  usdAmount: number,
-  target: string,
-  rates = getActiveRates()
-): number {
-  if (target === BASE_CURRENCY) return usdAmount;
-  const rate = rates[target];
-  if (!rate || rate <= 0) return usdAmount;
-  return usdAmount * rate;
-}
-
-/** Units of `toCurrency` per 1 unit of `fromCurrency` (via USD pivot). */
-export function getCrossRate(
-  fromCurrency: string,
-  toCurrency: string,
-  rates = getActiveRates()
-): number {
-  const from = (fromCurrency || BASE_CURRENCY).toUpperCase();
-  const to = (toCurrency || BASE_CURRENCY).toUpperCase();
-  if (from === to) return 1;
-  const fromRate = rates[from];
-  const toRate = rates[to];
-  if (!fromRate || fromRate <= 0 || !toRate || toRate <= 0) return 1;
-  return toRate / fromRate;
-}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { getCrossRate, setExchangeRates } from "@/lib/currency/rates";
+import { setExchangeRates } from "@/lib/currency/rates";
+import { getCrossRate } from "@/lib/currency/convert";
 import {
   buildRatesFromGhs,
   mergeLiveRates,

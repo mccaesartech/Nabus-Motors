@@ -1,5 +1,6 @@
 import { DEFAULT_DISPLAY_CURRENCY, REFERENCE_CURRENCIES } from "./types";
-import { convertFromUsd, type ExchangeRateMap } from "./rates";
+import { convertFromUsd } from "./convert";
+import type { ExchangeRateMap } from "./rates";
 import { getCurrencyLabel } from "./names";
 
 export function formatAmount(amount: number, currency: string): string {

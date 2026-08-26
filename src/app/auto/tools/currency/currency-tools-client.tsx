@@ -1,11 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { Container } from "@/components/shared/container";
 import { SectionHeader } from "@/components/shared/section-header";
 import { CurrencyCalculator } from "@/components/shared/currency-calculator";
 import { useCurrency } from "@/context/currency-context";
 import { ROUTES } from "@/lib/routes";
-import Link from "next/link";
 
 export function CurrencyToolsClient() {
   const { currency, ratesLoaded, ratesStale, ratesMeta } = useCurrency();
@@ -42,7 +42,8 @@ export function CurrencyToolsClient() {
             variant="public"
           />
           <p className="text-sm text-muted-foreground">
-            Looking for vehicle financing estimates?{" "}
+            Mid-market rates are for guidance only and are not a bank, bureau, or supplier
+            quote. Looking for vehicle financing estimates?{" "}
             <Link
               href={ROUTES.auto.financing}
               className="font-medium text-brand-primary underline-offset-4 hover:underline"

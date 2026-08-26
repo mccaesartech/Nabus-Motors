@@ -7,6 +7,7 @@ import {
   REFERENCE_CURRENCIES,
   type VehiclePriceFields,
 } from "@/lib/currency";
+import { ExchangeRateUsed } from "@/components/shared/exchange-rate-used";
 
 interface VehiclePriceSectionProps {
   /** @deprecated Prefer `vehicle` for listing-currency-aware display. */
@@ -18,7 +19,7 @@ export function VehiclePriceSection({
   usdAmount,
   vehicle,
 }: VehiclePriceSectionProps) {
-  const { currency, formatPrice, formatVehicleListPrice } = useCurrency();
+  const { currency, formatPrice, formatVehicleListPrice, ratesMeta, ratesStale } = useCurrency();
   const otherCurrencies = REFERENCE_CURRENCIES.filter((c) => c !== currency);
   const fields: VehiclePriceFields = vehicle ?? {
     price: usdAmount ?? 0,
@@ -46,6 +47,7 @@ export function VehiclePriceSection({
           ))}
         </ul>
       )}
+      <ExchangeRateUsed ratesMeta={ratesMeta} ratesStale={ratesStale} />
     </div>
   );
 }

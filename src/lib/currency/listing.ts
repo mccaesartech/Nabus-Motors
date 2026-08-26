@@ -1,5 +1,10 @@
 import { BASE_CURRENCY, REFERENCE_CURRENCIES } from "./types";
-import { convertFromUsd, getActiveRates } from "./rates";
+import {
+  convertFromUsd,
+  convertToUsd as convertToUsdStrict,
+  convertBetweenCurrencies as convertBetweenStrict,
+} from "./convert";
+import { getActiveRates } from "./rates";
 import { formatUsdPrice } from "./format";
 
 /** Currencies available when entering a vehicle list price. */
@@ -22,11 +27,7 @@ export function convertToUsd(
   fromCurrency: string,
   rates = getActiveRates()
 ): number {
-  const code = (fromCurrency || BASE_CURRENCY).toUpperCase();
-  if (code === BASE_CURRENCY) return amount;
-  const rate = rates[code];
-  if (!rate || rate <= 0) return amount;
-  return amount / rate;
+  return convertToUsdStrict(amount, fromCurrency, rates);
 }
 
 /** Convert between any two supported currencies via USD. */
@@ -36,11 +37,7 @@ export function convertBetweenCurrencies(
   toCurrency: string,
   rates = getActiveRates()
 ): number {
-  const from = (fromCurrency || BASE_CURRENCY).toUpperCase();
-  const to = (toCurrency || BASE_CURRENCY).toUpperCase();
-  if (from === to) return amount;
-  const usd = convertToUsd(amount, from, rates);
-  return convertFromUsd(usd, to, rates);
+  return convertBetweenStrict(amount, fromCurrency, toCurrency, rates);
 }
 
 export function resolveListingCurrency(
@@ -52,7 +49,7 @@ export function resolveListingCurrency(
 
 /**
  * Amount to show in the admin price input for a stored vehicle.
- * Prefers exact `listedPrice` when present; otherwise converts USD → listing currency.
+ * Prefers exact `listedPrice` when present; otherwise converts USD to listing currency.
  */
 export function listingAmountForForm(fields: VehiclePriceFields): number {
   const currency = resolveListingCurrency(fields.priceCurrency);

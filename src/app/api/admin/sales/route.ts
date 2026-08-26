@@ -9,6 +9,7 @@ import { createAdminSupabase } from "@/lib/supabase/admin";
 import { applySoldStatusTransition } from "@/lib/vehicles/stock-automation";
 import { recordVehicleSold } from "@/lib/platform/inventory-movements/record";
 import { notDeletedFilter, softDeleteEntity } from "@/lib/platform/trash";
+import { captureFxSnapshot } from "@/lib/currency/snapshot-server";
 
 const SALE_SELECT = `
   *,
@@ -341,6 +342,13 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    await captureFxSnapshot({
+      entityType: "sale",
+      entityId: data.id,
+      originalAmountUsd: Math.round(salePrice),
+      supabase,
+    });
+
     return NextResponse.json({ ok: true, sale: data });
   }
 
@@ -384,6 +392,13 @@ export async function POST(req: NextRequest) {
       request: req,
     });
   }
+
+  await captureFxSnapshot({
+    entityType: "sale",
+    entityId: data.id,
+    originalAmountUsd: sale_price,
+    supabase,
+  });
 
   return NextResponse.json({ ok: true, sale: data });
 }

@@ -17,6 +17,7 @@ import { countAvailableSiblings } from "@/lib/vehicles/stock-automation";
 import { notifyCustomerOrderSubmitted } from "@/lib/customer/notifications-server";
 import { notifyCustomer } from "@/lib/notifications/customer-notify";
 import type { CartPartLine, CartVehicleLine } from "@/lib/parts/cart-types";
+import { captureFxSnapshot } from "@/lib/currency/snapshot-server";
 
 type CheckoutPartItem = CartPartLine & {
   partName?: string;
@@ -257,6 +258,13 @@ export async function POST(req: NextRequest) {
       await supabase.from("parts_orders").delete().eq("id", order.id);
       return jsonError("Could not submit order. Please try again.", 500);
     }
+
+    await captureFxSnapshot({
+      entityType: "parts_order",
+      entityId: order.id,
+      originalAmountUsd: totalUsd,
+      supabase,
+    });
 
     const { rates } = await getServerExchangeRates();
 

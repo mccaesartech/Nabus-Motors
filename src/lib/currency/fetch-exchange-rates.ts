@@ -1,7 +1,12 @@
 import { REFERENCE_CURRENCIES } from "./types";
+import type { ExchangeRateSource } from "./types";
 import { getStaticFallbackRates, type ExchangeRateMap } from "./rates";
+import { EXCHANGE_RATE_CACHE_TTL_SECONDS } from "./fetch-exchange-rates-constants";
+import { getDefaultFxProvider } from "./providers/exchangerate-api";
+import type { FxProviderRequest } from "./providers/types";
 
-export type ExchangeRateSource = "exchangerate-api" | "fallback";
+export type { ExchangeRateSource };
+export { EXCHANGE_RATE_CACHE_TTL_SECONDS };
 
 export type ExchangeRatePayload = {
   rates: ExchangeRateMap;
@@ -10,19 +15,11 @@ export type ExchangeRatePayload = {
   stale: boolean;
   fetchedAt: string;
   rateDate?: string;
+  provider: string;
+  error?: string;
 };
 
-export const EXCHANGE_RATE_CACHE_TTL_SECONDS = 1800;
-
-const OPEN_ER_API_URL = "https://open.er-api.com/v6/latest/USD";
-
-function exchangeRateApiUrl(): string {
-  const apiKey = process.env.EXCHANGE_RATE_API_KEY?.trim();
-  if (apiKey) {
-    return `https://v6.exchangerate-api.com/v6/${apiKey}/latest/USD`;
-  }
-  return OPEN_ER_API_URL;
-}
+let inflight: Promise<ExchangeRatePayload> | null = null;
 
 export function buildRatesFromGhs(usdRates: ExchangeRateMap): ExchangeRateMap {
   const ghsPerUsd = usdRates.GHS;
@@ -53,7 +50,7 @@ export function mergeLiveRates(apiRates: Record<string, number>): ExchangeRateMa
   return merged;
 }
 
-function buildFallbackPayload(): ExchangeRatePayload {
+function buildFallbackPayload(error?: string): ExchangeRatePayload {
   const rates = getStaticFallbackRates();
   return {
     rates,
@@ -61,37 +58,21 @@ function buildFallbackPayload(): ExchangeRatePayload {
     source: "fallback",
     stale: true,
     fetchedAt: new Date().toISOString(),
+    provider: "fallback",
+    error,
   };
 }
 
-type ExchangeRateApiResponse = {
-  result?: string;
-  base_code?: string;
-  rates?: Record<string, number>;
-  time_last_update_utc?: string;
-};
-
-export async function fetchLiveExchangeRates(): Promise<ExchangeRatePayload> {
-  const fallbackPayload = buildFallbackPayload();
-
+async function fetchLiveExchangeRatesOnce(
+  request: FxProviderRequest = {}
+): Promise<ExchangeRatePayload> {
   try {
-    // Route/CDN cache (revalidate + s-maxage) owns freshness; do not silently
-    // serve outdated NEXT_PUBLIC_* env defaults as if they were live.
-    const res = await fetch(exchangeRateApiUrl(), {
-      next: { revalidate: EXCHANGE_RATE_CACHE_TTL_SECONDS },
-      headers: { Accept: "application/json" },
-    });
-
-    if (!res.ok) return fallbackPayload;
-
-    const data = (await res.json()) as ExchangeRateApiResponse;
-    if (data.result !== "success" || !data.rates) return fallbackPayload;
-
-    const rates = mergeLiveRates(data.rates);
+    const quote = await getDefaultFxProvider().fetchUsdLatest(request);
+    const rates = mergeLiveRates(quote.rates);
 
     for (const code of REFERENCE_CURRENCIES) {
       if (!rates[code] || rates[code] <= 0) {
-        rates[code] = fallbackPayload.rates[code] ?? 1;
+        rates[code] = getStaticFallbackRates()[code] ?? 1;
       }
     }
 
@@ -101,10 +82,32 @@ export async function fetchLiveExchangeRates(): Promise<ExchangeRatePayload> {
       source: "exchangerate-api",
       stale: false,
       fetchedAt: new Date().toISOString(),
-      rateDate: data.time_last_update_utc,
+      rateDate: quote.rateDate,
+      provider: quote.provider,
     };
-  } catch {
-    // Explicit fallback path: source=fallback, stale=true (see buildFallbackPayload).
-    return fallbackPayload;
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Exchange-rate provider is unavailable.";
+    return buildFallbackPayload(message);
   }
+}
+
+/**
+ * Fetch USD-base mid-market rates. Concurrent callers share one in-flight request.
+ * On provider failure this returns emergency env fallbacks (stale=true) — server
+ * code should prefer last-good DB cache via getServerExchangeRates().
+ */
+export async function fetchLiveExchangeRates(
+  request: FxProviderRequest = {}
+): Promise<ExchangeRatePayload> {
+  if (request.bypassCache) {
+    return fetchLiveExchangeRatesOnce(request);
+  }
+  if (inflight) return inflight;
+  inflight = fetchLiveExchangeRatesOnce(request).finally(() => {
+    inflight = null;
+  });
+  return inflight;
 }

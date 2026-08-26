@@ -97,6 +97,8 @@ export type PartsOrderSummary = {
   created_at: string;
   item_count: number;
   items?: PartsOrderItemSummary[];
+  /** Frozen USD-base rates from the document snapshot, when present. */
+  fxRates?: Record<string, number>;
 };
 
 export type CustomerCartSummary = {

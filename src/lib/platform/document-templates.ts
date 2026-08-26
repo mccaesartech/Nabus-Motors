@@ -1,9 +1,16 @@
 import { DEFAULT_SITE_SETTINGS } from "@/lib/platform/modules";
-import { formatPlatformPrice } from "@/lib/currency";
+import {
+  formatPlatformPrice,
+  FX_MARKET_DISCLAIMER,
+  formatUsdGhsRateLine,
+  getActiveRates,
+  rateSourceLabel,
+} from "@/lib/currency";
 import {
   brandHeader,
   documentFooter,
   escapeHtml,
+  openPrintableDocument,
   wrapDocument,
 } from "@/lib/print/document-shell";
 
@@ -37,9 +44,12 @@ export function buildDocumentHtml({
   company = DEFAULT_SITE_SETTINGS,
 }: DocTemplateInput) {
   const title = docTitle(docType);
+  const rates = getActiveRates();
+  const ghsPerUsd = rates.GHS ?? 0;
   const priceLine =
     vehiclePrice != null
-      ? `<p><strong>Vehicle price:</strong> ${formatPlatformPrice(vehiclePrice)}</p>`
+      ? `<p><strong>Vehicle price:</strong> ${formatPlatformPrice(vehiclePrice, rates)}</p>
+         <p style="font-size:12px;color:#555;">Exchange rate used: ${formatUsdGhsRateLine(ghsPerUsd)} · ${rateSourceLabel({ source: "exchangerate-api" })}. ${FX_MARKET_DISCLAIMER}</p>`
       : "";
   const today = new Date().toLocaleDateString("en-GB", {
     day: "numeric",
@@ -88,16 +98,10 @@ export function buildDocumentHtml({
       ${brandHeader(undefined, docTypeLabel(docType))}
       ${body}
       ${documentFooter()}
-    `,
-    true
+    `
   );
 }
 
 export function openPrintDocument(input: DocTemplateInput) {
-  const html = buildDocumentHtml(input);
-  const win = window.open("", "_blank", "noopener,noreferrer,width=800,height=900");
-  if (!win) return;
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
+  return openPrintableDocument(buildDocumentHtml(input));
 }

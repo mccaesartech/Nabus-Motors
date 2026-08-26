@@ -4,6 +4,7 @@ import { requireFinanceAccess } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { recordExpenseMovement } from "@/lib/platform/inventory-movements/record";
 import { notDeletedFilter, softDeleteEntity } from "@/lib/platform/trash";
+import { captureFxSnapshot } from "@/lib/currency/snapshot-server";
 
 const EMPTY_SUMMARY = {
   soldRevenue: 0,
@@ -112,6 +113,13 @@ export async function POST(req: NextRequest) {
     },
     auth.auth
   );
+
+  await captureFxSnapshot({
+    entityType: "expense",
+    entityId: data.id,
+    originalAmountUsd: data.amount_usd,
+    supabase,
+  });
 
   return NextResponse.json({ ok: true, expense: data });
 }

@@ -37,6 +37,8 @@ export const AUDIT_ACTIONS = [
   "api_unauthorized",
   "api_forbidden",
   "api_server_error",
+  "fx_rate_refresh",
+  "fx_rate_override",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -76,6 +78,8 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   api_unauthorized: "API unauthorized (401)",
   api_forbidden: "API forbidden (403)",
   api_server_error: "API server error (500)",
+  fx_rate_refresh: "Exchange rates refreshed",
+  fx_rate_override: "Manual exchange rate",
 };
 
 export function isAuditAction(value: string): value is AuditAction {

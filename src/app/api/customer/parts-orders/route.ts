@@ -3,6 +3,8 @@ import { getCustomerFromAuthHeader } from "@/lib/customer/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import type { PartsOrderItemSummary, PartsOrderSummary } from "@/lib/parts/cart-types";
 import { userOrEmailFilter } from "@/lib/security/postgrest-filter";
+import { loadFxSnapshotsForEntities } from "@/lib/currency/snapshot-server";
+import { ratesMapFromSnapshot } from "@/lib/currency/snapshot";
 
 function firstImage(images: unknown): string | null {
   if (!Array.isArray(images) || images.length === 0) return null;
@@ -69,6 +71,9 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  const ids = (orders ?? []).map((order) => order.id as string);
+  const snapshots = await loadFxSnapshotsForEntities("parts_order", ids, supabase);
+
   const summaries: PartsOrderSummary[] = (orders ?? []).map((order) => {
     const rawItems = Array.isArray(order.parts_order_items) ? order.parts_order_items : [];
     const items: PartsOrderItemSummary[] = rawItems.map((item) => {
@@ -104,6 +109,9 @@ export async function GET(req: NextRequest) {
       created_at: order.created_at,
       item_count: items.length,
       items,
+      fxRates: snapshots.get(order.id)
+        ? ratesMapFromSnapshot(snapshots.get(order.id)!)
+        : undefined,
     };
   });
 

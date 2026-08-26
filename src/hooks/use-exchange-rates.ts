@@ -2,20 +2,25 @@
 
 import { useEffect, useState } from "react";
 import { setExchangeRates } from "@/lib/currency/rates";
+import type { ExchangeRateSource } from "@/lib/currency/types";
 
 export type ExchangeRatesMeta = {
-  source: "exchangerate-api" | "fallback";
+  source: ExchangeRateSource;
   stale: boolean;
   fetchedAt: string | null;
   rateDate: string | null;
+  provider: string | null;
+  error: string | null;
 };
 
 type ExchangeRatesApiResponse = {
   rates?: Record<string, number>;
   stale?: boolean;
-  source?: "exchangerate-api" | "fallback";
+  source?: ExchangeRateSource;
   fetchedAt?: string;
   rateDate?: string;
+  provider?: string;
+  error?: string;
 };
 
 type UseExchangeRatesOptions = {
@@ -28,6 +33,8 @@ const DEFAULT_META: ExchangeRatesMeta = {
   stale: true,
   fetchedAt: null,
   rateDate: null,
+  provider: "fallback",
+  error: null,
 };
 
 export function useExchangeRates(options: UseExchangeRatesOptions = {}) {
@@ -51,6 +58,8 @@ export function useExchangeRates(options: UseExchangeRatesOptions = {}) {
             stale: data.stale === true,
             fetchedAt: data.fetchedAt ?? null,
             rateDate: data.rateDate ?? null,
+            provider: data.provider ?? data.source ?? null,
+            error: data.error ?? null,
           });
           setRatesLoaded(true);
         })

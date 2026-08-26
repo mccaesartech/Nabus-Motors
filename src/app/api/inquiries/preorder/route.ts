@@ -24,6 +24,7 @@ import {
   preorderLeadsLink,
 } from "@/lib/platform/vehicle-sale-notifications";
 import { recordVehicleInterest } from "@/lib/vehicle-interest/server";
+import { captureFxSnapshot } from "@/lib/currency/snapshot-server";
 
 export async function POST(req: NextRequest) {
   try {
@@ -201,6 +202,14 @@ export async function POST(req: NextRequest) {
     const accountCreated = Boolean(userId && !authUser);
     const inquiryId = inserted?.id ? String(inserted.id) : undefined;
     const { rates } = await getServerExchangeRates();
+
+    if (inquiryId) {
+      await captureFxSnapshot({
+        entityType: "preorder",
+        entityId: inquiryId,
+        originalAmountUsd: priceUsd,
+      });
+    }
 
     const adminSupabase = createAdminSupabase();
     if (inquiryId && adminSupabase) {

@@ -26,6 +26,8 @@ export const SCHEMA_CAPS = {
   vehiclesStockQuantity: "vehicles.stock_quantity",
   vehiclesPriceCurrency: "vehicles.price_currency",
   vehiclesDeletedAt: "vehicles.deleted_at",
+  exchangeRateCache: "exchange_rate_cache",
+  exchangeRateSnapshots: "exchange_rate_snapshots",
 } as const;
 
 export type SchemaCapKey = (typeof SCHEMA_CAPS)[keyof typeof SCHEMA_CAPS];

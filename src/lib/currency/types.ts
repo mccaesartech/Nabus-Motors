@@ -17,3 +17,10 @@ export const REFERENCE_CURRENCIES: readonly string[] = [
   "ZAR",
   "KES",
 ] as const;
+
+/** Where a USD-base rate map came from. Never present fallbacks as live market. */
+export type ExchangeRateSource =
+  | "exchangerate-api"
+  | "fallback"
+  | "cache"
+  | "manual";

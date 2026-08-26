@@ -11,6 +11,8 @@ import {
 } from "@/lib/print/document-shell";
 import { resolveOrderLinePricing } from "@/lib/print/order-line-pricing";
 import { formatPlatformPrice } from "@/lib/currency";
+import { FX_MARKET_DISCLAIMER, formatUsdGhsRateLine } from "@/lib/currency/meta";
+import { ratesMapFromSnapshot, snapshotRateLabel } from "@/lib/currency/snapshot";
 import {
   customRequestStatusLabel,
   formatBudgetRangeGhs,
@@ -164,13 +166,24 @@ function adminItemTypeLabel(item: AdminOrderDetail["items"][number]): string {
   return item.sku ? `Part · SKU ${item.sku}` : "Spare part";
 }
 
+function fxFootnote(order: AdminOrderDetail): string {
+  const snapshot = order.fxSnapshot;
+  if (!snapshot) {
+    return `<p class="payment-note">${escapeHtml(FX_MARKET_DISCLAIMER)}</p>`;
+  }
+  const label = snapshotRateLabel(snapshot);
+  return `<p class="payment-note">Exchange rate used: ${escapeHtml(formatUsdGhsRateLine(snapshot.rateUsed))} · ${escapeHtml(label)} · ${escapeHtml(FX_MARKET_DISCLAIMER)}</p>`;
+}
+
 function renderAdminOrderItems(order: AdminOrderDetail): string {
+  const rates = order.fxSnapshot ? ratesMapFromSnapshot(order.fxSnapshot) : undefined;
   const rows = order.items
     .map((item) => {
       const pricing = resolveOrderLinePricing(
         item.quantity,
         item.unitPriceUsd,
-        item.unitPriceUsd * item.quantity
+        item.unitPriceUsd * item.quantity,
+        rates
       );
 
       return `
@@ -236,6 +249,7 @@ export function buildAdminOrderDocumentHtml(order: AdminOrderDetail): string {
     ${sectionBlock("Customer", customerMetaGrid(customer, metaExtra))}
     ${sectionBlock("Line items", order.items.length > 0 ? renderAdminOrderItems(order) : "<p>No line items recorded.</p>")}
     <p class="total-row">Grand total: ${escapeHtml(order.totalLabel)}</p>
+    ${fxFootnote(order)}
     ${appointmentRow ? sectionBlock("Linked appointment", appointmentRow) : ""}
     ${documentFooter()}
   `;

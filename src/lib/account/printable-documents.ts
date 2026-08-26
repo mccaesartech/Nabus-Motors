@@ -16,6 +16,8 @@ import {
 import { resolveOrderLinePricing } from "@/lib/print/order-line-pricing";
 import { orderReferenceId } from "@/lib/account/types";
 import { formatPlatformPrice } from "@/lib/currency";
+import { FX_MARKET_DISCLAIMER } from "@/lib/currency/meta";
+import type { ExchangeRateMap } from "@/lib/currency/rates";
 import {
   customRequestStatusLabel,
   formatBudgetRangeGhs,
@@ -40,14 +42,14 @@ function itemTypeLabel(item: PartsOrderItemSummary): string {
   return item.sku ? `Part · SKU ${item.sku}` : "Spare part";
 }
 
-function renderOrderItemsTable(items: PartsOrderItemSummary[]): string {
+function renderOrderItemsTable(items: PartsOrderItemSummary[], rates?: ExchangeRateMap): string {
   const rows = items
     .map((item) => {
       const thumb = absoluteAssetUrl(item.image_url);
       const thumbCell = thumb
         ? `<img class="item-thumb" src="${escapeHtml(thumb)}" alt="" crossorigin="anonymous" />`
         : `<div class="item-thumb-placeholder" aria-hidden="true"></div>`;
-      const pricing = resolveOrderLinePricing(item.quantity, item.unit_price_usd);
+      const pricing = resolveOrderLinePricing(item.quantity, item.unit_price_usd, undefined, rates);
 
       return `
         <tr>
@@ -106,8 +108,9 @@ export function buildOrderDocumentHtml(
 ): string {
   const refId = orderReferenceId(order.id);
   const items = order.items ?? [];
+  const rates = order.fxRates;
   const subtotalUsd = items.reduce((sum, item) => {
-    const pricing = resolveOrderLinePricing(item.quantity, item.unit_price_usd);
+    const pricing = resolveOrderLinePricing(item.quantity, item.unit_price_usd, undefined, rates);
     return sum + pricing.lineTotalUsd;
   }, 0);
   const paymentNote = orderPaymentNote(order.status);
@@ -122,8 +125,8 @@ export function buildOrderDocumentHtml(
   `;
 
   const totalsRows = [
-    { label: "Subtotal", value: formatPlatformPrice(subtotalUsd) },
-    { label: "Grand total", value: formatPlatformPrice(order.total_usd), emphasis: true },
+    { label: "Subtotal", value: formatPlatformPrice(subtotalUsd, rates) },
+    { label: "Grand total", value: formatPlatformPrice(order.total_usd, rates), emphasis: true },
   ];
 
   const body = `
@@ -132,11 +135,12 @@ export function buildOrderDocumentHtml(
     ${sectionBlock(
       "Line items",
       items.length > 0
-        ? renderOrderItemsTable(items)
+        ? renderOrderItemsTable(items, rates)
         : '<p class="empty-note">No line items recorded for this order.</p>'
     )}
     ${renderTotalsBox(totalsRows)}
     ${paymentNote ? `<p class="payment-note">${escapeHtml(paymentNote)}</p>` : ""}
+    <p class="payment-note">${escapeHtml(FX_MARKET_DISCLAIMER)}</p>
     ${documentFooter()}
   `;
 
