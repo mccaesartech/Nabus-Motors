@@ -861,7 +861,9 @@ function writeHtmlToPrintTarget(
   if (invalid) return invalid;
 
   const prepared = preparePrintDocumentStage(html);
-  if (!prepared) return invalid;
+  if (!prepared) {
+    return { ok: false, error: "Invalid document. Refresh the page and try again." };
+  }
 
   const { win = null, iframe = null } = options;
 
