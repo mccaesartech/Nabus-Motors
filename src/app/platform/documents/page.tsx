@@ -2,14 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ExternalLink, FileText, Plus, Printer, Trash2 } from "lucide-react";
+import { ExternalLink, FileText, Plus, Trash2 } from "lucide-react";
+import { PlatformPrintButton } from "@/components/platform/printable-record";
 import { PageHeader } from "@/components/platform/page-header";
 import { usePlatformSession } from "@/components/platform/platform-shell";
 import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
 import { canDirectMutate } from "@/lib/platform/mutation-approval";
 import { DOCUMENT_TYPES, type DocumentRow } from "@/lib/platform/modules";
-import { openPrintDocument } from "@/lib/platform/document-templates";
+import {
+  buildDocumentHtml,
+  documentDownloadFilename,
+} from "@/lib/platform/document-templates";
 import { PlatformDateTime } from "@/components/platform/platform-datetime";
 
 type VehicleOption = {
@@ -55,15 +59,15 @@ export default function DocumentsPage() {
     [vehicles, vehicleId]
   );
 
-  function generatePrint() {
-    if (!selectedVehicle) return;
-    openPrintDocument({
+  const documentInput = useMemo(() => {
+    if (!selectedVehicle) return null;
+    return {
       docType,
       customerName: customerName || "Customer",
       vehicleLabel: `${selectedVehicle.year} ${selectedVehicle.make} ${selectedVehicle.model}`,
       vehiclePrice: selectedVehicle.price,
-    });
-  }
+    };
+  }, [docType, customerName, selectedVehicle]);
 
   async function saveDocumentLink(e: React.FormEvent) {
     e.preventDefault();
@@ -151,15 +155,18 @@ export default function DocumentsPage() {
               placeholder="John Mensah"
             />
           </label>
-          <button
-            type="button"
-            onClick={generatePrint}
-            disabled={!selectedVehicle}
-            className="platform-btn-primary w-full"
-          >
-            <Printer className="size-4" />
-            Generate & print
-          </button>
+          {documentInput ? (
+            <PlatformPrintButton
+              label="Print"
+              className="w-full"
+              getHtml={() => buildDocumentHtml(documentInput)}
+              downloadFilename={documentDownloadFilename(documentInput)}
+            />
+          ) : (
+            <p className="text-sm text-[var(--platform-text-secondary)]">
+              Select a vehicle to generate a printable document.
+            </p>
+          )}
         </div>
 
         <form onSubmit={saveDocumentLink} className="platform-card space-y-4 rounded-xl p-5">
