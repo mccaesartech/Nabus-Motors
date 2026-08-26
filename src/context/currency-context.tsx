@@ -118,8 +118,10 @@ export function CurrencyProvider({
   const [country, setCountryState] = useState<CountryCode>(DEFAULT_COUNTRY);
   const [currency, setCurrencyState] = useState<string>(DEFAULT_CURRENCY);
   const [hydrated, setHydrated] = useState(false);
+  // Fetch immediately so cards/calculator never flash the static 11.19 fallback
+  // (which would briefly show a different GHS amount than the live feed).
   const { ratesLoaded, ratesStale, meta: ratesMeta } = useExchangeRates({
-    defer: true,
+    defer: false,
   });
 
   useEffect(() => {

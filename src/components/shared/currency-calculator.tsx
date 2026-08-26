@@ -137,7 +137,8 @@ export function CurrencyCalculator({
                 : "text-muted-foreground"
             )}
           >
-            Mid-market rates via USD. For guidance only - not a bank quote.
+            Same live USD rates as vehicle prices. Guidance only — not a bank
+            quote. May differ slightly from Google Finance.
           </p>
         </div>
       </div>
@@ -269,6 +270,15 @@ export function CurrencyCalculator({
             : "Fetching exchange rates..."}
         </p>
         {updatedLabel ? <p>Rates updated: {updatedLabel}</p> : null}
+        {ratesMeta?.provider && ratesLoaded && !ratesStale ? (
+          <p>
+            Source:{" "}
+            {ratesMeta.provider === "exchangerate-api"
+              ? "ExchangeRate-API"
+              : ratesMeta.provider}
+            . Listings convert from canonical USD with this same rate.
+          </p>
+        ) : null}
         {ratesStale ? (
           <p
             className={

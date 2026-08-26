@@ -31,7 +31,7 @@ export function CurrencyToolsClient() {
         <Container className="max-w-3xl space-y-8">
           <SectionHeader
             title="Live conversion"
-            description="Amounts convert via USD using mid-market rates refreshed about every 30 minutes."
+            description="Amounts convert via USD using the same ExchangeRate-API feed as inventory cards, refreshed about every 30 minutes."
           />
           <CurrencyCalculator
             defaultFromCurrency="USD"
@@ -42,8 +42,11 @@ export function CurrencyToolsClient() {
             variant="public"
           />
           <p className="text-sm text-muted-foreground">
-            Mid-market rates are for guidance only and are not a bank, bureau, or supplier
-            quote. Looking for vehicle financing estimates?{" "}
+            Vehicle prices are stored in USD and converted to GHS with this feed.
+            Google Finance / bank apps may show a slightly different mid-market
+            rate — that is expected, not a listing bug. Rates are guidance only,
+            not a bank, bureau, or supplier quote. Looking for vehicle financing
+            estimates?{" "}
             <Link
               href={ROUTES.auto.financing}
               className="font-medium text-brand-primary underline-offset-4 hover:underline"

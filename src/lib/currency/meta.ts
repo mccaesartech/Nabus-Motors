@@ -1,7 +1,7 @@
 import type { ExchangeRateSource } from "./types";
 
 export const FX_MARKET_DISCLAIMER =
-  "Mid-market rate for guidance only - not a bank, bureau, or supplier quote.";
+  "Mid-market rate from ExchangeRate-API for guidance only — not a bank quote. May differ slightly from Google Finance.";
 
 export const FX_MANUAL_LABEL = "Manual Exchange Rate";
 

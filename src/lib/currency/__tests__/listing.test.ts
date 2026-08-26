@@ -61,6 +61,25 @@ describe("listing currency helpers", () => {
     expect(text).not.toContain("155");
   });
 
+  it("shows the same GHS for $38k as the live ExchangeRate-API feed (not Google ~11.19)", () => {
+    setExchangeRates({ GHS: 11.18204 });
+    const text = formatVehiclePrice(
+      { price: 38_000, priceCurrency: "USD", listedPrice: 38_000 },
+      "GHS"
+    );
+    // 38000 × 11.18204 = 424917.52 → 424,918 (Google ~11.195 → 425,410)
+    expect(text.replace(/[^\d]/g, "")).toBe("424918");
+  });
+
+  it("round-trips GHS display amount back to canonical USD with the same rate", () => {
+    setExchangeRates({ GHS: 11.18204 });
+    const ghs = convertBetweenCurrencies(38_000, "USD", "GHS");
+    expect(Math.round(ghs)).toBe(424_918);
+    expect(Math.round(convertBetweenCurrencies(424_918, "GHS", "USD"))).toBe(
+      38_000
+    );
+  });
+
   it("converts via USD when display currency differs", () => {
     setExchangeRates({ GHS: 15.5, EUR: 0.92 });
     const text = formatVehiclePrice(

@@ -29,15 +29,25 @@ export function VehiclePriceSection({
   const primary = vehicle
     ? formatVehicleListPrice(vehicle)
     : formatPrice(usdAmount ?? 0);
+  // Always surface canonical USD when the shopper is viewing a converted currency.
+  const showUsdCanonical = currency.toUpperCase() !== "USD";
+  const usdLabel = formatVehiclePrice(fields, "USD");
+  const alternates = otherCurrencies.filter((c) => c !== "USD");
 
   return (
     <div>
       <p className="text-3xl font-semibold tabular-nums text-foreground">
         {primary}
       </p>
-      {otherCurrencies.length > 0 && (
+      {showUsdCanonical ? (
+        <p className="mt-1 text-sm text-muted-foreground">
+          Listed as {usdLabel}{" "}
+          <span className="text-muted-foreground/70">(canonical)</span>
+        </p>
+      ) : null}
+      {alternates.length > 0 && (
         <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground">
-          {otherCurrencies.map((code) => (
+          {alternates.map((code) => (
             <li key={code}>
               ≈ {formatVehiclePrice(fields, code)}{" "}
               <span className="text-muted-foreground/70">
