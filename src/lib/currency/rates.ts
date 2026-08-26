@@ -14,17 +14,21 @@ export function getActiveRates(): ExchangeRateMap {
   return liveRates ?? getStaticFallbackRates();
 }
 
-/** Env-overridable fallbacks — used only when the live FX API is down or omits a code. */
+/**
+ * Env-overridable emergency fallbacks — used ONLY when the live FX API is down
+ * or omits a code. Defaults approximate mid-2026 mid-market (GHS ≈ 11.19).
+ * Do not treat these as live rates; `/api/exchange-rates` is the source of truth.
+ */
 export function getStaticFallbackRates(): ExchangeRateMap {
   return {
     USD: 1,
-    GHS: parseEnvRate(process.env.NEXT_PUBLIC_USD_TO_GHS, 15.5),
-    ZWL: parseEnvRate(process.env.NEXT_PUBLIC_USD_TO_ZWL, 30),
-    ZAR: parseEnvRate(process.env.NEXT_PUBLIC_USD_TO_ZAR, 18.5),
-    NGN: parseEnvRate(process.env.NEXT_PUBLIC_USD_TO_NGN, 1500),
-    KES: parseEnvRate(process.env.NEXT_PUBLIC_USD_TO_KES, 130),
-    GBP: parseEnvRate(process.env.NEXT_PUBLIC_USD_TO_GBP, 0.79),
-    EUR: parseEnvRate(process.env.NEXT_PUBLIC_USD_TO_EUR, 0.92),
+    GHS: parseEnvRate(process.env.NEXT_PUBLIC_USD_TO_GHS, 11.19),
+    ZWL: parseEnvRate(process.env.NEXT_PUBLIC_USD_TO_ZWL, 26.63),
+    ZAR: parseEnvRate(process.env.NEXT_PUBLIC_USD_TO_ZAR, 15.94),
+    NGN: parseEnvRate(process.env.NEXT_PUBLIC_USD_TO_NGN, 1351),
+    KES: parseEnvRate(process.env.NEXT_PUBLIC_USD_TO_KES, 129.5),
+    GBP: parseEnvRate(process.env.NEXT_PUBLIC_USD_TO_GBP, 0.73),
+    EUR: parseEnvRate(process.env.NEXT_PUBLIC_USD_TO_EUR, 0.86),
     ...STATIC_FALLBACK_RATES,
   };
 }

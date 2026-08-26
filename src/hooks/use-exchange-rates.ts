@@ -67,9 +67,9 @@ export function useExchangeRates(options: UseExchangeRatesOptions = {}) {
 
     if (defer) {
       if (typeof window.requestIdleCallback === "function") {
-        idleId = window.requestIdleCallback(loadRates, { timeout: 3000 });
+        idleId = window.requestIdleCallback(loadRates, { timeout: 1500 });
       } else {
-        timerId = setTimeout(loadRates, 150);
+        timerId = setTimeout(loadRates, 100);
       }
     } else {
       loadRates();

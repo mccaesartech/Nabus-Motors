@@ -75,8 +75,11 @@ export async function fetchLiveExchangeRates(): Promise<ExchangeRatePayload> {
   const fallbackPayload = buildFallbackPayload();
 
   try {
+    // Route/CDN cache (revalidate + s-maxage) owns freshness; do not silently
+    // serve outdated NEXT_PUBLIC_* env defaults as if they were live.
     const res = await fetch(exchangeRateApiUrl(), {
       next: { revalidate: EXCHANGE_RATE_CACHE_TTL_SECONDS },
+      headers: { Accept: "application/json" },
     });
 
     if (!res.ok) return fallbackPayload;
@@ -101,6 +104,7 @@ export async function fetchLiveExchangeRates(): Promise<ExchangeRatePayload> {
       rateDate: data.time_last_update_utc,
     };
   } catch {
+    // Explicit fallback path: source=fallback, stale=true (see buildFallbackPayload).
     return fallbackPayload;
   }
 }
