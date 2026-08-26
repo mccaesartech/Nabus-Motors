@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { platformPath } from "@/lib/platform/paths";
-import { PreorderNotificationPreview } from "@/components/platform/preorder-notification-preview";
+import { PreorderNotificationPreview, CartOrderNotificationPreview } from "@/components/platform/preorder-notification-preview";
 import {
   AdminNotificationBody,
   adminNotificationHref,
@@ -327,6 +327,8 @@ function NotificationRow({
   const display = formatAdminNotificationForDisplay(n);
   const href = adminNotificationHref(n);
   const isDelivery = n.type === "delivery_failed" || n.type === "delivery_deferred";
+  const isOrderAlert = n.type === "order" || n.type === "vehicle_order";
+  const isPreorderAlert = n.type === "preorder";
 
   return (
     <Link
@@ -364,10 +366,11 @@ function NotificationRow({
             <span className="mt-1.5 size-2 shrink-0 rounded-full bg-[var(--platform-accent)]" />
           )}
         </div>
-        <PreorderNotificationPreview notification={n} variant="compact" />
+        {isPreorderAlert ? <PreorderNotificationPreview notification={n} variant="compact" /> : null}
+        {isOrderAlert ? <CartOrderNotificationPreview notification={n} variant="compact" /> : null}
         {isDelivery ? (
           <AdminNotificationBody notification={n} variant="compact" />
-        ) : (
+        ) : isOrderAlert || isPreorderAlert ? null : (
           <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[var(--platform-text-secondary)]">
             {display.message}
           </p>

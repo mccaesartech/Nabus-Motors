@@ -66,6 +66,7 @@ export type PreorderInquiryRow = {
   budget_max?: number | null;
   reference_code?: string | null;
   matched_vehicle_id?: string | null;
+  whatsapp_opt_in?: boolean | null;
   vehicle?: PreorderVehicleInfo | PreorderVehicleInfo[] | null;
 };
 

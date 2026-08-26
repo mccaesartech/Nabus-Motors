@@ -416,8 +416,11 @@ export default function OrderDetailPage() {
           }}
         >
           <label className="mb-1 block text-xs text-[var(--platform-text-secondary)]">
-            Internal notes
+            Order notes
           </label>
+          <p className="mb-2 text-xs text-[var(--platform-text-secondary)]">
+            Includes any notes the customer left at checkout. Staff can add follow-up notes here.
+          </p>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}

@@ -406,6 +406,19 @@ export default function PreorderDetailPage() {
                 </div>
               </div>
             )}
+            <div className="flex items-start gap-3">
+              <User className="mt-0.5 size-4 shrink-0 text-[var(--platform-text-secondary)]" />
+              <div>
+                <p className="text-xs text-[var(--platform-text-secondary)]">WhatsApp updates</p>
+                <p className="font-medium text-[var(--platform-text)]">
+                  {inquiry.whatsapp_opt_in === true
+                    ? "Opted in"
+                    : inquiry.whatsapp_opt_in === false
+                      ? "Not opted in"
+                      : "Not specified"}
+                </p>
+              </div>
+            </div>
             {inquiry.message && (
               <div>
                 <p className="text-xs text-[var(--platform-text-secondary)]">Message</p>

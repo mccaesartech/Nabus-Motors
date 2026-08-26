@@ -96,6 +96,7 @@ function buildInquiryDetails(type: InquiryDetailType, record: InquiryRecord): st
 
   if (type === "finance") {
     return detailTable([
+      ["Phone", str(record.phone) || "—"],
       ["Annual income", str(record.annual_income_range) || "—"],
       ["Credit score", str(record.credit_score_range) || "—"],
       ["Vehicle of interest", str(record.vehicle_of_interest) || "—"],
@@ -362,33 +363,62 @@ export function buildCustomerInvoiceDocumentHtml(customer: AdminCustomerDetail):
     ["Cart orders", String(customer.ordersCount)],
     ["Pre-orders", String(customer.preordersCount)],
     ["Freight quotes", String(customer.quotesCount)],
+    ["Inquiries & applications", String(customer.inquiriesCount)],
     ["Shipments", String(customer.shipmentsCount)],
   ]);
 
-  const orderRows = customer.recentOrders
-    .slice(0, 10)
-    .map(
-      (order) =>
-        `<tr><td style="font-family:ui-monospace,monospace;">${escapeHtml(order.id.slice(0, 8).toUpperCase())}</td><td>${escapeHtml(orderStatusLabel(order.status))}</td><td class="num">${order.itemCount}</td><td class="num">${escapeHtml(order.totalLabel)}</td><td>${escapeHtml(formatPrintDate(order.createdAt))}</td></tr>`
-    )
-    .join("");
+  const orderSections = customer.recentOrders.slice(0, 10).map((order) => {
+    const ref = order.id.slice(0, 8).toUpperCase();
+    const itemRows = order.items
+      .map(
+        (item) =>
+          `<tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.itemType === "vehicle" ? (item.itemIntent === "pre_order" ? "Vehicle · Pre-order" : "Vehicle · Buy") : "Part")}</td><td class="num">${item.quantity}</td><td class="num">${escapeHtml(item.lineTotalLabel)}</td></tr>`
+      )
+      .join("");
+    const itemsTable =
+      order.items.length > 0
+        ? `<table class="items"><thead><tr><th>Item</th><th>Type</th><th class="num">Qty</th><th class="num">Line total</th></tr></thead><tbody>${itemRows}</tbody></table>`
+        : "";
+    const notesBlock = order.notes?.trim()
+      ? `<p class="message-block"><strong>Notes:</strong> ${escapeHtml(order.notes.trim())}</p>`
+      : "";
+    return `
+      <div style="margin-bottom:20px;">
+        <p style="font-weight:600;margin:0 0 8px;">Order ${escapeHtml(ref)} · ${escapeHtml(orderStatusLabel(order.status))} · ${escapeHtml(order.totalLabel)} · ${escapeHtml(formatPrintDate(order.createdAt))}</p>
+        ${itemsTable}
+        ${notesBlock}
+      </div>
+    `;
+  }).join("");
 
   const ordersTable =
-    customer.recentOrders.length > 0
-      ? `<table class="items"><thead><tr><th>Order ref</th><th>Status</th><th class="num">Items</th><th class="num">Total</th><th>Date</th></tr></thead><tbody>${orderRows}</tbody></table>`
-      : "<p>No cart orders yet.</p>";
+    customer.recentOrders.length > 0 ? orderSections : "<p>No cart orders yet.</p>";
 
   const quoteRows = customer.recentQuotes
     .slice(0, 5)
     .map(
       (q) =>
-        `<tr><td>${escapeHtml(q.referenceCode ?? "No reference")}</td><td>${escapeHtml(freightServiceLabel(q.serviceType))}</td><td>${escapeHtml(q.status)}</td><td>${escapeHtml(formatPrintDate(q.createdAt))}</td></tr>`
+        `<tr><td>${escapeHtml(q.referenceCode ?? "No reference")}</td><td>${escapeHtml(freightServiceLabel(q.serviceType))}</td><td>${escapeHtml(q.status)}</td><td>${escapeHtml([q.originCountry, q.destination].filter(Boolean).join(" → ") || "—")}</td><td>${escapeHtml(formatPrintDate(q.createdAt))}</td></tr>`
     )
+    .join("");
+
+  const quoteDetails = customer.recentQuotes
+    .slice(0, 5)
+    .map((q) => {
+      const parts = [
+        q.cargoDescription ? `Cargo: ${q.cargoDescription}` : null,
+        q.cargoSize ? `Size: ${q.cargoSize}` : null,
+        q.estimatedValueLabel ? `Est. value: ${q.estimatedValueLabel}` : null,
+        q.message?.trim() ? `Message: ${q.message.trim()}` : null,
+      ].filter(Boolean);
+      if (parts.length === 0) return "";
+      return `<p style="margin:8px 0 16px;font-size:13px;color:#555;"><strong>${escapeHtml(q.referenceCode ?? "Quote")}:</strong> ${escapeHtml(parts.join(" · "))}</p>`;
+    })
     .join("");
 
   const quotesTable =
     customer.recentQuotes.length > 0
-      ? `<table class="items"><thead><tr><th>Reference</th><th>Service</th><th>Status</th><th>Date</th></tr></thead><tbody>${quoteRows}</tbody></table>`
+      ? `<table class="items"><thead><tr><th>Reference</th><th>Service</th><th>Status</th><th>Route</th><th>Date</th></tr></thead><tbody>${quoteRows}</tbody></table>${quoteDetails}`
       : "<p>No freight quotes yet.</p>";
 
   const preorderRows = customer.recentPreorders
@@ -399,10 +429,32 @@ export function buildCustomerInvoiceDocumentHtml(customer: AdminCustomerDetail):
     )
     .join("");
 
+  const preorderMessages = customer.recentPreorders
+    .slice(0, 5)
+    .map((p) =>
+      p.message?.trim()
+        ? `<p style="margin:8px 0 16px;font-size:13px;color:#555;"><strong>${escapeHtml(p.referenceCode ?? p.vehicleLabel ?? "Pre-order")}:</strong> ${escapeHtml(p.message.trim())}</p>`
+        : ""
+    )
+    .join("");
+
   const preordersTable =
     customer.recentPreorders.length > 0
-      ? `<table class="items"><thead><tr><th>Vehicle</th><th>Reference</th><th>Status</th><th>Date</th></tr></thead><tbody>${preorderRows}</tbody></table>`
+      ? `<table class="items"><thead><tr><th>Vehicle</th><th>Reference</th><th>Status</th><th>Date</th></tr></thead><tbody>${preorderRows}</tbody></table>${preorderMessages}`
       : "<p>No pre-orders yet.</p>";
+
+  const inquiryRows = customer.recentInquiries
+    .slice(0, 10)
+    .map(
+      (inquiry) =>
+        `<tr><td>${escapeHtml(inquiry.type)}</td><td>${escapeHtml(inquiry.label)}</td><td>${escapeHtml(inquiry.summary || "—")}</td><td>${escapeHtml(inquiry.status)}</td><td>${escapeHtml(formatPrintDate(inquiry.createdAt))}</td></tr>`
+    )
+    .join("");
+
+  const inquiriesTable =
+    customer.recentInquiries.length > 0
+      ? `<table class="items"><thead><tr><th>Type</th><th>Subject</th><th>Details</th><th>Status</th><th>Date</th></tr></thead><tbody>${inquiryRows}</tbody></table>`
+      : "<p>No inquiries or applications yet.</p>";
 
   const body = `
     ${brandHeader(ref, "INVOICE")}
@@ -413,6 +465,7 @@ export function buildCustomerInvoiceDocumentHtml(customer: AdminCustomerDetail):
     ${sectionBlock("Cart orders", ordersTable)}
     ${sectionBlock("Pre-orders", preordersTable)}
     ${sectionBlock("Freight quotes", quotesTable)}
+    ${sectionBlock("Inquiries & applications", inquiriesTable)}
     ${documentFooter("Thank you for choosing")}
   `;
 

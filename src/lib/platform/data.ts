@@ -89,7 +89,7 @@ function inquiryPhone(row: Record<string, unknown>, tab: InquiryTab): string | u
 
 function inquirySummary(row: Record<string, unknown>, tab: InquiryTab): string {
   if (tab === "contact") {
-    return `${row.subject ? `${row.subject} — ` : ""}${String(row.message ?? "").slice(0, 120)}`;
+    return `${row.subject ? `${row.subject} — ` : ""}${String(row.message ?? "")}`;
   }
   if (tab === "vehicle") {
     return `${row.inquiry_type} — ${row.vehicle_name ?? row.vehicle_slug ?? "General"}`;

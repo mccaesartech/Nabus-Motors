@@ -98,3 +98,115 @@ export function PreorderNotificationPreview({
     </div>
   );
 }
+
+type CartOrderNotificationItem = {
+  label: string;
+  type: "part" | "vehicle";
+  intent?: "buy" | "pre_order" | null;
+  quantity: number;
+};
+
+function parseCartOrderNotificationMetadata(metadata: unknown): {
+  total_usd?: number;
+  items?: CartOrderNotificationItem[];
+} | null {
+  if (!metadata || typeof metadata !== "object") return null;
+  const row = metadata as Record<string, unknown>;
+  const items = Array.isArray(row.items)
+    ? row.items
+        .map((entry) => {
+          if (!entry || typeof entry !== "object") return null;
+          const item = entry as Record<string, unknown>;
+          const label = typeof item.label === "string" ? item.label.trim() : "";
+          if (!label) return null;
+          return {
+            label,
+            type: item.type === "vehicle" ? "vehicle" : "part",
+            intent:
+              item.intent === "pre_order" || item.intent === "buy" ? item.intent : null,
+            quantity:
+              typeof item.quantity === "number" && item.quantity > 0 ? item.quantity : 1,
+          } satisfies CartOrderNotificationItem;
+        })
+        .filter((item): item is CartOrderNotificationItem => item != null)
+    : undefined;
+
+  if (!items?.length) return null;
+  return {
+    total_usd: typeof row.total_usd === "number" ? row.total_usd : undefined,
+    items,
+  };
+}
+
+function cartItemLineLabel(item: CartOrderNotificationItem): string {
+  if (item.type === "vehicle") {
+    return `${item.label} (${item.intent === "pre_order" ? "Pre-order" : "Buy"})`;
+  }
+  return item.quantity > 1 ? `${item.label} x ${item.quantity}` : item.label;
+}
+
+export function CartOrderNotificationPreview({
+  notification,
+  variant = "compact",
+  className,
+}: PreorderNotificationPreviewProps) {
+  const { formatPrice } = usePlatformCurrency();
+  const meta = parseCartOrderNotificationMetadata(notification.metadata);
+
+  if (!meta?.items?.length) {
+    return (
+      <p
+        className={cn(
+          "mt-1 line-clamp-2 text-xs leading-relaxed text-[var(--platform-text-secondary)]",
+          className
+        )}
+      >
+        {notification.message}
+      </p>
+    );
+  }
+
+  const totalLabel =
+    meta.total_usd != null && meta.total_usd > 0 ? formatPrice(meta.total_usd) : null;
+  const preview = meta.items
+    .slice(0, 2)
+    .map((item) => cartItemLineLabel(item))
+    .join(" · ");
+  const extra = meta.items.length > 2 ? ` · +${meta.items.length - 2} more` : "";
+
+  if (variant === "full") {
+    return (
+      <div
+        className={cn(
+          "mt-2 rounded-lg border border-[var(--platform-border)] bg-[var(--platform-bg)] p-3",
+          className
+        )}
+      >
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--platform-text-secondary)]">
+          Cart items
+        </p>
+        <ul className="mt-2 space-y-1 text-sm text-[var(--platform-text-secondary)]">
+          {meta.items.map((item, index) => (
+            <li key={`${item.label}-${index}`}>{cartItemLineLabel(item)}</li>
+          ))}
+        </ul>
+        {totalLabel ? (
+          <p className="mt-2 text-sm font-medium text-[var(--platform-text)]">Total: {totalLabel}</p>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <p
+      className={cn(
+        "mt-1 min-w-0 text-xs leading-relaxed text-[var(--platform-text-secondary)] line-clamp-2",
+        className
+      )}
+    >
+      {preview}
+      {extra}
+      {totalLabel ? ` · ${totalLabel}` : ""}
+    </p>
+  );
+}

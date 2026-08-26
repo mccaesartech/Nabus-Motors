@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
-import { ExternalLink, KeyRound, MessageSquare, Package, Ship, ShoppingBag, Copy, Check, Trash2 } from "lucide-react";
+import { ExternalLink, KeyRound, MessageSquare, Package, Ship, ShoppingBag, Copy, Check, Trash2, FileText } from "lucide-react";
 import { ContactEmailAction, ContactPhoneAction } from "@/components/platform/contact-actions";
 import { WhatsAppAssistAction } from "@/components/platform/whatsapp-assist-dialog";
 import { CustomerDataTrustNote } from "@/components/forms/customer-data-trust-note";
@@ -348,7 +348,7 @@ export default function CustomerProfilePage() {
 
         <div className="platform-card rounded-xl p-5 lg:col-span-2">
           <h2 className="text-sm font-semibold">Activity summary</h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-4">
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <div className="rounded-lg border border-[var(--platform-border)] p-4">
               <p className="text-xs text-[var(--platform-text-secondary)]">Cart orders</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums">{customer.ordersCount}</p>
@@ -360,6 +360,10 @@ export default function CustomerProfilePage() {
             <div className="rounded-lg border border-[var(--platform-border)] p-4">
               <p className="text-xs text-[var(--platform-text-secondary)]">Pre-orders</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums">{customer.preordersCount}</p>
+            </div>
+            <div className="rounded-lg border border-[var(--platform-border)] p-4">
+              <p className="text-xs text-[var(--platform-text-secondary)]">Inquiries</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums">{customer.inquiriesCount}</p>
             </div>
             <div className="rounded-lg border border-[var(--platform-border)] p-4">
               <p className="text-xs text-[var(--platform-text-secondary)]">Shipments</p>
@@ -385,13 +389,35 @@ export default function CustomerProfilePage() {
                 key={order.id}
                 className="flex flex-wrap items-start justify-between gap-3 px-5 py-4"
               >
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="font-mono text-sm font-medium">
                     {order.id.slice(0, 8).toUpperCase()}
                   </p>
                   <p className="mt-1 text-sm text-[var(--platform-text-secondary)]">
                     {order.totalLabel} · {order.itemCount} item{order.itemCount === 1 ? "" : "s"}
                   </p>
+                  {order.items.length > 0 ? (
+                    <ul className="mt-2 space-y-1 text-xs text-[var(--platform-text-secondary)]">
+                      {order.items.map((item, index) => (
+                        <li key={`${order.id}-${index}`}>
+                          {item.name}
+                          {item.itemType === "vehicle" && item.itemIntent
+                            ? ` · ${item.itemIntent === "pre_order" ? "Pre-order" : "Buy"}`
+                            : item.quantity > 1
+                              ? ` · Qty ${item.quantity}`
+                              : ""}
+                          {" · "}
+                          {item.lineTotalLabel}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {order.notes?.trim() ? (
+                    <p className="mt-2 whitespace-pre-wrap text-xs text-[var(--platform-text)]">
+                      <span className="font-medium text-[var(--platform-text-secondary)]">Notes: </span>
+                      {order.notes.trim()}
+                    </p>
+                  ) : null}
                   <p className="mt-1 text-xs text-[var(--platform-text-secondary)]">
                     <PlatformDateTime value={order.createdAt} className="text-xs" /> · {order.status}
                   </p>
@@ -428,7 +454,7 @@ export default function CustomerProfilePage() {
                 key={quote.id}
                 className="flex flex-wrap items-start justify-between gap-3 px-5 py-4"
               >
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="font-mono text-sm font-medium">
                     {quote.referenceCode ?? "No reference"}
                   </p>
@@ -436,6 +462,22 @@ export default function CustomerProfilePage() {
                     {freightServiceLabel(quote.serviceType)} · {quote.originCountry ?? "—"} →{" "}
                     {quote.destination ?? "Ghana"}
                   </p>
+                  {(quote.cargoDescription || quote.cargoSize || quote.estimatedValueLabel) && (
+                    <p className="mt-2 text-xs text-[var(--platform-text)]">
+                      {[
+                        quote.cargoDescription ? `Cargo: ${quote.cargoDescription}` : null,
+                        quote.cargoSize ? `Size: ${quote.cargoSize}` : null,
+                        quote.estimatedValueLabel ? `Est. value: ${quote.estimatedValueLabel}` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  )}
+                  {quote.message?.trim() ? (
+                    <p className="mt-2 whitespace-pre-wrap text-xs text-[var(--platform-text)]">
+                      {quote.message.trim()}
+                    </p>
+                  ) : null}
                   <p className="mt-1 text-xs text-[var(--platform-text-secondary)]">
                     <PlatformDateTime value={quote.createdAt} className="text-xs" /> · {quote.status}
                   </p>
@@ -467,10 +509,16 @@ export default function CustomerProfilePage() {
             ) : (
               customer.recentPreorders.map((preorder) => (
                 <div key={preorder.id} className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium">
+                      {preorder.isCustomRequest ? "Custom request · " : ""}
                       {preorder.vehicleLabel ?? "Vehicle pre-order"}
                     </p>
+                    {preorder.message?.trim() ? (
+                      <p className="mt-2 whitespace-pre-wrap text-xs text-[var(--platform-text)]">
+                        {preorder.message.trim()}
+                      </p>
+                    ) : null}
                     <p className="mt-1 text-xs text-[var(--platform-text-secondary)]">
                       {preorder.referenceCode ? (
                         <span className="font-mono">{preorder.referenceCode}</span>
@@ -522,6 +570,48 @@ export default function CustomerProfilePage() {
               ))
             )}
           </div>
+        </div>
+      </div>
+
+      <div className="platform-card overflow-hidden rounded-xl">
+        <div className="flex items-center gap-2 border-b border-[var(--platform-border)] px-5 py-4">
+          <FileText className="size-4 text-[var(--platform-accent)]" />
+          <h2 className="text-sm font-semibold">Inquiries & applications</h2>
+        </div>
+        <div className="divide-y divide-[var(--platform-border)]">
+          {customer.recentInquiries.length === 0 ? (
+            <p className="px-5 py-8 text-sm text-[var(--platform-text-secondary)]">
+              No contact messages, vehicle inquiries, finance applications, or trade-in requests yet.
+            </p>
+          ) : (
+            customer.recentInquiries.map((inquiry) => (
+              <div
+                key={`${inquiry.type}-${inquiry.id}`}
+                className="flex flex-wrap items-start justify-between gap-3 px-5 py-4"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium capitalize text-[var(--platform-text)]">
+                    {inquiry.type.replace(/_/g, " ")} · {inquiry.label}
+                  </p>
+                  {inquiry.summary ? (
+                    <p className="mt-2 whitespace-pre-wrap text-xs text-[var(--platform-text)]">
+                      {inquiry.summary}
+                    </p>
+                  ) : null}
+                  <p className="mt-1 text-xs text-[var(--platform-text-secondary)]">
+                    <PlatformDateTime value={inquiry.createdAt} className="text-xs" /> · {inquiry.status}
+                  </p>
+                </div>
+                <Link
+                  href={platformPath(`leads/${inquiry.type}/${inquiry.id}`)}
+                  className="inline-flex items-center gap-1 text-xs text-[var(--platform-accent)] hover:underline"
+                >
+                  View details
+                  <ExternalLink className="size-3" />
+                </Link>
+              </div>
+            ))
+          )}
         </div>
       </div>
 

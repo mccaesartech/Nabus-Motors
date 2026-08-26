@@ -189,11 +189,10 @@ async function loadInquiryFocus(
   id: string
 ): Promise<{ focus: Record<string, unknown>; label: string } | null> {
   const tableMap: Record<string, string> = {
+    contact: "contact_inquiries",
     vehicle: "vehicle_inquiries",
-    appointment: "appointment_inquiries",
-    finance: "finance_inquiries",
-    appraisal: "appraisal_inquiries",
-    price_alert: "price_alert_inquiries",
+    finance: "finance_applications",
+    appraisal: "appraisal_requests",
   };
   const table = tableMap[inquiryType];
   if (!table) return null;

@@ -286,6 +286,10 @@ export function LeadInquiryDetail({ type, id }: LeadInquiryDetailProps) {
             <dl className="mt-4 space-y-3 text-sm">
               {type === "contact" && (
                 <>
+                  <div>
+                    <dt className="text-xs text-[var(--platform-text-secondary)]">Source</dt>
+                    <dd className="mt-0.5 font-medium">{source}</dd>
+                  </div>
                   {str(inquiry.subject) && (
                     <div>
                       <dt className="text-xs text-[var(--platform-text-secondary)]">Subject</dt>
@@ -342,6 +346,10 @@ export function LeadInquiryDetail({ type, id }: LeadInquiryDetailProps) {
               {type === "finance" && (
                 <>
                   <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <dt className="text-xs text-[var(--platform-text-secondary)]">Phone</dt>
+                      <dd className="mt-0.5 font-medium">{phone || "—"}</dd>
+                    </div>
                     <div>
                       <dt className="text-xs text-[var(--platform-text-secondary)]">Annual income</dt>
                       <dd className="mt-0.5 font-medium">

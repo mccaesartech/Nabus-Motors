@@ -134,6 +134,19 @@ function isWhatsAppSetupIssue(reason?: string): boolean {
   );
 }
 
+/** Prefer detail-page links over legacy list-tab URLs stored on older notifications. */
+function preferDetailNotificationLink(
+  storedLink: string | null | undefined,
+  sourceLink: string | null
+): string | null {
+  if (!sourceLink) return storedLink ?? null;
+  if (!storedLink) return sourceLink;
+  if (storedLink.includes("?tab=") && sourceLink.includes("/leads/")) {
+    return sourceLink;
+  }
+  return storedLink;
+}
+
 export function resolveNotificationSourceLink(
   sourceTable: string | null | undefined,
   sourceId: string | null | undefined
@@ -165,9 +178,25 @@ export function resolveNotificationSourceLink(
     case "freight_shipments":
       return { link: platformPath("freight/tracking"), label: "View shipment" };
     case "vehicle_inquiries":
-      return { link: `${platformPath("leads")}?tab=vehicle`, label: "View inquiry" };
+      return {
+        link: platformPath(`leads/vehicle/${sourceId}`),
+        label: "View vehicle inquiry",
+      };
     case "contact_inquiries":
-      return { link: `${platformPath("leads")}?tab=contact`, label: "View message" };
+      return {
+        link: platformPath(`leads/contact/${sourceId}`),
+        label: "View contact message",
+      };
+    case "finance_applications":
+      return {
+        link: platformPath(`leads/finance/${sourceId}`),
+        label: "View finance application",
+      };
+    case "appraisal_requests":
+      return {
+        link: platformPath(`leads/appraisal/${sourceId}`),
+        label: "View appraisal request",
+      };
     case "customer_conversations":
       return {
         link: `${platformPath("messages")}?conversation=${encodeURIComponent(sourceId)}`,
@@ -283,7 +312,7 @@ export function formatAdminNotificationForDisplay(
     notification.sourceTable,
     notification.sourceId
   );
-  const link = notification.link ?? sourceLink;
+  const link = preferDetailNotificationLink(notification.link, sourceLink);
   const linkLabel = sourceLabel;
 
   const isDeliveryType =
@@ -413,7 +442,7 @@ export function enhanceAdminNotification(notification: AdminNotification): Admin
     ...notification,
     title: display.title,
     message: display.message,
-    link: notification.link ?? link,
+    link: preferDetailNotificationLink(notification.link, link),
     metadata: {
       ...(notification.metadata ?? {}),
       pendingMessage: display.pendingMessage,
