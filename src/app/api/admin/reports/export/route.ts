@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requirePermission } from "@/lib/admin/auth";
-import { canViewFinance } from "@/lib/platform/permissions";
+import { canExportInventory, canViewFinance } from "@/lib/platform/permissions";
 import { apiFailure } from "@/lib/errors/api";
 import { logPlatformActivity } from "@/lib/platform/activity";
 import { createAdminSupabase } from "@/lib/supabase/admin";
@@ -85,6 +85,13 @@ export async function GET(req: NextRequest) {
     let content = "";
 
     if (type === "inventory") {
+      if (!canExportInventory(auth.auth.role)) {
+        return NextResponse.json(
+          { ok: false, message: "You do not have permission to export inventory data." },
+          { status: 403 }
+        );
+      }
+
       const rows = await fetchTableRows(supabase, "vehicles");
       const filtered = rows.filter(
         (row) =>

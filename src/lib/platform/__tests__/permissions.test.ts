@@ -4,6 +4,7 @@ import {
   ALL_PLATFORM_PERMISSIONS,
   buildSessionPermissions,
   canInstallPlatformApp,
+  canExportInventory,
   canViewFinance,
   hasPermission,
   INVITABLE_ROLES,
@@ -198,5 +199,15 @@ describe("platform role navigation and authorization", () => {
     expect(canViewFinance("manager")).toBe(false);
     expect(canViewFinance("staff")).toBe(false);
     expect(canViewFinance("accounts")).toBe(false);
+  });
+
+  it("allows inventory export for owner, super_admin, and manager but not staff", () => {
+    expect(canExportInventory("owner")).toBe(true);
+    expect(canExportInventory("super_admin")).toBe(true);
+    expect(canExportInventory("manager")).toBe(true);
+    expect(canExportInventory("staff")).toBe(false);
+    expect(canExportInventory("inventory_officer")).toBe(true);
+    expect(canExportInventory("sales_officer")).toBe(true);
+    expect(canExportInventory("freight_officer")).toBe(false);
   });
 });

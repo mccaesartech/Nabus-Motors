@@ -23,7 +23,7 @@ import type {
 } from "@/lib/platform/inventory-movements/types";
 import { platformPath } from "@/lib/platform/paths";
 import { usePlatformSession } from "@/components/platform/platform-shell";
-import { canViewFinance } from "@/lib/platform/permissions";
+import { canExportInventory, canViewFinance } from "@/lib/platform/permissions";
 import { usePlatformCurrency } from "@/context/platform-currency-context";
 import { cn } from "@/lib/utils";
 
@@ -68,6 +68,7 @@ export default function InventoryMovementsPage() {
   const router = useRouter();
   const session = usePlatformSession();
   const financeVisible = session ? canViewFinance(session.role) : false;
+  const canExport = session ? canExportInventory(session.role) : false;
   const { formatPrice } = usePlatformCurrency();
   const [period, setPeriod] = useState<MovementPeriod>("month");
   const [from, setFrom] = useState("");
@@ -203,15 +204,17 @@ export default function InventoryMovementsPage() {
               <RefreshCw className="size-4" />
               Refresh
             </button>
-            <button
-              type="button"
-              className="platform-btn-primary"
-              onClick={exportCsv}
-              disabled={!movements.length}
-            >
-              <Download className="size-4" />
-              Export CSV
-            </button>
+            {canExport ? (
+              <button
+                type="button"
+                className="platform-btn-primary"
+                onClick={exportCsv}
+                disabled={!movements.length}
+              >
+                <Download className="size-4" />
+                Export CSV
+              </button>
+            ) : null}
           </>
         }
       />

@@ -38,6 +38,7 @@ import type { DbVehicle } from "@/lib/platform/types";
 import { PlatformDateTime } from "@/components/platform/platform-datetime";
 import { downloadCsv, exportVehiclesCsv } from "@/lib/platform/data";
 import { usePlatformSession } from "@/components/platform/platform-shell";
+import { canExportInventory } from "@/lib/platform/permissions";
 import { adminErrorMessage, parseAdminResponse } from "@/lib/admin/client";
 import {
   VirtualTableBody,
@@ -75,6 +76,7 @@ export default function InventoryPage() {
   const session = usePlatformSession();
   const canEdit = session?.permissions.inventory_edit ?? false;
   const canApprove = session?.permissions.inventory_approve ?? false;
+  const canExport = session ? canExportInventory(session.role) : false;
   const isManager = session?.role === "manager";
   const { formatVehicleListPrice } = usePlatformCurrency();
   const searchParams = useSearchParams();
@@ -521,10 +523,12 @@ export default function InventoryPage() {
               <History className="size-4" />
               AI usage
             </Link>
-            <button type="button" onClick={handleExport} className="platform-btn-ghost">
-              <Download className="size-4" />
-              Export CSV
-            </button>
+            {canExport ? (
+              <button type="button" onClick={handleExport} className="platform-btn-ghost">
+                <Download className="size-4" />
+                Export CSV
+              </button>
+            ) : null}
             {canEdit && (
               <Link href={platformPath("inventory/new")} className="platform-btn-primary">
                 <Plus className="size-4" />

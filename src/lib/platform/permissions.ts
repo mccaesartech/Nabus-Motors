@@ -291,6 +291,12 @@ export function canApproveInventory(role: PlatformRole): boolean {
   return hasPermission(role, "inventory_approve");
 }
 
+/** Export inventory data (vehicles, movement ledger, inventory reports) — staff excluded. */
+export function canExportInventory(role: PlatformRole): boolean {
+  if (role === "staff") return false;
+  return hasPermission(role, "inventory");
+}
+
 /**
  * Create or update shipment tracking records (not delete).
  * Managers and legacy freight officers run day-to-day import/freight ops.
