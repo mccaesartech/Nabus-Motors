@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { platformPath } from "@/lib/platform/paths";
 import type { PlatformPermission, PlatformRole } from "@/lib/platform/permissions";
+import { canMutateFreight } from "@/lib/platform/permissions";
 import { canDirectMutate } from "@/lib/platform/mutation-approval";
 
 type QuickAction = {
@@ -20,6 +21,7 @@ type QuickAction = {
   icon: typeof Car;
   permission?: PlatformPermission;
   requiresDirectMutation?: boolean;
+  requiresFreightMutation?: boolean;
   allowPendingInventory?: boolean;
 };
 
@@ -46,7 +48,7 @@ const QUICK_ACTIONS: QuickAction[] = [
     href: platformPath("freight/orders"),
     icon: Ship,
     permission: "freight",
-    requiresDirectMutation: true,
+    requiresFreightMutation: true,
   },
   {
     label: "Freight quotes",
@@ -77,11 +79,12 @@ type QuickActionsProps = {
 };
 
 export function QuickActions({ permissions, role }: QuickActionsProps) {
-  const direct = canDirectMutate(role);
+  const directMutate = canDirectMutate(role);
   const actions = QUICK_ACTIONS.filter((a) => {
     if (a.permission && !permissions[a.permission]) return false;
-    if (a.requiresDirectMutation && !direct) return false;
-    if (a.allowPendingInventory && !permissions.inventory_edit && !direct) return false;
+    if (a.requiresDirectMutation && !directMutate) return false;
+    if (a.requiresFreightMutation && !canMutateFreight(role)) return false;
+    if (a.allowPendingInventory && !permissions.inventory_edit && !directMutate) return false;
     return true;
   });
 

@@ -9,6 +9,7 @@ import {
   passwordHashFingerprint,
 } from "@/lib/platform/session";
 import {
+  canMutateFreight,
   canViewFinance,
   hasPermission,
   normalizeRole,
@@ -514,6 +515,27 @@ export async function requireFinanceAccess() {
   }
 
   return { ok: true as const, auth: result.auth };
+}
+
+/**
+ * Freight shipment create/update — managers and freight officers included.
+ * Permanent deletes still use requireDirectMutation.
+ */
+export async function requireFreightMutation() {
+  const result = await requirePermission("freight");
+  if (!result.ok) return result;
+
+  if (result.auth.type === "owner") return result;
+  if (!canMutateFreight(result.auth.role)) {
+    return {
+      ok: false as const,
+      status: 403,
+      message: MUTATION_APPROVAL_REQUIRED_MESSAGE,
+      auth: result.auth,
+    };
+  }
+
+  return result;
 }
 
 /**

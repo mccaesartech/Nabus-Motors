@@ -17,7 +17,7 @@ import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
 import { canDirectMutate } from "@/lib/platform/mutation-approval";
 import { platformPath } from "@/lib/platform/paths";
-import { canUseCustomerNoteAi, type PlatformRole } from "@/lib/platform/permissions";
+import { canMutateFreight, canUseCustomerNoteAi, type PlatformRole } from "@/lib/platform/permissions";
 import { ShipmentStatusSelect } from "@/components/platform/shipment-timeline-guide";
 import {
   generateTrackingNumber,
@@ -58,6 +58,7 @@ export function ShipmentManager({
   const searchParams = useSearchParams();
   const session = usePlatformSession();
   const canMutate = session ? canDirectMutate(session.role) : false;
+  const canEditShipments = session ? canMutateFreight(session.role) : false;
   const [shipments, setShipments] = useState<ShipmentTrackingRow[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ShipmentWithEvents | null>(null);
@@ -128,6 +129,23 @@ export function ShipmentManager({
     }
   }
 
+  async function readApiErrorMessage(res: Response): Promise<string> {
+    try {
+      const json = (await res.json()) as { message?: string };
+      if (typeof json.message === "string" && json.message.trim()) {
+        return json.message;
+      }
+    } catch {
+      // ignore parse errors
+    }
+    return "Could not save shipment. Try again or contact an Owner.";
+  }
+
+  function showErrorToast(message: string) {
+    setToast(message);
+    setToastVariant("warning");
+  }
+
   async function addPresetEvent(presetId: string) {
     if (!detail || !selectedId || saving) return;
     const preset =
@@ -164,6 +182,8 @@ export function ShipmentManager({
       setEventForm((f) => ({ ...f, estimated_completion: "", attachment_urls: "" }));
       await loadList();
       await loadDetail(selectedId);
+    } else {
+      showErrorToast(await readApiErrorMessage(res));
     }
   }
 
@@ -223,6 +243,12 @@ export function ShipmentManager({
 
   async function createShipment(e: React.FormEvent) {
     e.preventDefault();
+    if (!canEditShipments) {
+      showErrorToast(
+        "You do not have permission to create shipments. Ask an Owner or Super Admin."
+      );
+      return;
+    }
     setSaving(true);
     const res = await fetch("/api/admin/freight/shipments", {
       method: "POST",
@@ -255,11 +281,19 @@ export function ShipmentManager({
       setForm((f) => ({ ...f, tracking_number: generateTrackingNumber() }));
       await loadList();
       if (json.shipment?.id) setSelectedId(json.shipment.id);
+    } else {
+      showErrorToast(await readApiErrorMessage(res));
     }
   }
 
   async function updateShipment(updates: Record<string, unknown>): Promise<boolean> {
     if (!selectedId) return false;
+    if (!canEditShipments) {
+      showErrorToast(
+        "You do not have permission to update shipments. Ask an Owner or Super Admin."
+      );
+      return false;
+    }
     setSaving(true);
     const res = await fetch("/api/admin/freight/shipments", {
       method: "PATCH",
@@ -281,6 +315,7 @@ export function ShipmentManager({
       await loadDetail(selectedId);
       return true;
     }
+    showErrorToast(await readApiErrorMessage(res));
     return false;
   }
 
@@ -336,7 +371,7 @@ export function ShipmentManager({
         description={description}
         breadcrumb={breadcrumb}
         actions={
-          showCreate ? (
+          showCreate && canEditShipments ? (
             <button
               type="button"
               className="platform-btn-primary inline-flex items-center gap-2"
@@ -345,6 +380,10 @@ export function ShipmentManager({
               <Plus className="size-4" />
               New shipment
             </button>
+          ) : showCreate && !canEditShipments ? (
+            <p className="text-xs text-[var(--platform-text-secondary)]">
+              Shipment creation requires Manager access or above.
+            </p>
           ) : undefined
         }
       />
@@ -428,7 +467,7 @@ export function ShipmentManager({
             )}
           </div>
           <div className="flex gap-2">
-            <button type="submit" disabled={saving} className="platform-btn-primary">
+            <button type="submit" disabled={saving || !canEditShipments} className="platform-btn-primary">
               {saving ? "Creating…" : "Create shipment"}
             </button>
             <button type="button" className="platform-btn-ghost" onClick={() => setShowForm(false)}>
@@ -580,7 +619,7 @@ export function ShipmentManager({
                     inline
                     value={detail.status}
                     onChange={(status) => void updateShipment({ status })}
-                    disabled={saving}
+                    disabled={saving || !canEditShipments}
                   />
                   {QUICK_SHIPMENT_EVENT_PRESETS.map((preset) => (
                     <button
@@ -588,7 +627,7 @@ export function ShipmentManager({
                       type="button"
                       className="rounded-full border border-[var(--platform-border)] bg-[var(--platform-surface)] px-2.5 py-1 text-xs text-[var(--platform-text-secondary)] hover:border-[var(--platform-accent)] hover:text-[var(--platform-accent)] disabled:opacity-50"
                       onClick={() => void addPresetEvent(preset.id)}
-                      disabled={saving}
+                      disabled={saving || !canEditShipments}
                     >
                       {preset.label}
                     </button>
@@ -605,7 +644,7 @@ export function ShipmentManager({
                         type="button"
                         className="rounded-full border border-[var(--platform-border)] bg-[var(--platform-bg)] px-2.5 py-1 text-xs text-[var(--platform-text-secondary)] hover:border-[var(--platform-accent)] hover:text-[var(--platform-accent)] disabled:opacity-50"
                         onClick={() => void addPresetEvent(preset.id)}
-                        disabled={saving}
+                        disabled={saving || !canEditShipments}
                       >
                         {preset.label}
                       </button>

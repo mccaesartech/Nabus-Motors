@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbFailure } from "@/lib/errors/api";
-import { requireDirectMutation, requirePermission } from "@/lib/admin/auth";
+import {
+  requireDirectMutation,
+  requireFreightMutation,
+  requirePermission,
+} from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { sendShipmentTrackingEmail } from "@/lib/email/shipment-tracking";
 import { notifyShipmentCustomerUpdate, type ShipmentNotifyResult } from "@/lib/notifications/shipment-notify";
@@ -128,7 +132,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requireDirectMutation("freight");
+  const auth = await requireFreightMutation();
   if (!auth.ok) {
     return NextResponse.json({ ok: false, message: auth.message }, { status: auth.status });
   }
@@ -276,7 +280,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const auth = await requireDirectMutation("freight");
+  const auth = await requireFreightMutation();
   if (!auth.ok) {
     return NextResponse.json({ ok: false, message: auth.message }, { status: auth.status });
   }

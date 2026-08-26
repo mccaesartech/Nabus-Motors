@@ -291,6 +291,20 @@ export function canApproveInventory(role: PlatformRole): boolean {
   return hasPermission(role, "inventory_approve");
 }
 
+/**
+ * Create or update shipment tracking records (not delete).
+ * Managers and legacy freight officers run day-to-day import/freight ops.
+ */
+export function canMutateFreight(role: PlatformRole): boolean {
+  return (
+    role === "owner" ||
+    role === "super_admin" ||
+    role === "administrator" ||
+    role === "manager" ||
+    role === "freight_officer"
+  );
+}
+
 /** AI-assisted customer-visible shipment / freight notes — owners and managers only. */
 export function canUseCustomerNoteAi(role: PlatformRole): boolean {
   return (
