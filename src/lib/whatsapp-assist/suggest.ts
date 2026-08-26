@@ -85,7 +85,7 @@ Rules:
 - Use the customer's first name when known.
 - Sign off as the team at True Goshen (not as AI).
 - If FACTS lack information needed for a specific claim (payment received, exact quote amount, delivery date, clearing status), set needsClarification true and start suggestedMessage with "Need clarification:" listing what staff must confirm.
-- Do NOT guess payment status, shipment ETA, or quote pricing — only state what appears in FACTS.
+- Do NOT guess payment status, shipment ETA, or quote pricing ΓÇö only state what appears in FACTS.
 - For reply mode, respond to lastCustomerMessage using FACTS and conversationHistory only.
 - If whatsappOptIn is false, note in missingFields that customer has not opted in to WhatsApp updates.
 - Never mention internal systems, AI, or database fields to the customer in suggestedMessage.`;
@@ -135,7 +135,7 @@ export async function generateWhatsAppSuggestion(
       result: {
         contextSummary: facts.focusLabel
           ? `Follow-up for ${facts.focusLabel}.`
-          : "Customer profile loaded — no AI summary available without Gemini key.",
+          : "Customer profile loaded ΓÇö no AI summary available without Gemini key.",
         followUpReason: facts.focusLabel ?? "General customer follow-up",
         suggestedMessage: fallbackMessage,
         missingFields: serverMissing,
@@ -203,11 +203,11 @@ export function sanitizeSuggestRequest(body: unknown): WhatsAppSuggestRequest | 
   const conversationHistory = Array.isArray(body.conversationHistory)
     ? body.conversationHistory
         .filter(isRecord)
-        .map((turn) => ({
+        .map((turn): WhatsAppConversationTurn => ({
           role:
             turn.role === "customer" || turn.role === "staff" || turn.role === "system"
               ? turn.role
-              : ("staff" as const),
+              : "staff",
           body: typeof turn.body === "string" ? turn.body.trim().slice(0, 4000) : "",
           at: typeof turn.at === "string" ? turn.at : null,
           source: typeof turn.source === "string" ? turn.source : null,
