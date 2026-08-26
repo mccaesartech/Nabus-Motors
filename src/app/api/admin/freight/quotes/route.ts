@@ -7,6 +7,7 @@ import { generateFreightReferenceCode } from "@/lib/platform/freight-reference";
 import { notifyCustomer, resolveWhatsAppPreferred } from "@/lib/notifications/customer-notify";
 import { formatCustomerNotificationFeedback } from "@/lib/notifications/notification-status";
 import { FREIGHT_QUOTE_STATUSES } from "@/lib/platform/shipment";
+import { notDeletedFilter, softDeleteEntity } from "@/lib/platform/trash";
 
 export async function GET() {
   const auth = await requirePermission("freight");
@@ -19,11 +20,9 @@ export async function GET() {
     return NextResponse.json({ ok: true, configured: false, quotes: [] });
   }
 
-  const { data, error } = await supabase
-    .from("freight_quote_requests")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(200);
+  const { data, error } = await notDeletedFilter(
+    supabase.from("freight_quote_requests").select("*").order("created_at", { ascending: false }).limit(200)
+  );
 
   if (error) {
     return dbFailure(error, {
@@ -193,13 +192,12 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "Quote id is required." }, { status: 400 });
   }
 
-  const { error } = await supabase.from("freight_quote_requests").delete().eq("id", id);
-  if (error) {
-    return dbFailure(error, {
-      module: "api.admin.freight.quotes.DELETE",
-      message: "The freight quote could not be saved. Try again.",
-      request: req,
-    });
+  const result = await softDeleteEntity(supabase, auth.auth, "freight_quote", id);
+  if (!result.ok) {
+    return NextResponse.json(
+      { ok: false, message: result.message },
+      { status: result.status ?? 500 }
+    );
   }
 
   return NextResponse.json({ ok: true });

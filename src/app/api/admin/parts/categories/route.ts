@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbFailure } from "@/lib/errors/api";
 import { requireDirectMutation, requirePermission } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
+import { notDeletedFilter, softDeleteEntity } from "@/lib/platform/trash";
 
 function slugify(value: string): string {
   return value
@@ -22,10 +23,9 @@ export async function GET() {
     return NextResponse.json({ ok: true, configured: false, categories: [] });
   }
 
-  const { data, error } = await supabase
-    .from("parts_categories")
-    .select("*")
-    .order("sort_order", { ascending: true });
+  const { data, error } = await notDeletedFilter(
+    supabase.from("parts_categories").select("*").order("sort_order", { ascending: true })
+  );
 
   if (error) {
     return dbFailure(error, {
@@ -135,13 +135,12 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "Category id is required." }, { status: 400 });
   }
 
-  const { error } = await supabase.from("parts_categories").delete().eq("id", id);
-  if (error) {
-    return dbFailure(error, {
-      module: "api.admin.parts.categories.DELETE",
-      message: "The parts category could not be saved. Try again.",
-      request: req,
-    });
+  const result = await softDeleteEntity(supabase, auth.auth, "part_category", id);
+  if (!result.ok) {
+    return NextResponse.json(
+      { ok: false, message: result.message },
+      { status: result.status ?? 500 }
+    );
   }
 
   return NextResponse.json({ ok: true });

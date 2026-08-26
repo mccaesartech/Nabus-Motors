@@ -13,6 +13,7 @@ import {
   type CustomerNotificationPayload,
 } from "@/lib/notifications/notification-status";
 import { getAdminSiteSettings, parseShipmentUpdateFrequency } from "@/lib/platform/site-settings";
+import { notDeletedFilter, softDeleteEntity } from "@/lib/platform/trash";
 import {
   generateTrackingNumber,
   SHIPMENT_REFERENCE_TYPES,
@@ -25,11 +26,9 @@ async function loadShipmentWithEvents(
   supabase: NonNullable<ReturnType<typeof createAdminSupabase>>,
   id: string
 ) {
-  const { data: shipment, error } = await supabase
-    .from("shipment_tracking")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
+  const { data: shipment, error } = await notDeletedFilter(
+    supabase.from("shipment_tracking").select("*").eq("id", id)
+  ).maybeSingle();
 
   if (error || !shipment) return { shipment: null, error };
 
@@ -109,11 +108,9 @@ export async function GET(req: NextRequest) {
   }
 
   const referenceType = req.nextUrl.searchParams.get("reference_type")?.trim();
-  let query = supabase
-    .from("shipment_tracking")
-    .select("*")
-    .order("updated_at", { ascending: false })
-    .limit(200);
+  let query = notDeletedFilter(
+    supabase.from("shipment_tracking").select("*").order("updated_at", { ascending: false }).limit(200)
+  );
 
   if (referenceType) {
     query = query.eq("reference_type", referenceType);
@@ -498,13 +495,12 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "Shipment id is required." }, { status: 400 });
   }
 
-  const { error } = await supabase.from("shipment_tracking").delete().eq("id", id);
-  if (error) {
-    return dbFailure(error, {
-      module: "api.admin.freight.shipments.DELETE",
-      message: "The shipment could not be saved. Try again.",
-      request: req,
-    });
+  const result = await softDeleteEntity(supabase, auth.auth, "shipment", id);
+  if (!result.ok) {
+    return NextResponse.json(
+      { ok: false, message: result.message },
+      { status: result.status ?? 500 }
+    );
   }
 
   return NextResponse.json({ ok: true });

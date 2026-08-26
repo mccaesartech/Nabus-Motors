@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbFailure } from "@/lib/errors/api";
 import { requireDirectMutation, requirePermission } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
+import { notDeletedFilter, softDeleteEntity } from "@/lib/platform/trash";
 
 export async function GET() {
   const auth = await requirePermission("documents");
@@ -15,7 +16,9 @@ export async function GET() {
   }
 
   const [docsRes, vehiclesRes] = await Promise.all([
-    supabase.from("documents").select("*").order("created_at", { ascending: false }),
+    notDeletedFilter(
+      supabase.from("documents").select("*").order("created_at", { ascending: false })
+    ),
     supabase
       .from("vehicles")
       .select("id, year, make, model, slug, price, status")
@@ -90,13 +93,12 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "Supabase not configured" }, { status: 503 });
   }
 
-  const { error } = await supabase.from("documents").delete().eq("id", id);
-  if (error) {
-    return dbFailure(error, {
-      module: "api.admin.documents.DELETE",
-      message: "The document could not be saved. Try again.",
-      request: req,
-    });
+  const result = await softDeleteEntity(supabase, auth.auth, "document", id);
+  if (!result.ok) {
+    return NextResponse.json(
+      { ok: false, message: result.message },
+      { status: result.status ?? 500 }
+    );
   }
 
   return NextResponse.json({ ok: true });

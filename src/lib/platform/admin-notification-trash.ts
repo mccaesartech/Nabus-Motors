@@ -158,6 +158,35 @@ export async function softDeleteAdminNotification(
   return { ok: true, trashId: trash.id };
 }
 
+/**
+ * Soft-delete admin notifications linked to a source row (moves to trash, not hard delete).
+ */
+export async function softDeleteAdminNotificationsBySource(
+  supabase: SupabaseClient,
+  auth: PlatformAuthContext,
+  sourceTable: string,
+  sourceIds: string | string[]
+): Promise<void> {
+  const ids = (Array.isArray(sourceIds) ? sourceIds : [sourceIds])
+    .map((id) => id.trim())
+    .filter(Boolean);
+  if (ids.length === 0) return;
+
+  const { data, error } = await supabase
+    .from("admin_notifications")
+    .select("id")
+    .eq("source_table", sourceTable)
+    .in("source_id", ids);
+
+  if (error || !data?.length) return;
+
+  await softDeleteAdminNotifications(
+    supabase,
+    auth,
+    data.map((row) => String(row.id))
+  );
+}
+
 export async function softDeleteAdminNotifications(
   supabase: SupabaseClient,
   auth: PlatformAuthContext,

@@ -91,12 +91,6 @@ export async function DELETE(_req: NextRequest, context: RouteContext) {
         : null,
     };
 
-    const result = await deleteAdminCustomer(supabase, id, auth.auth.email);
-    if (!result.ok) {
-      const status = result.message === "Customer not found." ? 404 : 400;
-      return NextResponse.json({ ok: false, message: result.message }, { status });
-    }
-
     const entityId = customer.userId ?? `email:${customer.email.toLowerCase()}`;
     const entityLabel = buildEntityLabel("customer", {
       first_name: customer.name.split(/\s+/)[0],
@@ -104,7 +98,24 @@ export async function DELETE(_req: NextRequest, context: RouteContext) {
       email: customer.email,
     });
 
-    await recordTrashEntry(supabase, auth.auth, "customer", entityId, entityLabel, snapshot);
+    const trash = await recordTrashEntry(
+      supabase,
+      auth.auth,
+      "customer",
+      entityId,
+      entityLabel,
+      snapshot
+    );
+    if (!trash.ok) {
+      return NextResponse.json({ ok: false, message: trash.message }, { status: 500 });
+    }
+
+    const result = await deleteAdminCustomer(supabase, id, auth.auth.email);
+    if (!result.ok) {
+      await supabase.from("platform_trash").delete().eq("id", trash.id);
+      const status = result.message === "Customer not found." ? 404 : 400;
+      return NextResponse.json({ ok: false, message: result.message }, { status });
+    }
 
     await logPlatformActivity(auth.auth, "customer_deleted", result.email, {
       customerName: result.name,

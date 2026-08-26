@@ -5,6 +5,7 @@ import { createAdminSupabase } from "@/lib/supabase/admin";
 import {
   recordPartStockChange,
 } from "@/lib/platform/inventory-movements/record";
+import { notDeletedFilter, softDeleteEntity } from "@/lib/platform/trash";
 
 function slugify(value: string): string {
   return value
@@ -26,11 +27,13 @@ export async function GET(req: NextRequest) {
   }
 
   const status = req.nextUrl.searchParams.get("status")?.trim();
-  let query = supabase
-    .from("parts")
-    .select("*, parts_categories(id, name, slug)")
-    .order("updated_at", { ascending: false })
-    .limit(300);
+  let query = notDeletedFilter(
+    supabase
+      .from("parts")
+      .select("*, parts_categories(id, name, slug)")
+      .order("updated_at", { ascending: false })
+      .limit(300)
+  );
 
   if (status) {
     query = query.eq("status", status);
@@ -214,13 +217,12 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "Part id is required." }, { status: 400 });
   }
 
-  const { error } = await supabase.from("parts").delete().eq("id", id);
-  if (error) {
-    return dbFailure(error, {
-      module: "api.admin.parts.DELETE",
-      message: "The spare part could not be saved. Try again.",
-      request: req,
-    });
+  const result = await softDeleteEntity(supabase, auth.auth, "part", id);
+  if (!result.ok) {
+    return NextResponse.json(
+      { ok: false, message: result.message },
+      { status: result.status ?? 500 }
+    );
   }
 
   return NextResponse.json({ ok: true });

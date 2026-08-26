@@ -12,6 +12,13 @@ export const TRASH_ENTITY_TYPES = [
   "preorder",
   "support_ticket",
   "admin_notification",
+  "document",
+  "part",
+  "part_category",
+  "shipment",
+  "freight_quote",
+  "appointment",
+  "sent_email",
 ] as const;
 
 export type TrashEntityType = (typeof TRASH_ENTITY_TYPES)[number];
@@ -30,6 +37,13 @@ export const TRASH_ENTITY_LABELS: Record<TrashEntityType, string> = {
   preorder: "Pre-order",
   support_ticket: "Support ticket",
   admin_notification: "Notification",
+  document: "Document",
+  part: "Spare part",
+  part_category: "Parts category",
+  shipment: "Shipment",
+  freight_quote: "Freight quote",
+  appointment: "Appointment",
+  sent_email: "Sent email log",
 };
 
 export const INQUIRY_TRASH_TYPES: Record<string, TrashEntityType> = {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbFailure } from "@/lib/errors/api";
-import { canManageTrash, requirePermission } from "@/lib/admin/auth";
+import { requirePermission } from "@/lib/admin/auth";
 import {
   buildConversationSummaries,
   claimSupportTicket,
@@ -26,6 +26,7 @@ import {
 import { notifyCustomerStaffMessage } from "@/lib/customer/notifications-server";
 import { formatCustomerNotificationFeedback } from "@/lib/notifications/notification-status";
 import { normalizeBatchIds, softDeleteEntities } from "@/lib/platform/trash";
+import { softDeleteAdminNotificationsBySource } from "@/lib/platform/admin-notification-trash";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 
 export async function GET(req: NextRequest) {
@@ -68,7 +69,7 @@ export async function GET(req: NextRequest) {
     ok: true,
     conversations,
     canOversight,
-    canDelete: canManageTrash(auth.auth),
+    canDelete: true,
     ...(customers ? { customers } : {}),
     ...(platformUsers ? { platformUsers } : {}),
   });
@@ -289,13 +290,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ ok: false, message: auth.message }, { status: auth.status });
   }
 
-  if (!canManageTrash(auth.auth)) {
-    return NextResponse.json(
-      { ok: false, message: "Only owners and super admins can delete support tickets." },
-      { status: 403 }
-    );
-  }
-
   const supabase = createAdminSupabase();
   if (!supabase) {
     return NextResponse.json({ ok: false, message: "Not configured" }, { status: 503 });
@@ -330,17 +324,19 @@ export async function DELETE(req: NextRequest) {
       ).data?.map((row) => String(row.id)) ?? [];
 
     await Promise.all([
-      supabase
-        .from("admin_notifications")
-        .delete()
-        .eq("source_table", "customer_conversations")
-        .in("source_id", batch.deletedIds),
+      softDeleteAdminNotificationsBySource(
+        supabase,
+        auth.auth,
+        "customer_conversations",
+        batch.deletedIds
+      ),
       messageIds.length > 0
-        ? supabase
-            .from("admin_notifications")
-            .delete()
-            .eq("source_table", "customer_conversation_messages")
-            .in("source_id", messageIds)
+        ? softDeleteAdminNotificationsBySource(
+            supabase,
+            auth.auth,
+            "customer_conversation_messages",
+            messageIds
+          )
         : Promise.resolve(),
     ]);
 

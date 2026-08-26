@@ -5,6 +5,7 @@ import { createAdminSupabase } from "@/lib/supabase/admin";
 import { fetchPreorderInquiries } from "@/lib/platform/data";
 import { fetchAdminOrders } from "@/lib/platform/orders-admin";
 import { INQUIRY_TRASH_TYPES, notDeletedFilter, softDeleteEntity } from "@/lib/platform/trash";
+import { softDeleteAdminNotificationsBySource } from "@/lib/platform/admin-notification-trash";
 
 export async function GET(req: NextRequest) {
   const auth = await requirePermission("leads");
@@ -137,11 +138,7 @@ export async function DELETE(req: NextRequest) {
     );
   }
 
-  await supabase
-    .from("admin_notifications")
-    .delete()
-    .eq("source_table", table)
-    .eq("source_id", id);
+  await softDeleteAdminNotificationsBySource(supabase, auth.auth, table, id);
 
   return NextResponse.json({ ok: true });
 }
