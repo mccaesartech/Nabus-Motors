@@ -16,6 +16,7 @@ import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
 import { platformPath } from "@/lib/platform/paths";
 import type { AdminCustomerDetail, AdminCustomerListItem } from "@/lib/platform/customers-admin";
+import { hasCustomerActivity } from "@/lib/platform/customers-admin";
 import { seedCachedCustomer } from "@/lib/print/pdf-cache";
 import { PlatformDateTime } from "@/components/platform/platform-datetime";
 
@@ -26,6 +27,7 @@ export default function CustomersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [showDeleted, setShowDeleted] = useState(false);
+  const [showSignUps, setShowSignUps] = useState(false);
   const [canDelete, setCanDelete] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AdminCustomerListItem | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -33,10 +35,11 @@ export default function CustomersPage() {
   const [detailById, setDetailById] = useState<Record<string, AdminCustomerDetail>>({});
   const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null);
 
-  const load = useCallback(async (query?: string, includeDeleted?: boolean) => {
+  const load = useCallback(async (query?: string, includeDeleted?: boolean, includeSignUps?: boolean) => {
     const params = new URLSearchParams();
     if (query?.trim()) params.set("search", query.trim());
     if (includeDeleted) params.set("showDeleted", "1");
+    if (includeSignUps) params.set("showSignUps", "1");
     const qs = params.toString();
     const res = await fetch(`/api/admin/customers${qs ? `?${qs}` : ""}`);
     if (isAdminAuthError(res)) {
@@ -64,10 +67,10 @@ export default function CustomersPage() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      void load(search, showDeleted);
+      void load(search, showDeleted, showSignUps);
     }, 250);
     return () => clearTimeout(timer);
-  }, [load, search, showDeleted]);
+  }, [load, search, showDeleted, showSignUps]);
 
   async function loadDetail(id: string) {
     if (detailById[id]) return;
@@ -104,7 +107,7 @@ export default function CustomersPage() {
     }
     setDeleteTarget(null);
     setSuccessMessage(json.message ?? "Customer removed from the directory.");
-    await load(search, showDeleted);
+    await load(search, showDeleted, showSignUps);
   }
 
   if (loading) {
@@ -115,9 +118,18 @@ export default function CustomersPage() {
     <div className="space-y-6">
       <PageHeader
         title="Customers"
-        description="Registered customers and contacts from freight quotes and pre-orders — for support and order resolution."
+        description="Customers with quotes, pre-orders, orders, or shipments. Search by email or name to find new sign-ups before their first activity."
         breadcrumb="AUTO · Customers"
       />
+
+      {!showSignUps && !search.trim() ? (
+        <p className="rounded-lg border border-[var(--platform-border)] bg-[rgba(37,99,235,0.04)] px-4 py-3 text-sm text-[var(--platform-text-secondary)]">
+          Showing customers with business activity only. New account sign-ups appear here after
+          their first quote, pre-order, or purchase — or enable{" "}
+          <span className="font-medium text-[var(--platform-text)]">Show sign-ups without activity</span>{" "}
+          below, or search by their email.
+        </p>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-4">
         <div className="relative max-w-md flex-1">
@@ -129,6 +141,15 @@ export default function CustomersPage() {
             className="platform-input platform-input--icon"
           />
         </div>
+        <label className="flex items-center gap-2 text-sm text-[var(--platform-text-secondary)]">
+          <input
+            type="checkbox"
+            checked={showSignUps}
+            onChange={(e) => setShowSignUps(e.target.checked)}
+            className="size-4 rounded border-[var(--platform-border)]"
+          />
+          Show sign-ups without activity
+        </label>
         {canDelete ? (
           <label className="flex items-center gap-2 text-sm text-[var(--platform-text-secondary)]">
             <input
@@ -178,7 +199,10 @@ export default function CustomersPage() {
                     colSpan={10}
                     className="px-4 py-12 text-center text-[var(--platform-text-secondary)]"
                   >
-                    No customers found. Freight quotes and pre-orders will populate this directory.
+                    No customers found.
+                    {!showSignUps && !search.trim()
+                      ? " Try searching by email, or enable sign-ups without activity."
+                      : " Freight quotes and pre-orders will populate this directory."}
                   </td>
                 </tr>
               ) : (
@@ -206,6 +230,11 @@ export default function CustomersPage() {
                         <td className="px-4 py-3 font-medium">
                           <span className="inline-flex items-center gap-2">
                             {customer.name}
+                            {!hasCustomerActivity(customer) ? (
+                              <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700">
+                                Sign-up only
+                              </span>
+                            ) : null}
                             {customer.deletedAt ? (
                               <span className="rounded bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
                                 Deleted

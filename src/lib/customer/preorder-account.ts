@@ -144,7 +144,7 @@ export async function ensureCustomerProfile(
 
   const { data: fallback, error: fallbackError } = await admin
     .from("profiles")
-    .upsert(baseProfile, { onConflict: "id" })
+    .upsert({ ...baseProfile, email: email.trim() }, { onConflict: "id" })
     .select("registration_id")
     .maybeSingle();
 

@@ -3,8 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertCircle, ExternalLink, Inbox, Mail, Send } from "lucide-react";
+import { AlertCircle, ExternalLink, Inbox, Mail, Send, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/platform/page-header";
+import {
+  ConfirmDialog,
+  DELETE_CONFIRM_PHRASE,
+} from "@/components/platform/confirm-dialog";
+import { usePlatformSession } from "@/components/platform/platform-shell";
 import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
 import type { ReceivedCommItem, SentEmailItem } from "@/lib/platform/emails";
@@ -25,6 +30,8 @@ function statusClass(status: string) {
 export default function PlatformEmailsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const session = usePlatformSession();
+  const canDelete = Boolean(session?.permissions?.emails);
   const [tab, setTab] = useState<Tab>(
     () => (searchParams.get("tab") === "received" ? "received" : "sent")
   );
@@ -53,6 +60,12 @@ export default function PlatformEmailsPage() {
   );
   const [dateFrom, setDateFrom] = useState(() => searchParams.get("from") ?? "");
   const [dateTo, setDateTo] = useState(() => searchParams.get("to") ?? "");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [toastError, setToastError] = useState(false);
 
   const limit = 50;
   const totalPages = Math.max(1, Math.ceil(total / limit));
@@ -156,6 +169,83 @@ export default function PlatformEmailsPage() {
     setDetail(null);
   }
 
+  async function deleteEmailRecords(ids: string[]) {
+    if (ids.length === 0) return;
+    setDeleting(true);
+    setToastError(false);
+    setToast(
+      ids.length === 1 ? "Moving email record to trash…" : `Moving ${ids.length} records to trash…`
+    );
+
+    const res = await fetch("/api/admin/emails", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setDeleting(false);
+    setDeleteTargetId(null);
+    setBulkDeleteConfirm(false);
+
+    if (!res.ok) {
+      setToastError(true);
+      setToast(json.message ?? "Could not delete email record(s).");
+      return;
+    }
+
+    const deleted = new Set<string>(
+      Array.isArray(json.deletedIds) ? json.deletedIds.map(String) : ids
+    );
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of deleted) next.delete(id);
+      return next;
+    });
+    if (selectedId && deleted.has(selectedId)) {
+      closeDetail();
+    }
+    if (tab === "sent") {
+      setSentItems((prev) => prev.filter((row) => !deleted.has(row.id)));
+    } else {
+      setReceivedItems((prev) => prev.filter((row) => !deleted.has(row.id)));
+    }
+    setTotal((prev) => Math.max(0, prev - deleted.size));
+    setToastError(Boolean(json.failed?.length));
+    setToast(
+      json.message ??
+        (deleted.size === 1
+          ? "Email record moved to trash."
+          : `${deleted.size} records moved to trash.`)
+    );
+    await loadList();
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllVisible() {
+    const visibleIds = activeItems.map((row) => row.id);
+    const allSelected =
+      visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        for (const id of visibleIds) next.delete(id);
+      } else {
+        for (const id of visibleIds) next.add(id);
+      }
+      return next;
+    });
+  }
+
+  const selectedCount = selectedIds.size;
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -171,6 +261,37 @@ export default function PlatformEmailsPage() {
           ) : undefined
         }
       />
+
+      {toast && (
+        <div
+          role="status"
+          className={cn(
+            "rounded-lg border px-4 py-3 text-sm",
+            toastError
+              ? "border-amber-500/40 bg-amber-500/10 text-[var(--platform-text)]"
+              : "border-[var(--platform-success)]/30 bg-[rgba(16,185,129,0.08)] text-[var(--platform-success)]"
+          )}
+        >
+          {toast}
+        </div>
+      )}
+
+      {canDelete && selectedCount > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[var(--platform-border)] bg-white px-4 py-3">
+          <span className="text-sm text-[var(--platform-text-secondary)]">
+            {selectedCount} selected
+          </span>
+          <button
+            type="button"
+            className="platform-btn-ghost inline-flex items-center gap-1.5 text-sm text-red-700"
+            onClick={() => setBulkDeleteConfirm(true)}
+            disabled={deleting}
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete selected
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="inline-flex rounded-lg border border-[var(--platform-border)] bg-white p-1">
@@ -286,6 +407,23 @@ export default function PlatformEmailsPage() {
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="platform-card overflow-hidden rounded-xl">
+          {canDelete && activeItems.length > 0 && (
+            <div className="flex items-center justify-end border-b border-[var(--platform-border)] px-4 py-2">
+              <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-[var(--platform-text-secondary)]">
+                <input
+                  type="checkbox"
+                  checked={
+                    activeItems.length > 0 &&
+                    activeItems.every((row) => selectedIds.has(row.id))
+                  }
+                  onChange={toggleSelectAllVisible}
+                  className="size-3.5 rounded border-[var(--platform-border)]"
+                  aria-label="Select all visible rows"
+                />
+                Select all
+              </label>
+            </div>
+          )}
           {loading ? (
             <p className="px-5 py-12 text-center text-sm text-[var(--platform-text-secondary)]">
               Loading {pageTitle.toLowerCase()}…
@@ -299,6 +437,7 @@ export default function PlatformEmailsPage() {
               <table className="platform-table w-full min-w-[640px] text-left text-sm">
                 <thead>
                   <tr className="border-b border-[var(--platform-border)] bg-[var(--platform-bg-secondary)]">
+                    {canDelete && <th className="w-10 px-2 py-3" aria-label="Select" />}
                     <th className="px-4 py-3 font-medium">Date</th>
                     {tab === "sent" ? (
                       <>
@@ -327,6 +466,17 @@ export default function PlatformEmailsPage() {
                             selectedId === row.id && "bg-violet-50"
                           )}
                         >
+                          {canDelete && (
+                            <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.has(row.id)}
+                                onChange={() => toggleSelected(row.id)}
+                                className="size-3.5 rounded border-[var(--platform-border)]"
+                                aria-label={`Select ${row.subject}`}
+                              />
+                            </td>
+                          )}
                           <td className="px-4 py-3 whitespace-nowrap text-[var(--platform-text-secondary)]">
                             <PlatformDateTime value={row.date} className="text-xs" />
                           </td>
@@ -377,6 +527,17 @@ export default function PlatformEmailsPage() {
                             selectedId === row.id && "bg-violet-50"
                           )}
                         >
+                          {canDelete && (
+                            <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.has(row.id)}
+                                onChange={() => toggleSelected(row.id)}
+                                className="size-3.5 rounded border-[var(--platform-border)]"
+                                aria-label={`Select ${row.subject}`}
+                              />
+                            </td>
+                          )}
                           <td className="px-4 py-3 whitespace-nowrap text-[var(--platform-text-secondary)]">
                             <PlatformDateTime value={row.date} className="text-xs" />
                           </td>
@@ -442,9 +603,22 @@ export default function PlatformEmailsPage() {
             <div className="space-y-4">
               <div className="flex items-start justify-between gap-2">
                 <h2 className="text-base font-semibold">Sent email</h2>
-                <button type="button" onClick={closeDetail} className="platform-btn-ghost text-xs">
-                  Close
-                </button>
+                <div className="flex items-center gap-1">
+                  {canDelete && selectedId && (
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTargetId(selectedId)}
+                      className="platform-btn-ghost inline-flex items-center gap-1 text-xs text-red-700"
+                      disabled={deleting}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete
+                    </button>
+                  )}
+                  <button type="button" onClick={closeDetail} className="platform-btn-ghost text-xs">
+                    Close
+                  </button>
+                </div>
               </div>
               <dl className="space-y-3 text-sm">
                 <div>
@@ -522,9 +696,22 @@ export default function PlatformEmailsPage() {
             <div className="space-y-4">
               <div className="flex items-start justify-between gap-2">
                 <h2 className="text-base font-semibold">Received communication</h2>
-                <button type="button" onClick={closeDetail} className="platform-btn-ghost text-xs">
-                  Close
-                </button>
+                <div className="flex items-center gap-1">
+                  {canDelete && selectedId && (
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTargetId(selectedId)}
+                      className="platform-btn-ghost inline-flex items-center gap-1 text-xs text-red-700"
+                      disabled={deleting}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete
+                    </button>
+                  )}
+                  <button type="button" onClick={closeDetail} className="platform-btn-ghost text-xs">
+                    Close
+                  </button>
+                </div>
               </div>
               <dl className="space-y-3 text-sm">
                 <div>
@@ -577,6 +764,32 @@ export default function PlatformEmailsPage() {
           )}
         </aside>
       </div>
+
+      <ConfirmDialog
+        open={deleteTargetId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTargetId(null);
+        }}
+        title="Delete email record?"
+        description="This moves the record to Trash. Owners can restore it from Platform → Trash."
+        confirmLabel="Delete"
+        destructive
+        confirmPhrase={DELETE_CONFIRM_PHRASE}
+        onConfirm={() => {
+          if (deleteTargetId) void deleteEmailRecords([deleteTargetId]);
+        }}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteConfirm}
+        onOpenChange={setBulkDeleteConfirm}
+        title={`Delete ${selectedCount} record${selectedCount === 1 ? "" : "s"}?`}
+        description="Selected email records will be moved to Trash. Owners can restore them from Platform → Trash."
+        confirmLabel="Delete selected"
+        destructive
+        confirmPhrase={DELETE_CONFIRM_PHRASE}
+        onConfirm={() => void deleteEmailRecords(Array.from(selectedIds))}
+      />
     </div>
   );
 }

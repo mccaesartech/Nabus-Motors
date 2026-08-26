@@ -405,6 +405,38 @@ export async function sendCustomerWelcomeAfterSignup(params: {
 
   const { data, error } = await admin.auth.admin.getUserById(params.userId);
   const authUser = data?.user;
+
+  const metaName =
+    (typeof authUser?.user_metadata?.full_name === "string"
+      ? authUser.user_metadata.full_name
+      : null) ||
+    (typeof authUser?.user_metadata?.name === "string"
+      ? authUser.user_metadata.name
+      : null);
+  const metaPhone =
+    typeof authUser?.user_metadata?.phone === "string"
+      ? authUser.user_metadata.phone
+      : null;
+
+  // Ensure profile exists for admin Customers even when welcome email is skipped.
+  let registrationId: string | null = null;
+  try {
+    const { ensureCustomerProfile } = await import(
+      "@/lib/customer/preorder-account"
+    );
+    registrationId = await ensureCustomerProfile(
+      params.userId,
+      email,
+      params.name?.trim() || metaName || email.split("@")[0] || "Customer",
+      params.phone?.trim() || metaPhone || undefined
+    );
+  } catch (profileError) {
+    console.warn(
+      "[welcome-email] post-signup profile ensure failed:",
+      profileError instanceof Error ? profileError.message : profileError
+    );
+  }
+
   if (error || !authUser) {
     console.warn("[welcome-email] post-signup user lookup failed:", error?.message);
     return {
@@ -435,37 +467,6 @@ export async function sendCustomerWelcomeAfterSignup(params: {
       smsSent: false,
       reason: "not_new_account",
     };
-  }
-
-  const metaName =
-    (typeof authUser.user_metadata?.full_name === "string"
-      ? authUser.user_metadata.full_name
-      : null) ||
-    (typeof authUser.user_metadata?.name === "string"
-      ? authUser.user_metadata.name
-      : null);
-  const metaPhone =
-    typeof authUser.user_metadata?.phone === "string"
-      ? authUser.user_metadata.phone
-      : null;
-
-  // Ensure profile exists so registration_id can appear in the welcome body.
-  let registrationId: string | null = null;
-  try {
-    const { ensureCustomerProfile } = await import(
-      "@/lib/customer/preorder-account"
-    );
-    registrationId = await ensureCustomerProfile(
-      params.userId,
-      email,
-      params.name?.trim() || metaName || email.split("@")[0] || "Customer",
-      params.phone?.trim() || metaPhone || undefined
-    );
-  } catch (profileError) {
-    console.warn(
-      "[welcome-email] post-signup profile ensure failed:",
-      profileError instanceof Error ? profileError.message : profileError
-    );
   }
 
   return maybeSendCustomerWelcomeEmail({

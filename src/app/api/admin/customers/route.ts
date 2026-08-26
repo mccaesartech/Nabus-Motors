@@ -18,9 +18,15 @@ export async function GET(req: NextRequest) {
   const search = req.nextUrl.searchParams.get("search") ?? undefined;
   const showDeleted =
     req.nextUrl.searchParams.get("showDeleted") === "1" && canDeleteCustomer(auth.auth);
+  const showSignUpsWithoutActivity =
+    req.nextUrl.searchParams.get("showSignUps") === "1";
 
   try {
-    const customers = await fetchAdminCustomers(supabase, { search, showDeleted });
+    const customers = await fetchAdminCustomers(supabase, {
+      search,
+      showDeleted,
+      showSignUpsWithoutActivity,
+    });
     return NextResponse.json({ ok: true, configured: true, customers });
   } catch (error) {
     return apiFailure(error, {

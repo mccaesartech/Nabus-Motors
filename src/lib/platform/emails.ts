@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { platformPath } from "@/lib/platform/paths";
 import { formatEmailFailureHint } from "@/lib/email/resend-constants";
+import { notDeletedFilter } from "@/lib/platform/trash-types";
 
 export const EMAIL_TEMPLATE_LABELS: Record<string, string> = {
   password_reset: "Password reset",
@@ -351,9 +352,11 @@ export async function fetchReceivedCommunications(
     !filters.type || filters.type === "all" || filters.type === "customer_message";
 
   if (includeContact) {
-    let q = supabase
-      .from("contact_inquiries")
-      .select("id, name, email, phone, subject, message, status, created_at")
+    let q = notDeletedFilter(
+      supabase
+        .from("contact_inquiries")
+        .select("id, name, email, phone, subject, message, status, created_at")
+    )
       .order("created_at", { ascending: false })
       .limit(fetchCap);
     if (filters.from) q = q.gte("created_at", filters.from);
@@ -378,11 +381,13 @@ export async function fetchReceivedCommunications(
   }
 
   if (includeVehicle) {
-    let q = supabase
-      .from("vehicle_inquiries")
-      .select(
-        "id, name, email, phone, inquiry_type, vehicle_name, message, status, created_at"
-      )
+    let q = notDeletedFilter(
+      supabase
+        .from("vehicle_inquiries")
+        .select(
+          "id, name, email, phone, inquiry_type, vehicle_name, message, status, created_at"
+        )
+    )
       .order("created_at", { ascending: false })
       .limit(fetchCap);
     if (filters.from) q = q.gte("created_at", filters.from);
