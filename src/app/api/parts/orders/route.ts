@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { after, NextRequest } from "next/server";
 import { formatPlatformPrice } from "@/lib/currency";
 import { getServerExchangeRates } from "@/lib/currency/server-rates";
 import { getCustomerFromAuthHeader } from "@/lib/customer/auth";
@@ -95,20 +95,29 @@ export async function POST(req: NextRequest) {
     >();
 
     if (supabase) {
-      if (partIds.length > 0) {
-        const { data } = await supabase
-          .from("parts")
-          .select("id, name, slug, sku, price_usd, stock_quantity")
-          .eq("status", "published")
-          .in("id", partIds);
+      const partsQuery =
+        partIds.length > 0
+          ? supabase
+              .from("parts")
+              .select("id, name, slug, sku, price_usd, stock_quantity")
+              .eq("status", "published")
+              .in("id", partIds)
+          : null;
+      const vehiclesQuery =
+        vehicleIds.length > 0
+          ? fetchCheckoutVehiclesByIdentifiers(vehicleIds, supabase)
+          : null;
 
-        for (const part of data ?? []) {
-          partsMap.set(part.id, part);
-        }
+      const [partsResult, vehiclesResult] = await Promise.all([
+        partsQuery,
+        vehiclesQuery,
+      ]);
+
+      for (const part of partsResult?.data ?? []) {
+        partsMap.set(part.id, part);
       }
-
-      if (vehicleIds.length > 0) {
-        vehiclesMap = await fetchCheckoutVehiclesByIdentifiers(vehicleIds, supabase);
+      if (vehiclesResult) {
+        vehiclesMap = vehiclesResult;
       }
     }
 
@@ -259,126 +268,144 @@ export async function POST(req: NextRequest) {
       return jsonError("Could not submit order. Please try again.", 500);
     }
 
-    await captureFxSnapshot({
-      entityType: "parts_order",
-      entityId: order.id,
-      originalAmountUsd: totalUsd,
-      supabase,
-    });
-
-    const { rates } = await getServerExchangeRates();
-
-    const summaryLines = orderItems.map((item) => {
-      const unitLabel = formatPlatformPrice(Number(item.unit_price_usd) || 0, rates);
-      if (item.item_type === "vehicle") {
-        const label = item.item_intent === "pre_order" ? "Pre-order" : "Buy";
-        return `• ${item.part_name} (${label}) @ ${unitLabel}`;
-      }
-      return `• ${item.part_name}${item.sku ? ` (${item.sku})` : ""} × ${item.quantity} @ ${unitLabel}`;
-    });
-
-    const orderLabel =
-      vehicleItems.length > 0 && partItems.length > 0
-        ? "Cart order"
-        : vehicleItems.length > 0
-          ? "Vehicle cart order"
-          : "Parts cart order";
-
-    await insertRow("contact_inquiries", {
-      name: name.trim(),
-      email: email.trim(),
-      phone: phone?.trim() || null,
-      subject: `${orderLabel} — ${orderItems.length} item(s)`,
-      message: [
-        `Order ID: ${order.id}`,
-        `Total: ${formatPlatformPrice(totalUsd, rates)}`,
-        "",
-        ...summaryLines,
-        notes?.trim() ? `\nNotes: ${notes.trim()}` : null,
-      ]
-        .filter(Boolean)
-        .join("\n"),
-      status: "new",
-    });
-
-    if (user?.id) {
-      const cartRow = await supabase
-        .from("customer_carts")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (cartRow.data?.id) {
-        await supabase.from("cart_items").delete().eq("cart_id", cartRow.data.id);
-      }
-    }
-
     const vehicleOrderItems = orderItems.filter((item) => item.item_type === "vehicle");
-
-    await notifyCartOrderToStaff(supabase, {
-      orderId: order.id,
-      customerName: name.trim(),
-      customerEmail: email.trim(),
-      customerPhone: phone?.trim() || null,
-      totalUsd,
-      items: orderItems.map((item) => ({
-        label: item.part_name,
-        itemType: item.item_type,
-        intent: item.item_intent,
-        quantity: item.quantity,
-      })),
-    }, { rates });
-
-    if (vehicleOrderItems.length > 0) {
-      for (const item of vehicleOrderItems) {
-        if (!item.vehicle_id) continue;
-        const vehicle = vehiclesMap.get(item.vehicle_id);
-        if (!vehicle?.make || !vehicle.model || vehicle.year == null) continue;
-        try {
-          const availableSiblings = await countAvailableSiblings(supabase, {
-            id: vehicle.id,
-            make: vehicle.make,
-            model: vehicle.model,
-            year: Number(vehicle.year),
-          });
-          await maybeNotifyVehicleStockAction(supabase, {
-            id: vehicle.id,
-            slug: vehicle.slug,
-            year: Number(vehicle.year),
-            make: vehicle.make,
-            model: vehicle.model,
-            availableSiblings,
-            source: "purchase",
-            sourceDetail: "cart_order",
-          });
-        } catch (err) {
-          console.error("[parts/orders] stock action notify failed:", err);
-        }
-      }
-
-      try {
-        await refreshFleetLowStockAlert(supabase);
-      } catch (err) {
-        console.error("[parts/orders] fleet low stock notify failed:", err);
-      }
-    }
-
     const orderUserId = checkoutCustomer.userId ?? user?.id ?? null;
-    if (orderUserId) {
-      await notifyCustomerOrderSubmitted(supabase, {
-        userId: orderUserId,
-        orderId: order.id,
-        itemCount: orderItems.length,
-      });
-    }
+    const customerName = name.trim();
+    const customerEmail = email.trim();
+    const customerPhone = phone?.trim() || null;
+    const customerNotes = notes?.trim() || null;
 
-    await notifyCustomer({
-      email: email.trim(),
-      phone: phone?.trim() || null,
-      customerName: name.trim(),
-      template: "order_submitted",
-      data: { itemCount: String(orderItems.length) },
-      sourceTable: "parts_orders",
-      sourceId: order.id,
+    // Return immediately after the order is committed. FX snapshot, lead row,
+    // cart clear, staff/customer alerts, and stock checks must not block checkout.
+    after(async () => {
+      try {
+        const [{ rates }] = await Promise.all([
+          getServerExchangeRates(),
+          captureFxSnapshot({
+            entityType: "parts_order",
+            entityId: order.id,
+            originalAmountUsd: totalUsd,
+            supabase,
+          }),
+        ]);
+
+        const summaryLines = orderItems.map((item) => {
+          const unitLabel = formatPlatformPrice(Number(item.unit_price_usd) || 0, rates);
+          if (item.item_type === "vehicle") {
+            const label = item.item_intent === "pre_order" ? "Pre-order" : "Buy";
+            return `• ${item.part_name} (${label}) @ ${unitLabel}`;
+          }
+          return `• ${item.part_name}${item.sku ? ` (${item.sku})` : ""} × ${item.quantity} @ ${unitLabel}`;
+        });
+
+        const orderLabel =
+          vehicleItems.length > 0 && partItems.length > 0
+            ? "Cart order"
+            : vehicleItems.length > 0
+              ? "Vehicle cart order"
+              : "Parts cart order";
+
+        await Promise.all([
+          insertRow("contact_inquiries", {
+            name: customerName,
+            email: customerEmail,
+            phone: customerPhone,
+            subject: `${orderLabel} — ${orderItems.length} item(s)`,
+            message: [
+              `Order ID: ${order.id}`,
+              `Total: ${formatPlatformPrice(totalUsd, rates)}`,
+              "",
+              ...summaryLines,
+              customerNotes ? `\nNotes: ${customerNotes}` : null,
+            ]
+              .filter(Boolean)
+              .join("\n"),
+            status: "new",
+          }),
+          (async () => {
+            if (!user?.id) return;
+            const cartRow = await supabase
+              .from("customer_carts")
+              .select("id")
+              .eq("user_id", user.id)
+              .maybeSingle();
+            if (cartRow.data?.id) {
+              await supabase.from("cart_items").delete().eq("cart_id", cartRow.data.id);
+            }
+          })(),
+          notifyCartOrderToStaff(
+            supabase,
+            {
+              orderId: order.id,
+              customerName,
+              customerEmail,
+              customerPhone,
+              totalUsd,
+              items: orderItems.map((item) => ({
+                label: item.part_name,
+                itemType: item.item_type,
+                intent: item.item_intent,
+                quantity: item.quantity,
+              })),
+            },
+            { rates }
+          ),
+          orderUserId
+            ? notifyCustomerOrderSubmitted(supabase, {
+                userId: orderUserId,
+                orderId: order.id,
+                itemCount: orderItems.length,
+              })
+            : Promise.resolve(),
+          notifyCustomer({
+            email: customerEmail,
+            phone: customerPhone,
+            customerName,
+            template: "order_submitted",
+            data: { itemCount: String(orderItems.length) },
+            sourceTable: "parts_orders",
+            sourceId: order.id,
+          }),
+        ]);
+
+        if (vehicleOrderItems.length > 0) {
+          await Promise.all(
+            vehicleOrderItems.map(async (item) => {
+              if (!item.vehicle_id) return;
+              const vehicle = vehiclesMap.get(item.vehicle_id);
+              if (!vehicle?.make || !vehicle.model || vehicle.year == null) return;
+              try {
+                const availableSiblings = await countAvailableSiblings(supabase, {
+                  id: vehicle.id,
+                  make: vehicle.make,
+                  model: vehicle.model,
+                  year: Number(vehicle.year),
+                });
+                await maybeNotifyVehicleStockAction(supabase, {
+                  id: vehicle.id,
+                  slug: vehicle.slug,
+                  year: Number(vehicle.year),
+                  make: vehicle.make,
+                  model: vehicle.model,
+                  availableSiblings,
+                  source: "purchase",
+                  sourceDetail: "cart_order",
+                });
+              } catch (err) {
+                console.error("[parts/orders] stock action notify failed:", err);
+              }
+            })
+          );
+
+          try {
+            await refreshFleetLowStockAlert(supabase);
+          } catch (err) {
+            console.error("[parts/orders] fleet low stock notify failed:", err);
+          }
+        }
+      } catch (err) {
+        console.error("[parts/orders] post-commit work failed:", err);
+      }
     });
 
     const hasVehicles = vehicleItems.length > 0;

@@ -1,8 +1,9 @@
-import { NextRequest } from "next/server";
+import { after, NextRequest } from "next/server";
 import { insertRow, jsonError, jsonOk } from "@/lib/inquiries/server";
 import { isValidUuid } from "@/lib/inquiries/uuid";
 import { formatVehicleName } from "@/lib/format";
 import { formatPlatformPrice } from "@/lib/currency";
+import { getStaticFallbackRates } from "@/lib/currency/rates";
 import { getServerExchangeRates } from "@/lib/currency/server-rates";
 import { getCustomerFromAuthHeader } from "@/lib/customer/auth";
 import { resolvePreorderAccount, linkCustomerPreordersByEmail, waitForCustomerProfile } from "@/lib/customer/preorder-account";
@@ -13,10 +14,6 @@ import {
   notifyCustomer,
   resolveWhatsAppPreferred,
 } from "@/lib/notifications/customer-notify";
-import {
-  formatPublicCustomerNotificationFeedback,
-  type CustomerNotificationPayload,
-} from "@/lib/notifications/notification-status";
 import { generateCustomerPasswordResetLink } from "@/lib/customer/password-reset";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import {
@@ -201,82 +198,99 @@ export async function POST(req: NextRequest) {
     const vehicleLabel = title ?? "this vehicle";
     const accountCreated = Boolean(userId && !authUser);
     const inquiryId = inserted?.id ? String(inserted.id) : undefined;
-    const { rates } = await getServerExchangeRates();
 
+    // Respond as soon as the inquiry is saved. Staff/customer alerts, FX snapshot,
+    // interest tracking, and password-reset email must not block the customer.
     if (inquiryId) {
-      await captureFxSnapshot({
-        entityType: "preorder",
-        entityId: inquiryId,
-        originalAmountUsd: priceUsd,
+      after(async () => {
+        try {
+          const [ratesPayload, adminSupabase] = await Promise.all([
+            getServerExchangeRates(),
+            Promise.resolve(createAdminSupabase()),
+            captureFxSnapshot({
+              entityType: "preorder",
+              entityId: inquiryId,
+              originalAmountUsd: priceUsd,
+            }),
+          ]);
+          const { rates } = ratesPayload;
+
+          const postCommit: Promise<unknown>[] = [];
+
+          if (adminSupabase) {
+            postCommit.push(
+              notifyVehicleSaleToLeadsTeam(
+                adminSupabase,
+                {
+                  kind: "pre_order",
+                  customerName: trimmedName,
+                  customerEmail: trimmedEmail,
+                  customerPhone: effectivePhone || null,
+                  vehicleTitles: [vehicleLabel],
+                  referenceId: inquiryId,
+                  sourceTable: "preorder_inquiries",
+                  link: preorderLeadsLink(inquiryId),
+                  totalUsd: priceUsd || null,
+                  registrationId,
+                },
+                { rates }
+              )
+            );
+
+            if (resolvedVehicleId) {
+              postCommit.push(
+                recordVehicleInterest(adminSupabase, {
+                  vehicleId: resolvedVehicleId,
+                  activityType: "preorder_inquiry",
+                  userId: linkedUserId,
+                  email: trimmedEmail,
+                  phone: effectivePhone || null,
+                })
+              );
+            }
+          }
+
+          let passwordResetUrl: string | undefined;
+          if (accountCreated && trimmedEmail) {
+            const linkResult = await generateCustomerPasswordResetLink(trimmedEmail);
+            if ("resetUrl" in linkResult) {
+              passwordResetUrl = linkResult.resetUrl;
+            }
+          }
+
+          postCommit.push(
+            notifyCustomer({
+              email: trimmedEmail,
+              phone: effectivePhone || null,
+              whatsappPreferred,
+              customerName: trimmedName,
+              template: "preorder_submitted",
+              data: {
+                vehicleTitle: vehicleLabel,
+                registrationId: registrationId ?? undefined,
+                passwordResetUrl,
+              },
+              sourceTable: "preorder_inquiries",
+              sourceId: inquiryId,
+            }).catch((notifyError) => {
+              console.error("[preorder] notifyCustomer failed:", notifyError);
+            })
+          );
+
+          await Promise.all(postCommit);
+        } catch (err) {
+          console.error("[preorder] post-commit work failed:", err);
+        }
       });
     }
 
-    const adminSupabase = createAdminSupabase();
-    if (inquiryId && adminSupabase) {
-      await notifyVehicleSaleToLeadsTeam(adminSupabase, {
-        kind: "pre_order",
-        customerName: trimmedName,
-        customerEmail: trimmedEmail,
-        customerPhone: effectivePhone || null,
-        vehicleTitles: [vehicleLabel],
-        referenceId: inquiryId,
-        sourceTable: "preorder_inquiries",
-        link: preorderLeadsLink(inquiryId),
-        totalUsd: priceUsd || null,
-        registrationId,
-      }, { rates });
-
-      if (resolvedVehicleId) {
-        await recordVehicleInterest(adminSupabase, {
-          vehicleId: resolvedVehicleId,
-          activityType: "preorder_inquiry",
-          userId: linkedUserId,
-          email: trimmedEmail,
-          phone: effectivePhone || null,
-        });
-      }
-    }
-
-    let passwordResetUrl: string | undefined;
-    if (accountCreated && trimmedEmail) {
-      const linkResult = await generateCustomerPasswordResetLink(trimmedEmail);
-      if ("resetUrl" in linkResult) {
-        passwordResetUrl = linkResult.resetUrl;
-      }
-    }
-
-    let notificationResult: CustomerNotificationPayload | null = null;
-    try {
-      notificationResult = await notifyCustomer({
-        email: trimmedEmail,
-        phone: effectivePhone || null,
-        whatsappPreferred,
-        customerName: trimmedName,
-        template: "preorder_submitted",
-        data: {
-          vehicleTitle: vehicleLabel,
-          registrationId: registrationId ?? undefined,
-          passwordResetUrl,
-        },
-        sourceTable: "preorder_inquiries",
-        sourceId: inserted?.id ? String(inserted.id) : undefined,
-      });
-    } catch (notifyError) {
-      console.error("[preorder] notifyCustomer failed:", notifyError);
-    }
-
-    const downPaymentLabel = formatPlatformPrice(downPayment, rates);
+    const downPaymentLabel = formatPlatformPrice(downPayment, getStaticFallbackRates());
 
     const successMessage = registrationId
       ? `Pre-order submitted for ${vehicleLabel}. 25% down payment: ${downPaymentLabel}. Track it in your account (${registrationId}).`
       : `Pre-order submitted for ${vehicleLabel}. 25% down payment: ${downPaymentLabel}. Our team will contact you shortly.`;
 
-    const notificationFeedback = formatPublicCustomerNotificationFeedback(notificationResult);
-    const fullMessage = notificationFeedback.message
-      ? `${successMessage} ${notificationFeedback.message}`
-      : successMessage;
-
-    return jsonOk(fullMessage, {
+    return jsonOk(successMessage, {
       registrationId,
       inquiryId,
       bookAppointment: true,
@@ -284,9 +298,6 @@ export async function POST(req: NextRequest) {
         id: resolvedVehicleId,
         name: vehicleLabel,
       },
-      notification: notificationResult,
-      notificationMessage: notificationFeedback.message || undefined,
-      notificationVariant: notificationFeedback.variant,
     });
   } catch {
     return jsonError("Invalid request.", 400);
