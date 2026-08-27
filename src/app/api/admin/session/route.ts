@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { canDeleteCustomer, getPlatformAuth, platformUserMustChangePassword } from "@/lib/admin/auth";
+import {
+  canDeleteAuditLog,
+  canDeleteCustomer,
+  getPlatformAuth,
+  platformUserMustChangePassword,
+} from "@/lib/admin/auth";
 import { canDirectMutate } from "@/lib/platform/mutation-approval";
 import { buildSessionPermissions, ROLE_LABELS } from "@/lib/platform/permissions";
 
@@ -30,6 +35,7 @@ export async function GET() {
     },
     permissions,
     canDeleteCustomers: canDeleteCustomer(auth),
+    canDeleteAuditLogs: canDeleteAuditLog(auth),
     canDirectMutate: directMutate,
     canPermanentlyDeleteTrash:
       auth.type === "owner" ||

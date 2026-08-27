@@ -29,7 +29,7 @@ export default function AuditLogPage() {
   const session = usePlatformSession();
   const canView =
     session?.role === "owner" || session?.role === "super_admin";
-  const canDelete = canView;
+  const [canDelete, setCanDelete] = useState(false);
 
   const [logs, setLogs] = useState<AuditLogRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,6 +83,13 @@ export default function AuditLogPage() {
     setSelectedIds(new Set());
     setLoading(false);
   }, [router, canView, q, action, success, actor, targetType, dateFrom, dateTo]);
+
+  useEffect(() => {
+    void fetch("/api/admin/session")
+      .then((res) => res.json())
+      .then((json) => setCanDelete(Boolean(json.ok && json.canDeleteAuditLogs)))
+      .catch(() => setCanDelete(false));
+  }, []);
 
   useEffect(() => {
     if (session && !canView) {
@@ -240,8 +247,16 @@ export default function AuditLogPage() {
     <div className="space-y-6">
       <PageHeader
         title="Audit Log"
-        description="Security and operations trail. Owner and Super Admin only. Entries can be moved to Trash; restore or permanently delete from there."
+        description="Security and operations trail. Owner and Super Admin only."
       />
+
+      {canDelete && !loading && logs.length > 0 && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-950">
+          To remove entries, check rows and click <strong>Delete selected</strong>, or use the{" "}
+          <strong>Delete</strong> button on each row. Confirm with &quot;yes delete&quot; — items
+          move to Trash (restore or permanently delete from Platform → Trash).
+        </div>
+      )}
 
       {migrationRequired && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
@@ -420,7 +435,11 @@ export default function AuditLogPage() {
               <th className="px-3 py-2 font-medium">IP / Location</th>
               <th className="px-3 py-2 font-medium">Client</th>
               <th className="px-3 py-2 font-medium">Error</th>
-              {canDelete && <th className="px-3 py-2 font-medium"> </th>}
+              {canDelete && (
+                <th className="sticky right-0 z-10 min-w-[5.5rem] bg-[var(--platform-bg-secondary)] px-3 py-2 font-medium text-red-800">
+                  Delete
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -498,16 +517,22 @@ export default function AuditLogPage() {
                     {row.error_message ?? ""}
                   </td>
                   {canDelete && (
-                    <td className="px-3 py-2 align-top">
+                    <td
+                      className={cn(
+                        "sticky right-0 z-10 px-3 py-2 align-top",
+                        row.success ? "bg-[var(--platform-bg)]" : "bg-red-50/80"
+                      )}
+                    >
                       <button
                         type="button"
                         disabled={deleting}
                         onClick={() => setDeleteTarget(row)}
-                        className="rounded-md p-1.5 text-[var(--platform-muted)] hover:bg-red-50 hover:text-red-700"
-                        aria-label="Move audit log entry to trash"
+                        className="inline-flex items-center gap-1 rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-900 hover:bg-red-100 disabled:opacity-50"
+                        aria-label="Delete audit log entry"
                         title="Move to trash"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete
                       </button>
                     </td>
                   )}
