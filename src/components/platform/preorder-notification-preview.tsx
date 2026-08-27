@@ -102,7 +102,7 @@ export function PreorderNotificationPreview({
 type CartOrderNotificationItem = {
   label: string;
   type: "part" | "vehicle";
-  intent?: "buy" | "pre_order" | null;
+  intent: "buy" | "pre_order" | null;
   quantity: number;
 };
 
