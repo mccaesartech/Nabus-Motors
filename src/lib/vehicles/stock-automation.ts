@@ -243,3 +243,40 @@ export async function resolveRequestedSoldStatus(
   const transition = await resolveUnitSoldTransition(supabase, vehicle);
   return transition.status;
 }
+
+/**
+ * Soft-hold inventory for a customer deal. Only transitions from
+ * `available` or `pre_order` — never overwrites sold/reserved.
+ */
+export async function reserveVehiclesForDeal(
+  supabase: SupabaseClient,
+  vehicleIds: Array<string | null | undefined>
+): Promise<string[]> {
+  const unique = [
+    ...new Set(
+      vehicleIds
+        .map((id) => (typeof id === "string" ? id.trim() : ""))
+        .filter(Boolean)
+    ),
+  ];
+  if (unique.length === 0) return [];
+
+  const reservedIds: string[] = [];
+  for (const id of unique) {
+    const { data, error } = await supabase
+      .from("vehicles")
+      .update({ status: "reserved" })
+      .eq("id", id)
+      .in("status", ["available", "pre_order"])
+      .select("id")
+      .maybeSingle();
+
+    if (error) {
+      console.error("[stock-automation] reserveVehiclesForDeal:", id, error.message);
+      continue;
+    }
+    if (data?.id) reservedIds.push(data.id);
+  }
+
+  return reservedIds;
+}

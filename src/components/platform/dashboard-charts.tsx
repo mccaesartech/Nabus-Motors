@@ -204,7 +204,7 @@ const TOOLTIP_WRAPPER_STYLE = { zIndex: 50 };
 
 const INVENTORY_COLORS: Record<string, string> = {
   Available: platformTokens.semantic.info,
-  "Pre-order (awaiting payment)": platformTokens.semantic.warning,
+  "Pre-order inquiries (awaiting deposit)": platformTokens.semantic.warning,
   "Pre-order (deposit paid)": platformTokens.semantic.success,
   Reserved: platformTokens.semantic.danger,
   Sold: platformTokens.semantic.neutral,
@@ -281,7 +281,7 @@ export function InventoryStatusChart({
 }: InventoryChartProps) {
   const data: PieChartDatum[] = [
     { name: "Available", value: available },
-    { name: "Pre-order (awaiting payment)", value: preOrderPending },
+    { name: "Pre-order inquiries (awaiting deposit)", value: preOrderPending },
     { name: "Pre-order (deposit paid)", value: preOrderConfirmed },
     { name: "Reserved", value: reserved },
     { name: "Sold", value: sold },

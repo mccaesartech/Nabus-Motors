@@ -617,10 +617,16 @@ export default function LeadsPage() {
                         ) : (
                           <select
                             value={lead.source}
+                            disabled={!canMutate}
                             onChange={(e) =>
                               updateLead(lead, { source: e.target.value })
                             }
                             className="platform-select text-xs"
+                            title={
+                              !canMutate
+                                ? "Owner or Super Admin required to change source"
+                                : undefined
+                            }
                           >
                             {LEAD_SOURCE_OPTIONS.map((s) => (
                               <option key={s} value={s}>
@@ -634,10 +640,16 @@ export default function LeadsPage() {
                         <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
                           <select
                             value={lead.status}
+                            disabled={!canMutate}
                             onChange={(e) =>
                               updateLead(lead, { status: e.target.value })
                             }
                             className="platform-select text-xs"
+                            title={
+                              !canMutate
+                                ? "Owner or Super Admin required to change status"
+                                : undefined
+                            }
                           >
                             {statusChoices.map((s) => (
                               <option key={s} value={s}>
@@ -666,6 +678,12 @@ export default function LeadsPage() {
                               <button
                                 type="button"
                                 className="platform-btn-primary h-7 px-2 text-xs"
+                                disabled={!canMutate}
+                                title={
+                                  !canMutate
+                                    ? "Owner or Super Admin required to save notes"
+                                    : undefined
+                                }
                                 onClick={() => {
                                   updateLead(lead, {
                                     follow_up_notes: notesDraft[key] ?? "",

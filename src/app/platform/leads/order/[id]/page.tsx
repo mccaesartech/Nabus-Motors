@@ -25,9 +25,14 @@ import { useMarkNotificationsOnVisit } from "@/hooks/use-mark-notifications-read
 import { WhatsAppAssistAction } from "@/components/platform/whatsapp-assist-dialog";
 import { SafeVehicleImage } from "@/components/shared/safe-vehicle-image";
 import { StatusBadge } from "@/components/platform/status-badge";
+import { usePlatformSession } from "@/components/platform/platform-shell";
 import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
 import { platformPath } from "@/lib/platform/paths";
+import {
+  canDirectMutate,
+  MUTATION_APPROVAL_REQUIRED_MESSAGE,
+} from "@/lib/platform/mutation-approval";
 import { ORDER_STATUS_OPTIONS } from "@/lib/platform/types";
 import { customerProfileIdForOrder } from "@/lib/platform/order-profile";
 import type { AdminOrderDetail } from "@/lib/platform/orders-admin";
@@ -40,6 +45,8 @@ export default function OrderDetailPage() {
   const pathname = usePathname() ?? "";
   const params = useParams();
   const id = String(params.id ?? "");
+  const session = usePlatformSession();
+  const canMutate = session ? canDirectMutate(session.role) : false;
   useMarkNotificationsOnVisit({ link: pathname });
   const [order, setOrder] = useState<AdminOrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -101,19 +108,34 @@ export default function OrderDetailPage() {
 
   async function updateOrder(updates: { status?: string; notes?: string }) {
     if (!order) return;
+    if (!canMutate) {
+      setConfirmToast(MUTATION_APPROVAL_REQUIRED_MESSAGE);
+      setConfirmToastVariant("warning");
+      return;
+    }
     setSaving(true);
     const res = await fetch(`/api/admin/orders/${encodeURIComponent(id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updates),
     });
-    const json = await res.json();
+    const json = await res.json().catch(() => ({}));
     setSaving(false);
+    if (!res.ok || json.ok === false) {
+      setConfirmToast(
+        String(json.message ?? MUTATION_APPROVAL_REQUIRED_MESSAGE)
+      );
+      setConfirmToastVariant("warning");
+      return;
+    }
     if (json.notificationMessage) {
       setConfirmToast(String(json.notificationMessage));
       setConfirmToastVariant(
         (json.notificationVariant as NotificationFeedbackVariant) ?? "success"
       );
+    } else {
+      setConfirmToast("Order updated.");
+      setConfirmToastVariant("success");
     }
     if (json.order) {
       const row = json.order as AdminOrderDetail;
@@ -127,19 +149,34 @@ export default function OrderDetailPage() {
 
   async function confirmOrder() {
     if (!order || order.status === "confirmed") return;
+    if (!canMutate) {
+      setConfirmToast(MUTATION_APPROVAL_REQUIRED_MESSAGE);
+      setConfirmToastVariant("warning");
+      return;
+    }
     setConfirming(true);
     const res = await fetch(`/api/admin/orders/${encodeURIComponent(id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "confirm" }),
     });
-    const json = await res.json();
+    const json = await res.json().catch(() => ({}));
     setConfirming(false);
+    if (!res.ok || json.ok === false) {
+      setConfirmToast(
+        String(json.message ?? MUTATION_APPROVAL_REQUIRED_MESSAGE)
+      );
+      setConfirmToastVariant("warning");
+      return;
+    }
     if (json.notificationMessage) {
       setConfirmToast(String(json.notificationMessage));
       setConfirmToastVariant(
         (json.notificationVariant as NotificationFeedbackVariant) ?? "success"
       );
+    } else {
+      setConfirmToast("Order confirmed.");
+      setConfirmToastVariant("success");
     }
     if (json.order) {
       const row = json.order as AdminOrderDetail;
@@ -185,6 +222,7 @@ export default function OrderDetailPage() {
 
   const orderRef = order.id.slice(0, 8).toUpperCase();
   const canConfirm = order.status === "pending";
+  const hasVehicleLines = order.vehicleCount > 0;
 
   return (
     <PrintableRecord
@@ -209,8 +247,27 @@ export default function OrderDetailPage() {
       ) : null}
       <section className="platform-card no-print rounded-xl border border-[var(--platform-accent)]/20 bg-[rgba(139,92,246,0.04)] p-5">
         <p className="text-xs font-semibold uppercase tracking-wide text-[var(--platform-accent)]">
-          Follow up
+          How to process this order
         </p>
+        <ol className="mt-2 list-decimal space-y-1 pl-4 text-sm text-[var(--platform-text-secondary)]">
+          <li>
+            {canConfirm
+              ? "Click Confirm order (Owner / Super Admin) to accept it and reserve any linked vehicles."
+              : "Order is already past pending — advance Status as fulfillment progresses."}
+          </li>
+          <li>Message or WhatsApp the customer to arrange payment / pickup.</li>
+          <li>
+            Set Status to shipped → fulfilled when done
+            {hasVehicleLines
+              ? ". Completing a Sale marks the vehicle sold if you convert via Sales."
+              : "."}
+          </li>
+        </ol>
+        {!canMutate ? (
+          <p className="mt-3 text-xs text-amber-700">
+            Status changes require Owner or Super Admin. You can still message the customer.
+          </p>
+        ) : null}
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Link href={messageHref} className="platform-btn-primary inline-flex items-center gap-2">
             <MessageSquare className="size-4" />
@@ -232,9 +289,10 @@ export default function OrderDetailPage() {
           {canConfirm ? (
             <button
               type="button"
-              disabled={confirming}
+              disabled={confirming || !canMutate}
               onClick={() => void confirmOrder()}
-              className="platform-btn-ghost inline-flex items-center gap-2 border border-emerald-500/40 text-emerald-700"
+              className="platform-btn-ghost inline-flex items-center gap-2 border border-emerald-500/40 text-emerald-700 disabled:opacity-50"
+              title={!canMutate ? MUTATION_APPROVAL_REQUIRED_MESSAGE : undefined}
             >
               <CheckCircle2 className="size-4" />
               {confirming ? "Confirming…" : "Confirm order"}
@@ -314,9 +372,10 @@ export default function OrderDetailPage() {
             <label className="mb-1 block text-xs text-[var(--platform-text-secondary)]">Status</label>
             <select
               value={order.status}
-              disabled={saving}
+              disabled={saving || !canMutate}
               onChange={(e) => void updateOrder({ status: e.target.value })}
               className="platform-select w-full"
+              title={!canMutate ? MUTATION_APPROVAL_REQUIRED_MESSAGE : undefined}
             >
               {ORDER_STATUS_OPTIONS.map((status) => (
                 <option key={status} value={status}>
@@ -333,6 +392,9 @@ export default function OrderDetailPage() {
             {order.status === "confirmed" ? (
               <p className="mt-2 text-xs text-[var(--platform-text-secondary)]">
                 Confirmed {formatPlatformDateTime(order.confirmedAt ?? order.updatedAt)}
+                {hasVehicleLines
+                  ? " · Linked available vehicles were reserved in inventory."
+                  : ""}
               </p>
             ) : null}
           </div>
@@ -425,10 +487,16 @@ export default function OrderDetailPage() {
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={4}
-            className="w-full rounded-lg border border-[var(--platform-border)] bg-[var(--platform-bg)] p-3 text-sm text-[var(--platform-text)]"
+            disabled={!canMutate}
+            className="w-full rounded-lg border border-[var(--platform-border)] bg-[var(--platform-bg)] p-3 text-sm text-[var(--platform-text)] disabled:opacity-60"
             placeholder="Follow-up notes for this order…"
           />
-          <button type="submit" disabled={saving} className="platform-btn-primary mt-3">
+          <button
+            type="submit"
+            disabled={saving || !canMutate}
+            className="platform-btn-primary mt-3"
+            title={!canMutate ? MUTATION_APPROVAL_REQUIRED_MESSAGE : undefined}
+          >
             {saving ? "Saving…" : "Save notes"}
           </button>
         </form>

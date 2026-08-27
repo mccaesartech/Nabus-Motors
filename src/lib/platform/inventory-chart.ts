@@ -44,7 +44,6 @@ export function computeInventoryChartSegments(
 
   let preOrderPending = 0;
   let preOrderConfirmed = 0;
-  const pendingVehicleIds = new Set<string>();
   const confirmedVehicleIds = new Set<string>();
 
   for (const row of activePreorders) {
@@ -57,8 +56,8 @@ export function computeInventoryChartSegments(
     }
 
     if (payment === "pending") {
+      // Inquiry metric only — do not soft-exclude the vehicle from Available.
       preOrderPending += 1;
-      if (row.vehicle_id) pendingVehicleIds.add(row.vehicle_id);
     }
   }
 
@@ -74,7 +73,10 @@ export function computeInventoryChartSegments(
       continue;
     }
 
-    if (confirmedVehicleIds.has(vehicle.id) || pendingVehicleIds.has(vehicle.id)) {
+    // Deposit-paid inquiries soft-hold the unit until status flips to reserved/sold.
+    // Pending-payment inquiries must NOT remove still-available cars from Available —
+    // that made the dashboard look "unavailable" while Inventory still showed Available.
+    if (confirmedVehicleIds.has(vehicle.id)) {
       continue;
     }
 

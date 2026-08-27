@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbFailure } from "@/lib/errors/api";
 import { requireDirectMutation } from "@/lib/admin/auth";
+import { revalidatePublicSite } from "@/lib/admin/revalidate";
 import { logPlatformActivity } from "@/lib/platform/activity";
 import { notifyCustomerPreorderUpdate } from "@/lib/customer/notifications-server";
 import { notifyCustomer } from "@/lib/notifications/customer-notify";
 import { customRequestStatusLabel } from "@/lib/platform/custom-request";
+import { MUTATION_APPROVAL_REQUIRED_MESSAGE } from "@/lib/platform/mutation-approval";
 import { createAdminSupabase } from "@/lib/supabase/admin";
+import { reserveVehiclesForDeal } from "@/lib/vehicles/stock-automation";
 
 const ORDER_STATUSES = ["pending", "confirmed", "shipped", "fulfilled", "cancelled"] as const;
 
@@ -21,7 +24,13 @@ const TABLE_MAP: Record<string, string> = {
 export async function PATCH(req: NextRequest) {
   const auth = await requireDirectMutation("leads");
   if (!auth.ok) {
-    return NextResponse.json({ ok: false }, { status: auth.status });
+    return NextResponse.json(
+      {
+        ok: false,
+        message: auth.message ?? MUTATION_APPROVAL_REQUIRED_MESSAGE,
+      },
+      { status: auth.status }
+    );
   }
 
   const supabase = createAdminSupabase();
@@ -162,6 +171,19 @@ export async function PATCH(req: NextRequest) {
         .eq("id", notification.id);
     }
 
+    if (payment_status === "down_payment_paid" || payment_status === "completed") {
+      const record = data as {
+        vehicle_id?: string | null;
+        matched_vehicle_id?: string | null;
+      };
+      const reservedIds = await reserveVehiclesForDeal(supabase, [
+        record.vehicle_id,
+        record.matched_vehicle_id,
+      ]);
+      if (reservedIds.length > 0) {
+        revalidatePublicSite();
+      }
+    }
   }
 
   await logPlatformActivity(auth.auth, "lead_updated", `${type}:${id}`, updates);

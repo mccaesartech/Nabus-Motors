@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbFailure } from "@/lib/errors/api";
 import { requireDirectMutation, requirePermission } from "@/lib/admin/auth";
+import { revalidatePublicSite } from "@/lib/admin/revalidate";
 import { getServerExchangeRates } from "@/lib/currency/server-rates";
 import { notifyCustomer } from "@/lib/notifications/customer-notify";
 import { notifyCustomerOrderConfirmed } from "@/lib/customer/notifications-server";
@@ -9,6 +10,8 @@ import { logPlatformActivity } from "@/lib/platform/activity";
 import { recordOrderConfirmed } from "@/lib/platform/inventory-movements/record";
 import { fetchAdminOrderDetail } from "@/lib/platform/orders-admin";
 import { createAdminSupabase } from "@/lib/supabase/admin";
+import { reserveVehiclesForDeal } from "@/lib/vehicles/stock-automation";
+import { MUTATION_APPROVAL_REQUIRED_MESSAGE } from "@/lib/platform/mutation-approval";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -38,7 +41,13 @@ export async function GET(_req: NextRequest, context: RouteContext) {
 export async function PATCH(req: NextRequest, context: RouteContext) {
   const auth = await requireDirectMutation("parts");
   if (!auth.ok) {
-    return NextResponse.json({ ok: false }, { status: auth.status });
+    return NextResponse.json(
+      {
+        ok: false,
+        message: auth.message ?? MUTATION_APPROVAL_REQUIRED_MESSAGE,
+      },
+      { status: auth.status }
+    );
   }
 
   const supabase = createAdminSupabase();
@@ -120,13 +129,25 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       auth.auth
     );
 
+    const reservedIds = await reserveVehiclesForDeal(
+      supabase,
+      existing.items.map((item) => item.vehicleId)
+    );
+    if (reservedIds.length > 0) {
+      revalidatePublicSite();
+    }
+
     const order = await fetchAdminOrderDetail(supabase, id, { rates });
     const feedback = formatCustomerNotificationFeedback(notificationResult, {
-      savedPrefix: "Order confirmed",
+      savedPrefix:
+        reservedIds.length > 0
+          ? "Order confirmed — linked vehicle(s) reserved"
+          : "Order confirmed",
     });
     return NextResponse.json({
       ok: true,
       order,
+      reservedVehicleIds: reservedIds,
       notification: notificationResult,
       notificationMessage: feedback.message,
       notificationVariant: feedback.variant,
@@ -208,13 +229,25 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       auth.auth
     );
 
+    const reservedIds = await reserveVehiclesForDeal(
+      supabase,
+      existing.items.map((item) => item.vehicleId)
+    );
+    if (reservedIds.length > 0) {
+      revalidatePublicSite();
+    }
+
     const order = await fetchAdminOrderDetail(supabase, id, { rates });
     const feedback = formatCustomerNotificationFeedback(notificationResult, {
-      savedPrefix: "Order updated",
+      savedPrefix:
+        reservedIds.length > 0
+          ? "Order updated — linked vehicle(s) reserved"
+          : "Order updated",
     });
     return NextResponse.json({
       ok: true,
       order,
+      reservedVehicleIds: reservedIds,
       notification: notificationResult,
       notificationMessage: feedback.message,
       notificationVariant: feedback.variant,

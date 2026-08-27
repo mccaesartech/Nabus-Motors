@@ -36,7 +36,10 @@ import {
 } from "@/lib/platform/custom-request";
 import { usePlatformSession } from "@/components/platform/platform-shell";
 import { formatPlatformDateTime } from "@/lib/platform/datetime";
-import { canDirectMutate } from "@/lib/platform/mutation-approval";
+import {
+  canDirectMutate,
+  MUTATION_APPROVAL_REQUIRED_MESSAGE,
+} from "@/lib/platform/mutation-approval";
 
 type LinkedSale = {
   id: string;
@@ -73,6 +76,8 @@ export default function PreorderDetailPage() {
   const [converting, setConverting] = useState(false);
   const [reverting, setReverting] = useState(false);
   const [matchedVehicleId, setMatchedVehicleId] = useState("");
+  const [actionToast, setActionToast] = useState<string | null>(null);
+  const [actionToastError, setActionToastError] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/admin/inquiries/preorder/${id}`);
@@ -108,53 +113,103 @@ export default function PreorderDetailPage() {
     matched_vehicle_id?: string | null;
   }) {
     if (!inquiry) return;
+    if (!canMutate) {
+      setActionToastError(true);
+      setActionToast(MUTATION_APPROVAL_REQUIRED_MESSAGE);
+      return;
+    }
     setSaving(true);
-    await fetch("/api/admin/inquiries/update", {
+    setActionToast(null);
+    const res = await fetch("/api/admin/inquiries/update", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type: "preorder", id: inquiry.id, ...updates }),
     });
+    const json = await res.json().catch(() => ({}));
     setSaving(false);
-    load();
+    if (!res.ok || json.ok === false) {
+      setActionToastError(true);
+      setActionToast(String(json.message ?? "Could not update pre-order."));
+      return;
+    }
+    setActionToastError(false);
+    if (updates.payment_status === "down_payment_paid") {
+      setActionToast("25% payment marked received. Linked vehicle reserved in inventory when available.");
+    } else {
+      setActionToast("Pre-order updated.");
+    }
+    await load();
   }
 
   async function handleDelete() {
+    if (!canMutate) {
+      setActionToastError(true);
+      setActionToast(MUTATION_APPROVAL_REQUIRED_MESSAGE);
+      return;
+    }
     const res = await fetch(`/api/admin/inquiries/preorder/${id}`, { method: "DELETE" });
     if (res.ok) {
       router.push(`${platformPath("leads")}?tab=preorder`);
+      return;
     }
+    const json = await res.json().catch(() => ({}));
+    setActionToastError(true);
+    setActionToast(String(json.message ?? "Could not delete pre-order."));
   }
 
   async function convertToSale() {
+    if (!canMutate) {
+      setActionToastError(true);
+      setActionToast(MUTATION_APPROVAL_REQUIRED_MESSAGE);
+      return;
+    }
     setConverting(true);
+    setActionToast(null);
     const res = await fetch("/api/admin/sales", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ preorder_inquiry_id: id }),
     });
+    const json = await res.json().catch(() => ({}));
     setConverting(false);
-    if (res.ok) {
-      const json = await res.json();
-      if (json.sale?.id) {
-        router.push(platformPath("sales"));
-      } else {
-        load();
-      }
+    if (!res.ok || json.ok === false) {
+      setActionToastError(true);
+      setActionToast(String(json.message ?? "Could not convert to sale."));
+      return;
+    }
+    if (json.sale?.id) {
+      router.push(platformPath("sales"));
+    } else {
+      setActionToastError(false);
+      setActionToast("Converted to sale.");
+      await load();
     }
   }
 
   async function revertToPreorder() {
     if (!linkedSale) return;
+    if (!canMutate) {
+      setActionToastError(true);
+      setActionToast(MUTATION_APPROVAL_REQUIRED_MESSAGE);
+      return;
+    }
     setReverting(true);
+    setActionToast(null);
     const res = await fetch("/api/admin/sales", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: linkedSale.id, action: "revert" }),
     });
+    const json = await res.json().catch(() => ({}));
     setReverting(false);
-    if (res.ok) {
-      load();
+    if (!res.ok || json.ok === false) {
+      setActionToastError(true);
+      setActionToast(String(json.message ?? "Could not revert sale."));
+      return;
     }
+    setActionToastError(false);
+    setActionToast("Sale reverted to pre-order.");
+    await load();
   }
 
   if (loading) {
@@ -196,6 +251,24 @@ export default function PreorderDetailPage() {
       reference={inquiry.reference_code ?? id.slice(0, 8).toUpperCase()}
     >
     <div className="space-y-6">
+      {actionToast ? (
+        <div
+          role="status"
+          className={`rounded-lg border px-4 py-3 text-sm ${
+            actionToastError
+              ? "border-amber-500/40 bg-amber-500/10 text-[var(--platform-text-secondary)]"
+              : "border-[var(--platform-success)]/30 bg-[rgba(16,185,129,0.08)] text-[var(--platform-success)]"
+          }`}
+        >
+          {actionToast}
+        </div>
+      ) : null}
+      {!canMutate ? (
+        <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-xs text-amber-800">
+          Payment, status, and convert-to-sale actions require Owner or Super Admin. You can still
+          message the customer.
+        </p>
+      ) : null}
       <PageHeader
         title={isCustom ? "Custom Vehicle Request" : "Pre-Order Inquiry"}
         description={`${isCustom ? "Custom request · " : ""}Submitted ${formatPlatformDateTime(inquiry.created_at)}${inquiry.reference_code ? ` · Ref ${inquiry.reference_code}` : ""}`}
@@ -451,14 +524,16 @@ export default function PreorderDetailPage() {
                     <>
                       <button
                         type="button"
-                        disabled={saving}
+                        disabled={saving || !canMutate}
                         onClick={() => updateField({ payment_status: "down_payment_paid" })}
-                        className="platform-btn-primary w-full"
+                        className="platform-btn-primary w-full disabled:opacity-50"
+                        title={!canMutate ? MUTATION_APPROVAL_REQUIRED_MESSAGE : undefined}
                       >
                         Mark 25% payment received
                       </button>
                       <p className="text-xs text-[var(--platform-text-secondary)]">
-                        Also reserves the linked vehicle in inventory when one is attached.
+                        Reserves the linked vehicle in inventory (available / pre-order → reserved),
+                        then unlocks Convert to sale.
                       </p>
                     </>
                   )}
@@ -479,9 +554,9 @@ export default function PreorderDetailPage() {
                         </Link>
                         <button
                           type="button"
-                          disabled={reverting}
+                          disabled={reverting || !canMutate}
                           onClick={() => setShowRevert(true)}
-                          className="platform-btn-ghost w-full text-[var(--platform-warning)]"
+                          className="platform-btn-ghost w-full text-[var(--platform-warning)] disabled:opacity-50"
                         >
                           <RotateCcw className="size-4" />
                           {reverting ? "Reverting…" : "Revert to pre-order"}
@@ -490,9 +565,10 @@ export default function PreorderDetailPage() {
                     ) : (
                       <button
                         type="button"
-                        disabled={converting}
+                        disabled={converting || !canMutate}
                         onClick={() => setShowConvert(true)}
-                        className="platform-btn-primary w-full"
+                        className="platform-btn-primary w-full disabled:opacity-50"
+                        title={!canMutate ? MUTATION_APPROVAL_REQUIRED_MESSAGE : undefined}
                       >
                         <FileText className="size-4" />
                         {converting ? "Converting…" : "Convert to sale"}
@@ -571,9 +647,10 @@ export default function PreorderDetailPage() {
               </label>
               <select
                 value={inquiry.status ?? (isCustom ? "reviewing" : "new")}
-                disabled={saving}
+                disabled={saving || !canMutate}
                 onChange={(e) => updateField({ status: e.target.value })}
                 className="platform-select w-full"
+                title={!canMutate ? MUTATION_APPROVAL_REQUIRED_MESSAGE : undefined}
               >
                 {statusOptions.map((s) => (
                   <option key={s} value={s}>
@@ -588,9 +665,10 @@ export default function PreorderDetailPage() {
               </label>
               <select
                 value={inquiry.source ?? "website"}
-                disabled={saving}
+                disabled={saving || !canMutate}
                 onChange={(e) => updateField({ source: e.target.value })}
                 className="platform-select w-full"
+                title={!canMutate ? MUTATION_APPROVAL_REQUIRED_MESSAGE : undefined}
               >
                 {LEAD_SOURCE_OPTIONS.map((s) => (
                   <option key={s} value={s}>
@@ -621,7 +699,8 @@ export default function PreorderDetailPage() {
                 }
               }}
               rows={4}
-              className="w-full rounded-lg border border-[var(--platform-border)] bg-[var(--platform-bg)] p-3 text-sm text-[var(--platform-text)]"
+              disabled={!canMutate}
+              className="w-full rounded-lg border border-[var(--platform-border)] bg-[var(--platform-bg)] p-3 text-sm text-[var(--platform-text)] disabled:opacity-60"
               placeholder="Internal notes about this pre-order…"
             />
             <p className="mt-1 text-xs text-[var(--platform-text-secondary)]">
@@ -629,8 +708,9 @@ export default function PreorderDetailPage() {
             </p>
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || !canMutate}
               className="platform-btn-primary mt-2"
+              title={!canMutate ? MUTATION_APPROVAL_REQUIRED_MESSAGE : undefined}
             >
               {saving ? "Saving…" : "Save notes"}
             </button>
