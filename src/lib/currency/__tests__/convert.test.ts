@@ -56,3 +56,16 @@ describe("central conversion service", () => {
     expect(getCrossRate("USD", "XXX")).toBe(1);
   });
 });
+
+describe("display rate override helpers", () => {
+  it("detects when manual GHS override is active", async () => {
+    const { isDisplayOverrideActive, parseManualRatesJson } = await import("@/lib/currency/rates");
+    expect(
+      isDisplayOverrideActive({
+        fx_use_live_rates: "false",
+        fx_manual_rates_json: '{"GHS":12.5}',
+      })
+    ).toBe(true);
+    expect(parseManualRatesJson('{"GHS":12.1}')).toEqual({ GHS: 12.1 });
+  });
+});

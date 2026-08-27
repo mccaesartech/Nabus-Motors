@@ -40,7 +40,6 @@ export const ROUTES = {
     availableLocally: `${AUTO_DIVISION}/inventory?fulfillment=in_ghana`,
     customRequest: `${AUTO_DIVISION}/inventory/custom-request`,
     financing: `${AUTO_DIVISION}/financing`,
-    currencyConverter: `${AUTO_DIVISION}/tools/currency`,
     garage: `${AUTO_DIVISION}/garage`,
     compare: `${AUTO_DIVISION}/compare`,
     spareParts: `${AUTO_DIVISION}/spare-parts`,

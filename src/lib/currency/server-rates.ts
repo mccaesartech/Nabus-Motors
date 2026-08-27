@@ -4,20 +4,82 @@ import { unstable_cache } from "next/cache";
 import { revalidateTag } from "next/cache";
 import {
   EXCHANGE_RATE_CACHE_TTL_SECONDS,
+  buildRatesFromGhs,
   fetchLiveExchangeRates,
   type ExchangeRatePayload,
 } from "./fetch-exchange-rates";
 import {
-  applyDisplayRateOverride,
-  type EffectiveExchangeRatesPayload,
-} from "./display-override";
+  isDisplayOverrideActive,
+  parseManualRatesJson,
+  type ExchangeRateMap,
+} from "./rates";
 import { persistLastGoodRates, readLastGoodRates } from "./persist-cache";
 import { getSiteSettings } from "@/lib/platform/site-settings-server";
 
 export const EXCHANGE_RATES_CACHE_TAG = "exchange-rates";
 
+export type DisplayOverrideMeta = {
+  active: boolean;
+  targetCurrency: string;
+  rateUsed: number;
+  liveRate: number;
+  reason: string | null;
+  setAt: string | null;
+  setBy: string | null;
+};
+
+export type EffectiveExchangeRatesPayload = ExchangeRatePayload & {
+  liveRates: ExchangeRateMap;
+  displayOverride: DisplayOverrideMeta | null;
+};
+
 export type { EffectiveExchangeRatesPayload as ServerExchangeRatesPayload };
-export type { DisplayOverrideMeta } from "./display-override";
+
+export { isDisplayOverrideActive, parseManualRatesJson };
+
+function applyDisplayRateOverride(
+  payload: ExchangeRatePayload,
+  settings: {
+    fx_use_live_rates?: string;
+    fx_manual_rates_json?: string;
+    fx_manual_rate_reason?: string;
+    fx_manual_rate_set_by?: string;
+    fx_manual_rate_set_at?: string;
+  }
+): EffectiveExchangeRatesPayload {
+  const liveRates = { ...payload.rates };
+
+  if (!isDisplayOverrideActive(settings)) {
+    return { ...payload, liveRates, displayOverride: null };
+  }
+
+  const manualRates = parseManualRatesJson(settings.fx_manual_rates_json);
+  const ghsRate = manualRates.GHS;
+  if (!ghsRate || ghsRate <= 0) {
+    return { ...payload, liveRates, displayOverride: null };
+  }
+
+  const effectiveRates: ExchangeRateMap = { ...payload.rates, GHS: ghsRate };
+
+  return {
+    ...payload,
+    rates: effectiveRates,
+    ratesFromGhs: buildRatesFromGhs(effectiveRates),
+    source: "manual",
+    stale: false,
+    provider: "manual-override",
+    liveRates,
+    displayOverride: {
+      active: true,
+      targetCurrency: "GHS",
+      rateUsed: ghsRate,
+      liveRate: liveRates.GHS ?? ghsRate,
+      reason: settings.fx_manual_rate_reason?.trim() || null,
+      setAt: settings.fx_manual_rate_set_at?.trim() || null,
+      setBy: settings.fx_manual_rate_set_by?.trim() || null,
+    },
+  };
+}
 
 async function loadRatesWithLastGood(): Promise<ExchangeRatePayload> {
   const live = await fetchLiveExchangeRates();

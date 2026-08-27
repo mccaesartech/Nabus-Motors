@@ -1,6 +1,9 @@
 /** Units of target currency per 1 USD */
 export type ExchangeRateMap = Record<string, number>;
 
+import { REFERENCE_CURRENCIES } from "./types";
+import { parseBoolean } from "@/lib/platform/site-settings";
+
 let liveRates: ExchangeRateMap | null = null;
 
 /** Override live rates (e.g. after fetching /api/exchange-rates). */
@@ -171,3 +174,29 @@ const STATIC_FALLBACK_RATES: ExchangeRateMap = {
   YER: 250,
   ZMW: 27,
 };
+
+export const FX_OVERRIDE_CURRENCIES = REFERENCE_CURRENCIES.filter((c) => c !== "USD");
+
+export function parseManualRatesJson(value: string | undefined): Record<string, number> {
+  if (!value?.trim()) return {};
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    const out: Record<string, number> = {};
+    for (const [code, rate] of Object.entries(parsed)) {
+      const n = Number(rate);
+      if (Number.isFinite(n) && n > 0) out[code.toUpperCase()] = n;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export function isDisplayOverrideActive(settings: {
+  fx_use_live_rates?: string;
+  fx_manual_rates_json?: string;
+}): boolean {
+  if (parseBoolean(settings.fx_use_live_rates, true)) return false;
+  const manualRates = parseManualRatesJson(settings.fx_manual_rates_json);
+  return Boolean(manualRates.GHS && manualRates.GHS > 0);
+}

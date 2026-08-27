@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   Bell,
   Building2,
+  Coins,
   Download,
   ExternalLink,
   Package,
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 import { PageHeader } from "@/components/platform/page-header";
 import { CargoOptionsEditor } from "@/components/platform/cargo-options-editor";
+import { CurrencySettingsPanel } from "@/components/platform/currency-settings-panel";
 import { SecuritySettings } from "@/components/platform/security-settings";
 import { InstallAdminAppCard } from "@/components/pwa/install-admin-app-card";
 import { InstallAdminAppBanner } from "@/components/pwa/install-admin-app-banner";
@@ -30,7 +32,6 @@ import {
 } from "@/lib/admin/client";
 import { DEFAULT_SITE_SETTINGS, type SiteSettingKey } from "@/lib/platform/modules";
 import { formatPlatformDateTime } from "@/lib/platform/datetime";
-import { platformPath } from "@/lib/platform/paths";
 
 type SettingsMeta = {
   publicSiteUrl: string;
@@ -421,13 +422,7 @@ export default function SettingsPage() {
               </select>
               <p className="mt-1.5 text-xs text-[var(--platform-text-secondary)]">
                 Controls platform/admin money display only. Public visitors choose their own
-                currency in the site UI — this setting never overrides them.{" "}
-                <Link
-                  href={platformPath("tools/currency")}
-                  className="font-medium text-[var(--platform-accent)] hover:underline"
-                >
-                  Open currency converter
-                </Link>
+                currency in the site UI — this setting never overrides them.
               </p>
             </Field>
             <Field
@@ -455,6 +450,19 @@ export default function SettingsPage() {
               />
             </Field>
           </div>
+        </SettingsSection>
+
+        <SettingsSection
+          icon={Coins}
+          title="Currency"
+          description="Live ExchangeRate-API feed for storefront prices. Owner/Super Admin may set a manual display override when needed."
+        >
+          <CurrencySettingsPanel
+            settings={settings}
+            update={update}
+            updateBool={updateBool}
+            isOn={isOn}
+          />
         </SettingsSection>
 
         <SettingsSection
