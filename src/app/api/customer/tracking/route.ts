@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
     supabase
       .from("preorder_inquiries")
       .select(
-        "id, status, payment_status, created_at, vehicle_title, vehicle_slug, shipping_handling, vehicle:vehicles(year, make, model, trim, slug)"
+        "id, status, payment_status, created_at, vehicle_title, vehicle_slug, shipping_handling, vehicle:vehicles!vehicle_id(year, make, model, trim, slug)"
       )
       .or(userOrEmailFilter(user.id, email))
       .order("created_at", { ascending: false })

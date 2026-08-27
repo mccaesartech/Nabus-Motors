@@ -7,10 +7,10 @@ import { parseCustomRequestSpecs } from "@/lib/platform/custom-request";
 import { userOrEmailFilter } from "@/lib/security/postgrest-filter";
 
 const PREORDER_SELECT_FULL =
-  "id, status, payment_status, down_payment_usd, vehicle_price_usd, created_at, vehicle_slug, vehicle_title, is_custom_request, reference_code, requested_make, requested_model, requested_year, requested_specs, budget_min, budget_max, matched_vehicle_id, vehicle:vehicles(year, make, model, trim, slug), matched_vehicle:vehicles!preorder_inquiries_matched_vehicle_id_fkey(slug, make, model, year)";
+  "id, status, payment_status, down_payment_usd, vehicle_price_usd, created_at, vehicle_slug, vehicle_title, is_custom_request, reference_code, requested_make, requested_model, requested_year, requested_specs, budget_min, budget_max, matched_vehicle_id, vehicle:vehicles!vehicle_id(year, make, model, trim, slug), matched_vehicle:vehicles!matched_vehicle_id(slug, make, model, year)";
 
 const PREORDER_SELECT_LEGACY =
-  "id, status, payment_status, down_payment_usd, vehicle_price_usd, created_at, vehicle_slug, vehicle_title, vehicle:vehicles(year, make, model, trim, slug)";
+  "id, status, payment_status, down_payment_usd, vehicle_price_usd, created_at, vehicle_slug, vehicle_title, vehicle:vehicles!vehicle_id(year, make, model, trim, slug)";
 
 type PreorderInquiryRow = {
   id: string;

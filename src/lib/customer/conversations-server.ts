@@ -189,7 +189,7 @@ async function loadPreorderTitles(
 
   const { data } = await supabase
     .from("preorder_inquiries")
-    .select("id, vehicle_title, vehicle:vehicles(year, make, model, trim)")
+    .select("id, vehicle_title, vehicle:vehicles!vehicle_id(year, make, model, trim)")
     .in("id", preorderIds);
 
   for (const row of data ?? []) {

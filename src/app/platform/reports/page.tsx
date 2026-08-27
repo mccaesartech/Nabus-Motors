@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Download } from "lucide-react";
+import { CheckCircle2, Download, XCircle } from "lucide-react";
 import { PageHeader } from "@/components/platform/page-header";
 import { usePlatformSession } from "@/components/platform/platform-shell";
 import { canExportInventory, canViewFinance } from "@/lib/platform/permissions";
+import { cn } from "@/lib/utils";
 
 export default function ReportsPage() {
   const session = usePlatformSession();
@@ -13,42 +14,50 @@ export default function ReportsPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [exporting, setExporting] = useState<string | null>(null);
-  const [error, setError] = useState("");
+  const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
 
   async function handleExport(type: "inventory" | "leads" | "preorders" | "sales") {
     setExporting(type);
-    setError("");
+    setToast(null);
     const params = new URLSearchParams({ type });
     if (from) params.set("from", from);
     if (to) params.set("to", to);
 
-    const res = await fetch(`/api/admin/reports/export?${params.toString()}`);
-    const body = await res.text();
+    try {
+      const res = await fetch(`/api/admin/reports/export?${params.toString()}`);
+      const body = await res.text();
 
-    if (!res.ok) {
-      let message = `Export failed (${res.status})`;
-      try {
-        const json = JSON.parse(body) as { message?: string };
-        if (json.message) message = json.message;
-      } catch {
-        if (body.trim()) message = body.trim();
+      if (!res.ok) {
+        let message = `Export failed (${res.status})`;
+        try {
+          const json = JSON.parse(body) as { message?: string };
+          if (json.message) message = json.message;
+        } catch {
+          if (body.trim()) message = body.trim();
+        }
+        setToast({ ok: false, text: message });
+        return;
       }
-      setError(message);
-      setExporting(null);
-      return;
-    }
 
-    const disposition = res.headers.get("Content-Disposition") ?? "";
-    const match = disposition.match(/filename="([^"]+)"/);
-    const filename = match?.[1] ?? `true-goshen-${type}.csv`;
-    const blob = new Blob([body], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-    setExporting(null);
+      const disposition = res.headers.get("Content-Disposition") ?? "";
+      const match = disposition.match(/filename="([^"]+)"/);
+      const filename = match?.[1] ?? `true-goshen-${type}.csv`;
+      const blob = new Blob([body], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      setToast({ ok: true, text: `Downloaded ${filename}` });
+    } catch {
+      setToast({
+        ok: false,
+        text: "Could not reach the export service. Check your connection and try again.",
+      });
+    } finally {
+      setExporting(null);
+    }
   }
 
   return (
@@ -59,10 +68,24 @@ export default function ReportsPage() {
         breadcrumb="Reports"
       />
 
-      {error ? (
-        <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-          {error}
-        </p>
+      {toast ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className={cn(
+            "flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium shadow-sm",
+            toast.ok
+              ? "border-emerald-600/40 bg-emerald-50 text-emerald-900"
+              : "border-red-600/40 bg-red-50 text-red-900"
+          )}
+        >
+          {toast.ok ? (
+            <CheckCircle2 className="size-5 shrink-0 text-emerald-700" aria-hidden />
+          ) : (
+            <XCircle className="size-5 shrink-0 text-red-700" aria-hidden />
+          )}
+          {toast.text}
+        </div>
       ) : null}
 
       <div className="platform-card rounded-xl p-6">
@@ -104,10 +127,24 @@ export default function ReportsPage() {
                   },
                 ]
               : []),
-            { type: "leads" as const, label: "Export Leads CSV", desc: "Contact, vehicle, finance, appraisal, pre-order" },
-            { type: "preorders" as const, label: "Export Pre-orders CSV", desc: "Pre-order inquiries with payment status" },
+            {
+              type: "leads" as const,
+              label: "Export Leads CSV",
+              desc: "Contact, vehicle, finance, appraisal, pre-order",
+            },
+            {
+              type: "preorders" as const,
+              label: "Export Pre-orders CSV",
+              desc: "Pre-order inquiries with payment status",
+            },
             ...(showFinance
-              ? [{ type: "sales" as const, label: "Export Sales CSV", desc: "Quotations and completed sales" }]
+              ? [
+                  {
+                    type: "sales" as const,
+                    label: "Export Sales CSV",
+                    desc: "Quotations and completed sales",
+                  },
+                ]
               : []),
           ] as const
         ).map((item) => (

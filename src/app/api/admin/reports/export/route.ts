@@ -14,6 +14,7 @@ import {
 } from "@/lib/platform/data";
 import type { InquiryData } from "@/lib/platform/types";
 import { exportSalesCsv, type SaleRow } from "@/lib/platform/sales";
+import { notDeletedFilter } from "@/lib/platform/trash-types";
 import { isInStockStatus } from "@/lib/vehicles/availability";
 
 export const dynamic = "force-dynamic";
@@ -32,10 +33,9 @@ async function fetchTableRows(
   table: string,
   orderColumn = "created_at"
 ) {
-  const { data, error } = await supabase
-    .from(table)
-    .select("*")
-    .order(orderColumn, { ascending: false });
+  const { data, error } = await notDeletedFilter(
+    supabase.from(table).select("*")
+  ).order(orderColumn, { ascending: false });
 
   if (error) {
     throw new Error(`${table}: ${error.message}`);
@@ -152,15 +152,14 @@ export async function GET(req: NextRequest) {
         );
       }
 
-      const { data, error } = await supabase
-        .from("sales")
-        .select(
+      const { data, error } = await notDeletedFilter(
+        supabase.from("sales").select(
           `
           *,
           vehicle:vehicles (id, year, make, model, trim, price, status)
         `
         )
-        .order("created_at", { ascending: false });
+      ).order("created_at", { ascending: false });
 
       if (error) {
         throw new Error(`sales: ${error.message}`);

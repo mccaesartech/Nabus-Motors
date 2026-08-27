@@ -12,18 +12,23 @@ import {
   buildCustomVehicleTitle,
   formatBudgetRangeGhs,
 } from "@/lib/platform/custom-request";
+import { notDeletedFilter } from "@/lib/platform/trash-types";
 
-const PREORDER_VEHICLE_SELECT = `
+/**
+ * Hint the vehicle_id FK explicitly. After matched_vehicle_id was added,
+ * bare `vehicle:vehicles(...)` fails PostgREST with "more than one relationship".
+ */
+export const PREORDER_VEHICLE_SELECT = `
   *,
-  vehicle:vehicles (
+  vehicle:vehicles!vehicle_id (
     id, year, make, model, trim, slug, price, images, status
   )
 `;
 
 export async function fetchPreorderInquiries(supabase: SupabaseClient) {
-  const { data, error } = await supabase
-    .from("preorder_inquiries")
-    .select(PREORDER_VEHICLE_SELECT)
+  const { data, error } = await notDeletedFilter(
+    supabase.from("preorder_inquiries").select(PREORDER_VEHICLE_SELECT)
+  )
     .order("created_at", { ascending: false })
     .limit(100);
 
@@ -36,10 +41,9 @@ export async function fetchPreorderInquiries(supabase: SupabaseClient) {
 }
 
 export async function fetchAllPreorderInquiries(supabase: SupabaseClient) {
-  const { data, error } = await supabase
-    .from("preorder_inquiries")
-    .select(PREORDER_VEHICLE_SELECT)
-    .order("created_at", { ascending: false });
+  const { data, error } = await notDeletedFilter(
+    supabase.from("preorder_inquiries").select(PREORDER_VEHICLE_SELECT)
+  ).order("created_at", { ascending: false });
 
   if (error) {
     throw new Error(`preorder_inquiries: ${error.message}`);
@@ -49,9 +53,9 @@ export async function fetchAllPreorderInquiries(supabase: SupabaseClient) {
 }
 
 export async function fetchPreorderInquiryById(supabase: SupabaseClient, id: string) {
-  const { data, error } = await supabase
-    .from("preorder_inquiries")
-    .select(PREORDER_VEHICLE_SELECT)
+  const { data, error } = await notDeletedFilter(
+    supabase.from("preorder_inquiries").select(PREORDER_VEHICLE_SELECT)
+  )
     .eq("id", id)
     .maybeSingle();
 
