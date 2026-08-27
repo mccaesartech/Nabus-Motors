@@ -98,5 +98,31 @@ describe("nav-search", () => {
   it("allows intentional description word-prefix matches for longer queries", () => {
     expect(navItemMatchesSearch(catalog[2]!, "vehicle")).toBe(true);
     expect(navItemMatchesSearch(catalog[2]!, "ve")).toBe(false);
+    // Raised bar: 3-char description prefixes are no longer enough.
+    expect(navItemMatchesSearch(catalog[2]!, "veh")).toBe(false);
+  });
+
+  it("does not match Audit Log for short query se", () => {
+    const auditLog = item({
+      label: "Audit Log",
+      href: "/platform/audit-log",
+      // Historical description that made "se" hit via Security word-prefix.
+      description: "Security & ops activity trail",
+      icon: FileText,
+    });
+    const settings = item({
+      label: "Settings",
+      href: "/platform/settings",
+      description: "Platform configuration",
+      icon: FileText,
+    });
+
+    const ranked = rankNavSearchResults([auditLog, settings], "se");
+    expect(ranked.map((r) => r.item.label)).toEqual(["Settings"]);
+    expect(navItemMatchesSearch(auditLog, "se")).toBe(false);
+    expect(navItemMatchesSearch(auditLog, "sec")).toBe(false);
+    expect(navItemMatchesSearch(auditLog, "audit")).toBe(true);
+    expect(navItemMatchesSearch(auditLog, "log")).toBe(true);
+    expect(navItemMatchesSearch(auditLog, "audit log")).toBe(true);
   });
 });

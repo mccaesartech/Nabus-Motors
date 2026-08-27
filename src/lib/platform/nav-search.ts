@@ -2,6 +2,15 @@ import type { PlatformNavItem } from "@/lib/platform/nav";
 
 const IGNORED_PATH_SEGMENTS = new Set(["admin", "platform"]);
 
+/** Mid-label / mid-path substring matching requires at least this many chars. */
+const MIN_SUBSTRING_QUERY_LEN = 3;
+
+/**
+ * Description word-prefix matching needs a longer intentional query.
+ * Blocks short prefixes like "se"/"sec" → "Security".
+ */
+const MIN_DESCRIPTION_QUERY_LEN = 4;
+
 /** Split label/description/path into searchable word tokens. */
 export function navSearchTokens(value: string): string[] {
   return value
@@ -23,6 +32,7 @@ function meaningfulPathSegments(href: string): string[] {
  * Returns 0 when there is no meaningful match (caller should hide the item).
  *
  * Priority: exact/prefix label → label word → label substring → path segment → description word.
+ * Short queries (1–2 chars) only use strong label/path prefix or word matches.
  * Avoids weak full-href / mid-word description matches that surface unrelated pages.
  */
 export function scoreNavSearchTerm(item: PlatformNavItem, term: string): number {
@@ -32,20 +42,33 @@ export function scoreNavSearchTerm(item: PlatformNavItem, term: string): number 
   const label = item.label.toLowerCase();
   const labelTokens = navSearchTokens(item.label);
   const pathSegments = meaningfulPathSegments(item.href);
+  const shortQuery = q.length <= 2;
 
   if (label === q) return 100;
   if (label.startsWith(q)) return 90;
   if (labelTokens.some((token) => token.startsWith(q))) return 80;
+
   // Mid-label substring only for longer queries (avoids "or" → Reports).
-  if (q.length >= 3 && label.includes(q)) return 60;
+  if (!shortQuery && q.length >= MIN_SUBSTRING_QUERY_LEN && label.includes(q)) {
+    return 60;
+  }
 
   if (pathSegments.some((segment) => segment === q)) return 70;
   if (pathSegments.some((segment) => segment.startsWith(q))) return 55;
   // Mid-segment path match only for longer queries (e.g. "move" → movements).
-  if (q.length >= 3 && pathSegments.some((segment) => segment.includes(q))) return 40;
+  if (
+    !shortQuery &&
+    q.length >= MIN_SUBSTRING_QUERY_LEN &&
+    pathSegments.some((segment) => segment.includes(q))
+  ) {
+    return 40;
+  }
+
+  // 1–2 char queries: label/path strong matches only — no description.
+  if (shortQuery) return 0;
 
   // Description: word-prefix only, and only for queries long enough to be intentional.
-  if (item.description && q.length >= 3) {
+  if (item.description && q.length >= MIN_DESCRIPTION_QUERY_LEN) {
     const descTokens = navSearchTokens(item.description);
     if (descTokens.some((token) => token.startsWith(q))) return 25;
   }

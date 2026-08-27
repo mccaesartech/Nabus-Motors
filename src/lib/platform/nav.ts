@@ -285,7 +285,7 @@ const administrationGroup: PlatformNavGroup = {
       label: "Audit Log",
       href: platformPath("audit-log"),
       icon: ClipboardList,
-      description: "Security & ops activity trail",
+      description: "Immutable activity trail",
       groupId: "administration",
     },
     {
