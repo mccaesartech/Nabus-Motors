@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import type { PlatformNavItem } from "@/lib/platform/nav";
+import { rankNavSearchResults } from "@/lib/platform/nav-search";
 import { cn } from "@/lib/utils";
 
 type SidebarSearchProps = {
@@ -11,6 +12,7 @@ type SidebarSearchProps = {
   collapsed: boolean;
   onNavigate: () => void;
   onExpand?: () => void;
+  onQueryChange?: (query: string) => void;
   isActive: (href: string) => boolean;
 };
 
@@ -19,22 +21,21 @@ export function SidebarSearch({
   collapsed,
   onNavigate,
   onExpand,
+  onQueryChange,
   isActive,
 }: SidebarSearchProps) {
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return items.filter(
-      (item) =>
-        item.label.toLowerCase().includes(q) ||
-        item.description?.toLowerCase().includes(q) ||
-        item.href.toLowerCase().includes(q)
-    );
-  }, [items, query]);
+  useEffect(() => {
+    onQueryChange?.(query);
+  }, [query, onQueryChange]);
+
+  const results = useMemo(
+    () => rankNavSearchResults(items, query).map((entry) => entry.item),
+    [items, query]
+  );
 
   if (collapsed) {
     return (

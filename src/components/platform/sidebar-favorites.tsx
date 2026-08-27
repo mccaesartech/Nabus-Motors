@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ChevronDown, ChevronRight, Clock, Star } from "lucide-react";
 import type { PlatformNavItem } from "@/lib/platform/nav";
+import { navItemMatchesSearch } from "@/lib/platform/nav-search";
 import type { RecentNavVisit } from "@/lib/platform/sidebar-storage";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +13,7 @@ type SidebarFavoritesProps = {
   navItems: PlatformNavItem[];
   collapsed: boolean;
   recentCollapsed: boolean;
+  searchQuery?: string;
   onToggleRecent: () => void;
   onNavigate: () => void;
   isActive: (href: string) => boolean;
@@ -23,17 +25,22 @@ export function SidebarFavorites({
   navItems,
   collapsed,
   recentCollapsed,
+  searchQuery = "",
   onToggleRecent,
   onNavigate,
   isActive,
 }: SidebarFavoritesProps) {
+  const q = searchQuery.trim();
+
   const favorites = favoriteHrefs
     .map((href) => navItems.find((item) => item.href === href))
-    .filter((item): item is PlatformNavItem => Boolean(item));
+    .filter((item): item is PlatformNavItem => Boolean(item))
+    .filter((item) => !q || navItemMatchesSearch(item, q));
 
   const recent = recentVisits
     .map((visit) => navItems.find((item) => item.href === visit.href))
     .filter((item): item is PlatformNavItem => Boolean(item))
+    .filter((item) => !q || navItemMatchesSearch(item, q))
     .slice(0, 5);
 
   if (favorites.length === 0 && recent.length === 0) return null;
@@ -68,13 +75,13 @@ export function SidebarFavorites({
         </div>
       )}
 
-      {recent.length > 0 && (
+          {recent.length > 0 && (
         <div>
           {!collapsed ? (
             <button
               type="button"
               onClick={onToggleRecent}
-              aria-expanded={!recentCollapsed}
+              aria-expanded={!recentCollapsed || Boolean(searchQuery.trim())}
               className={cn(
                 "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] transition-colors",
                 "text-[var(--platform-text-secondary)] hover:text-[var(--platform-text)]"
@@ -82,7 +89,7 @@ export function SidebarFavorites({
             >
               <Clock className="size-3.5 shrink-0" aria-hidden />
               <span className="min-w-0 flex-1 truncate">Recently visited</span>
-              {recentCollapsed ? (
+              {recentCollapsed && !searchQuery.trim() ? (
                 <ChevronRight className="size-3.5 shrink-0" aria-hidden />
               ) : (
                 <ChevronDown className="size-3.5 shrink-0" aria-hidden />
@@ -90,7 +97,7 @@ export function SidebarFavorites({
             </button>
           ) : null}
 
-          {(!recentCollapsed || collapsed) && (
+          {(!recentCollapsed || collapsed || Boolean(searchQuery.trim())) && (
             <ul
               className={cn("space-y-0.5", !collapsed && !recentCollapsed && "mt-0.5")}
               role="group"

@@ -19,6 +19,7 @@ import { SidebarNavBadge } from "@/components/platform/sidebar-nav-badge";
 import { SidebarSearch } from "@/components/platform/sidebar-search";
 import { SidebarFavorites } from "@/components/platform/sidebar-favorites";
 import { PlatformLogoutAction } from "@/components/platform/platform-logout-action";
+import { navItemMatchesSearch } from "@/lib/platform/nav-search";
 import {
   getNavFavorites,
   getRecentNavVisits,
@@ -102,6 +103,10 @@ export function PlatformSidebar({
   const [favorites, setFavorites] = useState<string[]>([]);
   const [recentVisits, setRecentVisits] = useState(getRecentNavVisits());
   const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const handleSearchQueryChange = useCallback((query: string) => {
+    setSearchQuery(query);
+  }, []);
 
   const showMobileDrawer = !isDesktop && mobileOpen;
   const showMobileIconRail = !isDesktop && collapsed && !mobileOpen;
@@ -275,6 +280,22 @@ export function PlatformSidebar({
   const customersActive = isActive(PLATFORM_CUSTOMERS_ITEM.href);
   const CustomersIcon = PLATFORM_CUSTOMERS_ITEM.icon;
 
+  const activeSearch = searchQuery.trim();
+  const showDashboard =
+    !activeSearch || navItemMatchesSearch(PLATFORM_DASHBOARD_ITEM, activeSearch);
+  const showCustomersLink =
+    showCustomers &&
+    (!activeSearch || navItemMatchesSearch(PLATFORM_CUSTOMERS_ITEM, activeSearch));
+  const visibleDepartments = useMemo(() => {
+    if (!activeSearch) return departments;
+    return departments
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) => navItemMatchesSearch(item, activeSearch)),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [activeSearch, departments]);
+
   return (
     <>
       <button
@@ -349,12 +370,14 @@ export function PlatformSidebar({
           collapsed={collapsed}
           onNavigate={onMobileClose}
           onExpand={onExpand}
+          onQueryChange={handleSearchQueryChange}
           isActive={isActive}
         />
 
         <nav className="platform-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-2 pb-2">
           {/* Dashboard & Customers — always visible top-level links */}
           <ul className="space-y-0.5">
+            {showDashboard ? (
             <li>
               <Link
                 href={PLATFORM_DASHBOARD_ITEM.href}
@@ -371,7 +394,8 @@ export function PlatformSidebar({
                 )}
               </Link>
             </li>
-            {showCustomers ? (
+            ) : null}
+            {showCustomersLink ? (
               <li>
                 <Link
                   href={PLATFORM_CUSTOMERS_ITEM.href}
@@ -399,8 +423,8 @@ export function PlatformSidebar({
           </ul>
 
           {/* Department groups */}
-          {departments.map((group, groupIndex) => {
-            const groupCollapsed = collapsedGroups.includes(group.id);
+          {visibleDepartments.map((group, groupIndex) => {
+            const groupCollapsed = !activeSearch && collapsedGroups.includes(group.id);
             const groupActive = activeDepartmentId === group.id;
             const GroupIcon = group.icon;
 
@@ -501,6 +525,7 @@ export function PlatformSidebar({
             navItems={navItems}
             collapsed={collapsed}
             recentCollapsed={collapsedGroups.includes(RECENT_GROUP_ID)}
+            searchQuery={searchQuery}
             onToggleRecent={() => toggleGroup(RECENT_GROUP_ID)}
             onNavigate={onMobileClose}
             isActive={isActive}
