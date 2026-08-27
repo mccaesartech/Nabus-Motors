@@ -35,6 +35,7 @@ export default function RestoreDeletionPage() {
     const res = await fetch("/api/customer/deletion-verification", {
       method: "POST",
       headers,
+      body: JSON.stringify({ email: email.trim().toLowerCase() }),
     });
     const json = await res.json();
     if (!res.ok) {

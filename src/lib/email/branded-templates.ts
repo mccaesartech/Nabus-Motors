@@ -107,6 +107,25 @@ export function verifyEmail(name: string, verifyUrl: string): BrandedEmail {
   return { subject, html, text: `Confirm your True Goshen email: ${verifyUrl}` };
 }
 
+export function accountReauthCodeEmail(
+  name: string,
+  code: string,
+  expiryMinutes: number
+): BrandedEmail {
+  const subject = "Your True Goshen verification code";
+  const safeName = name ? ` ${escapeHtml(name)}` : "";
+  const safeCode = escapeHtml(code);
+  const html = layout(
+    subject,
+    `<h1 style="margin:0 0 12px;font-size:22px;">Verification code</h1><p>Hi${safeName}, use this code to confirm your identity:</p><p style="font-size:28px;font-weight:700;letter-spacing:0.2em;margin:16px 0;">${safeCode}</p><p>This code expires in ${expiryMinutes} minutes. If you did not request this, you can ignore this email.</p>`
+  );
+  return {
+    subject,
+    html,
+    text: `Your True Goshen verification code is ${code}. It expires in ${expiryMinutes} minutes.`,
+  };
+}
+
 export function passwordResetEmail(name: string, resetUrl: string): BrandedEmail {
   const subject = "Reset your True Goshen password";
   const safeName = name ? ` ${escapeHtml(name)}` : "";

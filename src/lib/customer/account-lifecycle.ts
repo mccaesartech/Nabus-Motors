@@ -1,8 +1,19 @@
 import "server-only";
+import { randomInt } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { notifyCustomer } from "@/lib/notifications/customer-notify";
+import { sendEmail } from "@/lib/email/resend";
+import { accountReauthCodeEmail } from "@/lib/email/branded-templates";
+import { hashToken } from "@/lib/platform/password";
+import {
+  isMissingRelationError,
+  isSchemaMissing,
+  markSchemaMissing,
+  SCHEMA_CAPS,
+} from "@/lib/observability/schema-capability";
+import { reportSchemaIssue } from "@/lib/observability/schema-issue";
 import type { AccountStatus } from "@/lib/customer/account-lifecycle.shared";
 
 export {
@@ -42,7 +53,177 @@ export function parseClientIp(req: Request): string | null {
   return req.headers.get("x-real-ip");
 }
 
+export const CUSTOMER_REAUTH_CODE_TTL_MS = 15 * 60_000;
+export const CUSTOMER_REAUTH_CODE_PURPOSE = "account_lifecycle";
+
+const REAUTH_TABLE = "customer_reauth_codes";
+const REAUTH_SCHEMA_KEY = SCHEMA_CAPS.customerReauthCodes;
+
+function reportMissingReauthTable(message: string, source: string) {
+  markSchemaMissing(REAUTH_SCHEMA_KEY);
+  reportSchemaIssue({
+    table: REAUTH_TABLE,
+    migration: "102_customer_reauth_codes.sql",
+    source,
+    message,
+  });
+}
+
+export function generateCustomerReauthCode(): string {
+  return String(randomInt(0, 1_000_000)).padStart(6, "0");
+}
+
+export function computeCustomerReauthExpiresAt(nowMs = Date.now()): string {
+  return new Date(nowMs + CUSTOMER_REAUTH_CODE_TTL_MS).toISOString();
+}
+
+export function isCustomerReauthCodeExpired(expiresAt: string, nowMs = Date.now()): boolean {
+  return Date.parse(expiresAt) <= nowMs;
+}
+
+export async function createCustomerReauthCode(params: {
+  userId: string;
+  purpose?: string;
+  requestedIp?: string | null;
+}): Promise<
+  | { ok: true; code: string; expiresAt: string }
+  | { ok: false; reason: "schema_missing" | "db_error" | "not_configured" }
+> {
+  if (isSchemaMissing(REAUTH_SCHEMA_KEY)) {
+    return { ok: false, reason: "schema_missing" };
+  }
+
+  const supabase = createAdminSupabase();
+  if (!supabase) return { ok: false, reason: "not_configured" };
+
+  const purpose = params.purpose?.trim() || CUSTOMER_REAUTH_CODE_PURPOSE;
+  const code = generateCustomerReauthCode();
+  const codeHash = await hashToken(code);
+  const expiresAt = computeCustomerReauthExpiresAt();
+  const nowIso = new Date().toISOString();
+
+  const { error: invalidateError } = await supabase
+    .from(REAUTH_TABLE)
+    .update({ used_at: nowIso })
+    .eq("user_id", params.userId)
+    .eq("purpose", purpose)
+    .is("used_at", null);
+
+  if (invalidateError) {
+    if (isMissingRelationError(invalidateError.message, REAUTH_TABLE)) {
+      reportMissingReauthTable(invalidateError.message, "customer-reauth.create");
+      return { ok: false, reason: "schema_missing" };
+    }
+    console.error("[account-lifecycle] reauth invalidate failed:", invalidateError.message);
+    return { ok: false, reason: "db_error" };
+  }
+
+  const { error: insertError } = await supabase.from(REAUTH_TABLE).insert({
+    user_id: params.userId,
+    purpose,
+    code_hash: codeHash,
+    expires_at: expiresAt,
+    requested_ip: params.requestedIp?.trim() || null,
+  });
+
+  if (insertError) {
+    if (isMissingRelationError(insertError.message, REAUTH_TABLE)) {
+      reportMissingReauthTable(insertError.message, "customer-reauth.create");
+      return { ok: false, reason: "schema_missing" };
+    }
+    console.error("[account-lifecycle] reauth insert failed:", insertError.message);
+    return { ok: false, reason: "db_error" };
+  }
+
+  return { ok: true, code, expiresAt };
+}
+
+export async function verifyCustomerReauthCode(params: {
+  userId: string;
+  code: string;
+  purpose?: string;
+}): Promise<
+  | { ok: true }
+  | { ok: false; reason: "invalid" | "expired" | "used" | "schema_missing" | "not_configured" }
+> {
+  const raw = params.code.trim();
+  if (!/^\d{6}$/.test(raw)) return { ok: false, reason: "invalid" };
+  if (isSchemaMissing(REAUTH_SCHEMA_KEY)) return { ok: false, reason: "schema_missing" };
+
+  const supabase = createAdminSupabase();
+  if (!supabase) return { ok: false, reason: "not_configured" };
+
+  const purpose = params.purpose?.trim() || CUSTOMER_REAUTH_CODE_PURPOSE;
+  const codeHash = await hashToken(raw);
+
+  const { data, error } = await supabase
+    .from(REAUTH_TABLE)
+    .select("id, expires_at, used_at")
+    .eq("user_id", params.userId)
+    .eq("purpose", purpose)
+    .eq("code_hash", codeHash)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    if (isMissingRelationError(error.message, REAUTH_TABLE)) {
+      reportMissingReauthTable(error.message, "customer-reauth.verify");
+      return { ok: false, reason: "schema_missing" };
+    }
+    console.warn("[account-lifecycle] reauth verify query failed:", error.message);
+    return { ok: false, reason: "invalid" };
+  }
+
+  if (!data) return { ok: false, reason: "invalid" };
+  if (data.used_at) return { ok: false, reason: "used" };
+  if (isCustomerReauthCodeExpired(data.expires_at)) {
+    return { ok: false, reason: "expired" };
+  }
+
+  const nowIso = new Date().toISOString();
+  const { data: consumed, error: consumeError } = await supabase
+    .from(REAUTH_TABLE)
+    .update({ used_at: nowIso })
+    .eq("id", data.id)
+    .is("used_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (consumeError || !consumed?.id) {
+    return { ok: false, reason: consumeError ? "invalid" : "used" };
+  }
+
+  return { ok: true };
+}
+
+export async function sendCustomerReauthCodeEmail(params: {
+  to: string;
+  name?: string;
+  code: string;
+  expiryMinutes?: number;
+}): Promise<{ emailSent: boolean; emailError?: string; resendId?: string }> {
+  const expiryMinutes =
+    params.expiryMinutes ?? Math.round(CUSTOMER_REAUTH_CODE_TTL_MS / 60_000);
+  const branded = accountReauthCodeEmail(params.name?.trim() || "", params.code, expiryMinutes);
+
+  try {
+    const result = await sendEmail({
+      to: params.to,
+      subject: branded.subject,
+      html: branded.html,
+      text: branded.text,
+    });
+    return { emailSent: true, resendId: result.messageId };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Email send failed";
+    console.error("[account-lifecycle] reauth code email failed:", message);
+    return { emailSent: false, emailError: message };
+  }
+}
+
 export async function verifyCustomerReauth(params: {
+  userId: string;
   email: string;
   password?: string;
   verificationToken?: string;
@@ -91,12 +272,11 @@ export async function verifyCustomerReauth(params: {
   }
 
   if (params.verificationToken?.trim()) {
-    const { error } = await supabase.auth.verifyOtp({
-      email,
-      token: params.verificationToken.trim(),
-      type: "email",
+    const verified = await verifyCustomerReauthCode({
+      userId: params.userId,
+      code: params.verificationToken.trim(),
     });
-    if (error) {
+    if (!verified.ok) {
       return { ok: false, message: "Invalid or expired verification code." };
     }
     return { ok: true };

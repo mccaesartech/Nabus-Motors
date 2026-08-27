@@ -80,6 +80,7 @@ export async function POST(req: NextRequest) {
   }
 
   const reauth = await verifyCustomerReauth({
+    userId: user.id,
     email: user.email,
     password,
     verificationToken,

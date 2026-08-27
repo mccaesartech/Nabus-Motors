@@ -78,7 +78,11 @@ export function DeleteAccountSection({ retentionDays = 30 }: DeleteAccountSectio
 
     const res = await fetch("/api/customer/deletion-verification", {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: "{}",
     });
     const json = await res.json();
     if (!res.ok) {

@@ -1,10 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("server-only", () => ({}));
+vi.mock("@/lib/supabase/admin", () => ({ createAdminSupabase: () => null }));
+vi.mock("@/lib/supabase/server", () => ({ createServerSupabase: () => null }));
+vi.mock("@/lib/email/resend", () => ({ sendEmail: vi.fn() }));
+vi.mock("@/lib/notifications/customer-notify", () => ({ notifyCustomer: vi.fn() }));
+
 import { isValidDeleteConfirmation } from "@/lib/customer/account-lifecycle.validation";
-import {
-  DELETION_REASONS,
-  getAccountRetentionDaysClient,
-} from "@/lib/customer/account-lifecycle.shared";
+import { DELETION_REASONS } from "@/lib/customer/account-lifecycle.shared";
 import { isValidDeletionReason } from "@/lib/customer/account-lifecycle.validation";
+import {
+  computeCustomerReauthExpiresAt,
+  CUSTOMER_REAUTH_CODE_TTL_MS,
+  generateCustomerReauthCode,
+  isCustomerReauthCodeExpired,
+} from "@/lib/customer/account-lifecycle";
 
 describe("account deletion confirmation", () => {
   it("accepts DELETE keyword", () => {
@@ -29,8 +39,19 @@ describe("deletion reasons", () => {
   });
 });
 
-describe("retention days", () => {
-  it("defaults to 30 days", () => {
-    expect(getAccountRetentionDaysClient()).toBe(30);
+describe("customer reauth code helpers", () => {
+  it("generates a 6-digit zero-padded code", () => {
+    const code = generateCustomerReauthCode();
+    expect(code).toMatch(/^\d{6}$/);
+  });
+
+  it("computes a 15-minute expiry", () => {
+    const now = Date.parse("2026-08-04T12:00:00.000Z");
+    const expiresAt = computeCustomerReauthExpiresAt(now);
+    expect(Date.parse(expiresAt) - now).toBe(CUSTOMER_REAUTH_CODE_TTL_MS);
+    expect(isCustomerReauthCodeExpired(expiresAt, now)).toBe(false);
+    expect(isCustomerReauthCodeExpired(expiresAt, now + CUSTOMER_REAUTH_CODE_TTL_MS + 1)).toBe(
+      true
+    );
   });
 });

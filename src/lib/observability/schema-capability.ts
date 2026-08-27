@@ -21,6 +21,7 @@ export const SCHEMA_CAPS = {
   aiUsageLogs: "ai_usage_logs",
   staffWhatsappMessages: "staff_whatsapp_messages",
   platformPasswordResetTokens: "platform_password_reset_tokens",
+  customerReauthCodes: "customer_reauth_codes",
   customerSessions: "customer_sessions",
   customerLoginHistory: "customer_login_history",
   vehiclesStockQuantity: "vehicles.stock_quantity",
