@@ -19,7 +19,8 @@ const continuationWebpPath = path.join(
 );
 const dataPath = path.join(root, "src/lib/print/letterhead-data.ts");
 
-const RENDER_DPI = 150;
+/** 300 DPI keeps letterhead crisp on physical A4 printers (~150 DPI looked soft). */
+const RENDER_DPI = 300;
 const A4_WIDTH_MM = 210;
 const A4_HEIGHT_MM = 297;
 const SCALE = RENDER_DPI / 25.4;

@@ -90,10 +90,13 @@ export function injectPageBackgrounds(doc: Document): void {
 }
 
 /**
- * html2canvas scale — 1.0 prioritizes speed and text stays readable on A4. Keep it at 1
- * so {@link PRINT_PAGE_HEIGHT_PX} equals html2pdf's canvas page slice exactly.
+ * html2canvas scale — 2× (~192 DPI on A4) keeps Download PDFs sharp on physical printers.
+ * Scale 1 (~96 DPI) looked soft when printed. We slice pages ourselves with
+ * {@link PRINT_PAGE_HEIGHT_PX} × scale (html2pdf's `floor(canvasWidth × 297/210)` drifts at scale≠1).
  */
-const PDF_CANVAS_SCALE = 1.0;
+const PDF_CANVAS_SCALE = 2;
+/** JPEG quality for PDF page images — high enough for crisp print, still compact. */
+const PDF_IMAGE_QUALITY = 0.95;
 /** Max wait before opening print dialog even if images are still loading. */
 const PRINT_DIALOG_MAX_WAIT_MS = 2000;
 
@@ -174,6 +177,9 @@ export const DOCUMENT_STYLES = `
     height: ${PRINT_PAGE_HEIGHT_PX}px;
     max-width: none;
     object-fit: fill;
+    /* Prefer high-quality resampling when the browser scales the 300 DPI letterhead. */
+    image-rendering: auto;
+    image-rendering: high-quality;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -1083,16 +1089,18 @@ function replaceExternalImagesForPdf(root: HTMLElement): void {
   }
 }
 
-let html2pdfModule: Promise<typeof import("html2pdf.js").default> | null = null;
+let html2canvasModule: Promise<typeof import("html2canvas").default> | null =
+  null;
 
-function loadHtml2Pdf() {
-  html2pdfModule ??= import("html2pdf.js").then((mod) => mod.default);
-  return html2pdfModule;
+function loadHtml2Canvas() {
+  html2canvasModule ??= import("html2canvas").then((mod) => mod.default);
+  return html2canvasModule;
 }
 
-/** Prefetch html2pdf.js so the first PDF click pays less import latency. */
+/** Prefetch PDF capture libraries so the first Download click pays less import latency. */
 export function preloadPdfEngine(): void {
-  void loadHtml2Pdf();
+  void loadHtml2Canvas();
+  void import("jspdf");
 }
 
 function measureDocumentHeight(doc: Document): number {
@@ -1323,6 +1331,56 @@ function createPdfStage(html: string): { stage: HTMLElement; root: HTMLElement }
   return { stage, root };
 }
 
+/**
+ * Build a multi-page A4 PDF from a high-DPI canvas, slicing on our baked page height
+ * (not html2pdf's floor(width×ratio), which inserts blank/squashed pages at scale > 1).
+ */
+async function canvasToA4PdfBlob(
+  canvas: HTMLCanvasElement,
+  pageCount: number
+): Promise<Blob> {
+  const { jsPDF } = await import("jspdf");
+  const pdf = new jsPDF({
+    unit: "mm",
+    format: "a4",
+    orientation: "portrait",
+    compress: true,
+  });
+  const pageWidthMm = pdf.internal.pageSize.getWidth();
+  const pageHeightMm = pdf.internal.pageSize.getHeight();
+  const slicePx = Math.round(PRINT_PAGE_HEIGHT_PX * PDF_CANVAS_SCALE);
+
+  const pageCanvas = document.createElement("canvas");
+  pageCanvas.width = canvas.width;
+  pageCanvas.height = slicePx;
+  const ctx = pageCanvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Canvas unsupported");
+  }
+
+  for (let page = 0; page < pageCount; page++) {
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+    ctx.drawImage(
+      canvas,
+      0,
+      page * slicePx,
+      canvas.width,
+      slicePx,
+      0,
+      0,
+      canvas.width,
+      slicePx
+    );
+
+    const imgData = pageCanvas.toDataURL("image/jpeg", PDF_IMAGE_QUALITY);
+    if (page > 0) pdf.addPage();
+    pdf.addImage(imgData, "JPEG", 0, 0, pageWidthMm, pageHeightMm);
+  }
+
+  return pdf.output("blob");
+}
+
 async function htmlToPdfBlob(html: string): Promise<Blob> {
   const { stage, root } = createPdfStage(html);
 
@@ -1333,34 +1391,22 @@ async function htmlToPdfBlob(html: string): Promise<Blob> {
     const pageCount = prepareDocumentForOutput(root);
     const totalHeight = pageCount * PRINT_PAGE_HEIGHT_PX;
 
-    const html2pdf = await loadHtml2Pdf();
-    const pdfOptions = {
-      margin: [0, 0, 0, 0],
-      filename: "document.pdf",
-      image: { type: "jpeg", quality: 0.92 },
-      enableLinks: false,
-      html2canvas: {
-        scale: PDF_CANVAS_SCALE,
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
-        backgroundColor: "#ffffff",
-        width: PRINT_PAGE_WIDTH_PX,
-        windowWidth: PRINT_PAGE_WIDTH_PX,
-        height: totalHeight,
-        windowHeight: totalHeight,
-        scrollX: 0,
-        scrollY: 0,
-      },
-      // Page breaks are already baked into the staged DOM; the plugin would double them.
-      pagebreak: { mode: [], before: [], after: [], avoid: [] },
-      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-    };
+    const html2canvas = await loadHtml2Canvas();
+    const canvas = await html2canvas(root, {
+      scale: PDF_CANVAS_SCALE,
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+      backgroundColor: "#ffffff",
+      width: PRINT_PAGE_WIDTH_PX,
+      windowWidth: PRINT_PAGE_WIDTH_PX,
+      height: totalHeight,
+      windowHeight: totalHeight,
+      scrollX: 0,
+      scrollY: 0,
+    });
 
-    return await html2pdf()
-      .set(pdfOptions as never)
-      .from(root)
-      .outputPdf("blob");
+    return await canvasToA4PdfBlob(canvas, pageCount);
   } finally {
     stage.remove();
   }
