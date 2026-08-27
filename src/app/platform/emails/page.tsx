@@ -16,6 +16,7 @@ import type { ReceivedCommItem, SentEmailItem } from "@/lib/platform/emails";
 import { cn } from "@/lib/utils";
 import { RESEND_DOMAIN_SETUP_URL } from "@/lib/email/resend-constants";
 import { PlatformDateTime } from "@/components/platform/platform-datetime";
+import { useAdminNotifications } from "@/context/admin-notifications-context";
 
 type Tab = "sent" | "received";
 
@@ -31,6 +32,7 @@ export default function PlatformEmailsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const session = usePlatformSession();
+  const { load: reloadNotifications } = useAdminNotifications();
   const canDelete = Boolean(session?.permissions?.emails);
   const [tab, setTab] = useState<Tab>(
     () => (searchParams.get("tab") === "received" ? "received" : "sent")
@@ -220,6 +222,7 @@ export default function PlatformEmailsPage() {
           ? "Email record moved to trash."
           : `${ids.length} records moved to trash.`)
     );
+    void reloadNotifications();
   }
 
   function toggleSelected(id: string) {

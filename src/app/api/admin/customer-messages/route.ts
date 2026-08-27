@@ -26,7 +26,7 @@ import {
 import { notifyCustomerStaffMessage } from "@/lib/customer/notifications-server";
 import { formatCustomerNotificationFeedback } from "@/lib/notifications/notification-status";
 import { normalizeBatchIds, softDeleteEntities } from "@/lib/platform/trash";
-import { softDeleteAdminNotificationsBySource } from "@/lib/platform/admin-notification-trash";
+import { clearNotificationsForDeletedSource } from "@/lib/platform/admin-notification-trash";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 
 export async function GET(req: NextRequest) {
@@ -324,14 +324,14 @@ export async function DELETE(req: NextRequest) {
       ).data?.map((row) => String(row.id)) ?? [];
 
     await Promise.all([
-      softDeleteAdminNotificationsBySource(
+      clearNotificationsForDeletedSource(
         supabase,
         auth.auth,
         "customer_conversations",
         batch.deletedIds
       ),
       messageIds.length > 0
-        ? softDeleteAdminNotificationsBySource(
+        ? clearNotificationsForDeletedSource(
             supabase,
             auth.auth,
             "customer_conversation_messages",

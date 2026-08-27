@@ -7,6 +7,11 @@ import {
   fetchSentEmails,
 } from "@/lib/platform/emails";
 import {
+  clearNotificationsForDeletedSource,
+  hideEphemeralDeliveryNotification,
+  softDeleteAdminNotificationsBySource,
+} from "@/lib/platform/admin-notification-trash";
+import {
   buildEntityLabel,
   normalizeBatchIds,
   recordTrashEntry,
@@ -72,17 +77,21 @@ async function deleteSentEmailLog(
     return { ok: false, message: deleteError.message };
   }
 
-  await supabase
-    .from("admin_notifications")
-    .delete()
-    .eq("source_table", "notification_log")
-    .eq("source_id", id);
+  // Hide synthetic delivery alert + any legacy persisted rows linked to this log.
+  await hideEphemeralDeliveryNotification(supabase, auth, id, {
+    id: `notification-log-${id}`,
+    title: entityLabel,
+    ephemeral: true,
+    ...snapshot,
+  });
+  await softDeleteAdminNotificationsBySource(supabase, auth, "notification_log", id);
 
   return { ok: true };
 }
 
 async function deleteCustomerMessage(
   supabase: SupabaseClient,
+  auth: PlatformAuthContext,
   messageId: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const { data, error } = await supabase
@@ -104,11 +113,12 @@ async function deleteCustomerMessage(
     return { ok: false, message: deleteError.message };
   }
 
-  await supabase
-    .from("admin_notifications")
-    .delete()
-    .eq("source_table", "customer_conversation_messages")
-    .eq("source_id", messageId);
+  await clearNotificationsForDeletedSource(
+    supabase,
+    auth,
+    "customer_conversation_messages",
+    messageId
+  );
 
   return { ok: true };
 }
@@ -140,11 +150,12 @@ async function deleteEmailItems(
       const result = await softDeleteEntity(supabase, auth, "lead_contact", parsed.id);
       if (result.ok) {
         deletedIds.push(rawId);
-        await supabase
-          .from("admin_notifications")
-          .delete()
-          .eq("source_table", "contact_inquiries")
-          .eq("source_id", parsed.id);
+        await clearNotificationsForDeletedSource(
+          supabase,
+          auth,
+          "contact_inquiries",
+          parsed.id
+        );
       } else {
         failed.push({ id: rawId, message: result.message });
       }
@@ -155,18 +166,19 @@ async function deleteEmailItems(
       const result = await softDeleteEntity(supabase, auth, "lead_vehicle", parsed.id);
       if (result.ok) {
         deletedIds.push(rawId);
-        await supabase
-          .from("admin_notifications")
-          .delete()
-          .eq("source_table", "vehicle_inquiries")
-          .eq("source_id", parsed.id);
+        await clearNotificationsForDeletedSource(
+          supabase,
+          auth,
+          "vehicle_inquiries",
+          parsed.id
+        );
       } else {
         failed.push({ id: rawId, message: result.message });
       }
       continue;
     }
 
-    const result = await deleteCustomerMessage(supabase, parsed.id);
+    const result = await deleteCustomerMessage(supabase, auth, parsed.id);
     if (result.ok) deletedIds.push(rawId);
     else failed.push({ id: rawId, message: result.message });
   }

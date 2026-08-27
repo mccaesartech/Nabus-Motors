@@ -3,7 +3,7 @@ import { requireDirectMutation, requirePermission } from "@/lib/admin/auth";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { fetchPreorderInquiryById } from "@/lib/platform/data";
 import { softDeleteEntity } from "@/lib/platform/trash";
-import { softDeleteAdminNotificationsBySource } from "@/lib/platform/admin-notification-trash";
+import { clearNotificationsForDeletedSource } from "@/lib/platform/admin-notification-trash";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -54,7 +54,7 @@ export async function DELETE(_req: NextRequest, context: RouteContext) {
     );
   }
 
-  await softDeleteAdminNotificationsBySource(
+  await clearNotificationsForDeletedSource(
     supabase,
     auth.auth,
     "preorder_inquiries",

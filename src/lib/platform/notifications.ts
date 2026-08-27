@@ -18,9 +18,13 @@ import {
   LOW_STOCK_NOTIFICATION_ID,
 } from "@/lib/platform/notification-read-state";
 import {
+  filterDeliveryLogsForActiveSources,
   filterOutTrashedAdminNotifications,
+  filterOutTrashedDeliveryNotifications,
   listTrashedAdminNotificationIds,
+  listTrashedSentEmailIds,
 } from "@/lib/platform/admin-notification-trash";
+import { notDeletedFilter } from "@/lib/platform/trash-types";
 import { buildFleetLowStockMessage } from "@/lib/vehicles/low-stock";
 import { reportSchemaIssue } from "@/lib/observability/schema-issue";
 import {
@@ -129,10 +133,9 @@ export async function buildFallbackNotifications(
     mapMetadata?: (row: Record<string, unknown>) => Record<string, unknown> | undefined,
     statuses: string[] = OPEN_STATUSES
   ) => {
-    const { data } = await supabase
-      .from(table)
-      .select("*")
-      .in("status", statuses)
+    const { data } = await notDeletedFilter(
+      supabase.from(table).select("*").in("status", statuses)
+    )
       .order("created_at", { ascending: false })
       .limit(20);
 
@@ -155,7 +158,11 @@ export async function buildFallbackNotifications(
 
   const addPreorderRows = async () => {
     const rows = await fetchPreorderInquiries(supabase);
-    for (const row of rows.filter((r) => OPEN_STATUSES.includes(String(r.status ?? "new")))) {
+    for (const row of rows.filter(
+      (r) =>
+        OPEN_STATUSES.includes(String(r.status ?? "new")) &&
+        !(r as { deleted_at?: string | null }).deleted_at
+    )) {
       const down = row.down_payment_usd
         ? formatPlatformPrice(Number(row.down_payment_usd))
         : formatPlatformPrice(0);
@@ -329,21 +336,42 @@ export async function fetchAdminNotifications(
 
   const scope = auth ? adminNotificationRecipientScope(auth) : null;
 
-  const [failedDeliveriesRes, trashedIds, dismissedKeys] = await Promise.all([
-    supabase
-      .from("notification_log")
-      .select("id, template, channel, status, recipient, detail, created_at, source_table, source_id")
-      .in("status", ["failed", "deferred", "undeliverable"])
-      .order("created_at", { ascending: false })
-      .limit(5),
-    listTrashedAdminNotificationIds(supabase),
-    scope
-      ? listDismissedAdminNotificationKeys(supabase, scope)
-      : Promise.resolve(new Set<string>()),
-  ]);
+  const [failedDeliveriesRes, trashedIds, trashedSentEmailIds, dismissedKeys] =
+    await Promise.all([
+      supabase
+        .from("notification_log")
+        .select(
+          "id, template, channel, status, recipient, detail, created_at, source_table, source_id"
+        )
+        .in("status", ["failed", "deferred", "undeliverable"])
+        .order("created_at", { ascending: false })
+        .limit(5),
+      listTrashedAdminNotificationIds(supabase),
+      listTrashedSentEmailIds(supabase),
+      scope
+        ? listDismissedAdminNotificationKeys(supabase, scope)
+        : Promise.resolve(new Set<string>()),
+    ]);
 
-  for (const row of failedDeliveriesRes.data ?? []) {
+  const activeFailedDeliveries = await filterDeliveryLogsForActiveSources(
+    supabase,
+    (failedDeliveriesRes.data ?? []) as Array<{
+      id: string;
+      template: string;
+      channel: string;
+      status: string;
+      recipient: string;
+      detail: string | null;
+      created_at: string;
+      source_table: string | null;
+      source_id: string | null;
+    }>
+  );
+
+  for (const row of activeFailedDeliveries) {
+    if (trashedSentEmailIds.has(String(row.id))) continue;
     const mapped = mapNotificationLogToAdminNotification(row);
+    if (trashedIds.has(mapped.id)) continue;
     const exists = notifications.some((n) => n.id === mapped.id);
     if (exists) continue;
     notifications.unshift(mapped);
@@ -351,6 +379,11 @@ export async function fetchAdminNotifications(
 
   let finalNotifications = notifications.slice(0, limit);
   finalNotifications = filterOutTrashedAdminNotifications(finalNotifications, trashedIds);
+  finalNotifications = filterOutTrashedDeliveryNotifications(
+    finalNotifications,
+    trashedSentEmailIds,
+    trashedIds
+  );
 
   if (auth && dismissedKeys.size > 0) {
     finalNotifications = applyDismissalsToNotifications(finalNotifications, dismissedKeys);
