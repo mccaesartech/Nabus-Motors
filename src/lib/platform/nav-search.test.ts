@@ -40,6 +40,12 @@ const catalog: PlatformNavItem[] = [
     icon: ShoppingCart,
   }),
   item({
+    label: "Appointments",
+    href: "/platform/sales/appointments",
+    description: "Scheduled visits",
+    icon: ShoppingCart,
+  }),
+  item({
     label: "Inventory",
     href: "/platform/inventory",
     description: "Your vehicles",
@@ -106,21 +112,41 @@ const adminCatalog: PlatformNavItem[] = [
 ];
 
 describe("nav-search", () => {
-  it("ranks label prefix matches above weaker hits for short queries", () => {
-    // 1-2 char queries are label-word prefix only — path/description must not pull extras.
-    const ranked = rankNavSearchResults(catalog, "in");
-    expect(ranked.map((r) => r.item.label)).toEqual(["Inventory"]);
+  it("progressively filters labels that contain a single character", () => {
+    const ranked = rankNavSearchResults([...catalog, ...adminCatalog], "a");
+    const labels = ranked.map((r) => r.item.label);
+    expect(labels).toContain("Appointments");
+    expect(labels).toContain("Sales");
+    expect(labels).toContain("Audit Log");
+    expect(labels).toContain("Dashboard");
+    expect(labels).toContain("Emails");
+    // No "a" in these labels — must stay hidden for a pure label contains query.
+    expect(labels).not.toContain("Users");
+    expect(labels).not.toContain("Settings");
+    expect(labels).not.toContain("Reports");
   });
 
-  it("does not match unrelated pages via weak substrings", () => {
-    // Old bug: href/description `.includes("or")` pulled in Reports, Documents, etc.
+  it("ranks label prefix matches above weaker includes for short queries", () => {
+    const ranked = rankNavSearchResults(catalog, "in");
+    // Inventory starts with "in"; Appointments contains "in".
+    expect(ranked.map((r) => r.item.label)).toEqual(["Inventory", "Appointments"]);
+    expect(ranked[0]!.score).toBeGreaterThan(ranked[1]!.score);
+  });
+
+  it("matches label substrings as the query grows (contains filter)", () => {
+    // Freight Orders (word prefix), Inventory/Reports (label includes "or").
     const ranked = rankNavSearchResults(catalog, "or");
-    expect(ranked.map((r) => r.item.label)).toEqual(["Freight Orders"]);
+    expect(ranked.map((r) => r.item.label)).toEqual([
+      "Freight Orders",
+      "Inventory",
+      "Reports",
+    ]);
+    expect(ranked[0]!.score).toBeGreaterThan(ranked[1]!.score);
   });
 
   it("matches path segments and ranks them below label hits", () => {
-    const inventory = scoreNavSearch(catalog[2]!, "inventory");
-    const movements = scoreNavSearch(catalog[3]!, "movements");
+    const inventory = scoreNavSearch(catalog[3]!, "inventory");
+    const movements = scoreNavSearch(catalog[4]!, "movements");
     expect(inventory).toBeGreaterThan(0);
     expect(movements).toBeGreaterThan(0);
     expect(inventory).toBeGreaterThan(movements);
@@ -139,33 +165,47 @@ describe("nav-search", () => {
   });
 
   it("requires every query term to match", () => {
-    expect(navItemMatchesSearch(catalog[3]!, "movement ledger")).toBe(true);
-    expect(navItemMatchesSearch(catalog[3]!, "movement sales")).toBe(false);
+    expect(navItemMatchesSearch(catalog[4]!, "movement ledger")).toBe(true);
+    expect(navItemMatchesSearch(catalog[4]!, "movement sales")).toBe(false);
   });
 
-  it("hides zero-relevance results", () => {
+  it("hides zero-relevance results and treats empty query as no search", () => {
     expect(rankNavSearchResults(catalog, "zzzz")).toEqual([]);
     expect(rankNavSearchResults(catalog, "   ")).toEqual([]);
+    expect(rankNavSearchResults(catalog, "")).toEqual([]);
   });
 
   it("allows intentional description word-prefix matches for longer queries", () => {
-    expect(navItemMatchesSearch(catalog[2]!, "vehicle")).toBe(true);
-    expect(navItemMatchesSearch(catalog[2]!, "ve")).toBe(false);
-    // Raised bar: 3-char description prefixes are no longer enough.
-    expect(navItemMatchesSearch(catalog[2]!, "veh")).toBe(false);
+    const vehiclesOnly = item({
+      label: "Stock",
+      href: "/platform/inventory",
+      description: "Your vehicles",
+    });
+    expect(navItemMatchesSearch(vehiclesOnly, "vehicle")).toBe(true);
+    // Short / mid description prefixes must not match (label has no "ve"/"veh").
+    expect(navItemMatchesSearch(vehiclesOnly, "ve")).toBe(false);
+    expect(navItemMatchesSearch(vehiclesOnly, "veh")).toBe(false);
   });
 
-  it("does not allow mid-label includes for queries under 4 chars", () => {
-    expect(navItemMatchesSearch(adminCatalog[2]!, "ser")).toBe(false);
+  it("allows mid-label includes from the first character", () => {
+    expect(navItemMatchesSearch(adminCatalog[2]!, "ser")).toBe(true); // Users
+    expect(navItemMatchesSearch(adminCatalog[2]!, "u")).toBe(true);
     expect(navItemMatchesSearch(adminCatalog[2]!, "user")).toBe(true);
   });
 
-  it("matches se to Settings only among admin pages", () => {
+  it("matches se to Settings and Users, not Audit Log or Emails", () => {
     const ranked = rankNavSearchResults(adminCatalog, "se");
-    expect(ranked.map((r) => r.item.label)).toEqual(["Settings"]);
+    expect(ranked.map((r) => r.item.label)).toEqual(["Settings", "Users"]);
     expect(navItemMatchesSearch(adminCatalog[0]!, "se")).toBe(false); // Emails
-    expect(navItemMatchesSearch(adminCatalog[1]!, "se")).toBe(false); // Audit Log
-    expect(navItemMatchesSearch(adminCatalog[2]!, "se")).toBe(false); // Users
+    expect(navItemMatchesSearch(adminCatalog[1]!, "se")).toBe(false); // Audit Log (description/keyword gated)
+    expect(navItemMatchesSearch(adminCatalog[2]!, "se")).toBe(true); // Users (contains se)
+    expect(navItemMatchesSearch(adminCatalog[3]!, "se")).toBe(true); // Settings
+  });
+
+  it("narrows se to Settings as the user types sett", () => {
+    const ranked = rankNavSearchResults(adminCatalog, "sett");
+    expect(ranked.map((r) => r.item.label)).toEqual(["Settings"]);
+    expect(navItemMatchesSearch(adminCatalog[2]!, "sett")).toBe(false); // Users
   });
 
   it("matches us to Users and not Settings", () => {
@@ -213,7 +253,9 @@ describe("nav-search", () => {
   });
 
   it("blocks keyword prefixes for 1-2 chars but allows exact curated aliases", () => {
-    expect(navItemMatchesSearch(adminCatalog[0]!, "ma")).toBe(false); // mail prefix
+    // Emails label contains "ma" — expected under contains matching.
+    expect(navItemMatchesSearch(adminCatalog[0]!, "ma")).toBe(true);
+    // Keyword-only short prefixes stay blocked when the label does not contain them.
     expect(navItemMatchesSearch(adminCatalog[2]!, "te")).toBe(false); // team prefix
     expect(navItemMatchesSearch(adminCatalog[1]!, "se")).toBe(false); // security prefix
     expect(navItemMatchesSearch(adminCatalog[3]!, "fx")).toBe(true); // exact curated alias

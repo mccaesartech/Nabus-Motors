@@ -3,21 +3,15 @@ import type { PlatformNavItem } from "@/lib/platform/nav";
 const IGNORED_PATH_SEGMENTS = new Set(["admin", "platform"]);
 
 /**
- * Mid-label substring matching (`.includes` on the full label) requires a longer
- * intentional query. Blocks "se" -> Users and "ser" -> Users.
- */
-const MIN_SUBSTRING_QUERY_LEN = 4;
-
-/**
- * Keyword prefix / token matching starts at length 3 (mail, team, currency).
+ * Keyword prefix / token / includes matching starts at length 3.
  * Exact curated aliases may match at length 2 (e.g. "fx") without opening
- * prefix false-positives for "se".
+ * prefix false-positives for "se" → keyword "security".
  */
-const MIN_KEYWORD_PREFIX_QUERY_LEN = 3;
+const MIN_KEYWORD_RELATED_QUERY_LEN = 3;
 
 /**
  * Description word-prefix matching needs a longer intentional query.
- * Blocks short prefixes like "se"/"sec" -> "Security" / "Sent".
+ * Blocks short prefixes like "se"/"sec" → "Security" / "Sent".
  */
 const MIN_DESCRIPTION_QUERY_LEN = 4;
 
@@ -46,6 +40,7 @@ function meaningfulPathSegments(href: string): string[] {
 /**
  * Score keyword / alias relatedness for a single term.
  * Exact aliases allowed from length 2; prefix/token/includes from length 3+.
+ * Short queries rely on label `.includes` instead — avoids "se" → security.
  */
 function scoreKeywordMatch(item: PlatformNavItem, q: string): number {
   if (!item.keywords?.length || q.length < 2) return 0;
@@ -60,7 +55,7 @@ function scoreKeywordMatch(item: PlatformNavItem, q: string): number {
       continue;
     }
 
-    if (q.length < MIN_KEYWORD_PREFIX_QUERY_LEN) continue;
+    if (q.length < MIN_KEYWORD_RELATED_QUERY_LEN) continue;
 
     if (kw.startsWith(q)) {
       best = Math.max(best, 50);
@@ -73,7 +68,7 @@ function scoreKeywordMatch(item: PlatformNavItem, q: string): number {
       continue;
     }
 
-    if (q.length >= MIN_SUBSTRING_QUERY_LEN && kw.includes(q)) {
+    if (kw.includes(q)) {
       best = Math.max(best, 42);
     }
   }
@@ -84,14 +79,13 @@ function scoreKeywordMatch(item: PlatformNavItem, q: string): number {
  * Score how well a nav item matches a single search term.
  * Returns 0 when there is no meaningful match (caller should hide the item).
  *
- * Priority: label hits -> keyword/alias -> path segment -> description word.
+ * Progressive filter-as-you-type: label `.includes` from the first character.
  *
- * Length rules:
- * - 1-2 chars: label exact/prefix/word-prefix, plus exact curated keywords only
- * - 3 chars: above + keyword prefixes + path segment equal/prefix
- * - >=4 chars: above + mid-label includes + description word-prefix
+ * Rank: label exact > startsWith > word-prefix > includes >
+ *       keyword (exact / related) > path segment > description (longer queries).
  *
- * Path matching never uses mid-segment `.includes` or full-href substrings.
+ * Description never matches short queries (blocks "se" → "Security").
+ * Keyword related matches start at length 3 (blocks "se" → keyword "security").
  */
 export function scoreNavSearchTerm(item: PlatformNavItem, term: string): number {
   const q = term.trim().toLowerCase();
@@ -105,13 +99,11 @@ export function scoreNavSearchTerm(item: PlatformNavItem, term: string): number 
   if (label.startsWith(q)) return 90;
   if (labelTokens.some((token) => token.startsWith(q))) return 80;
 
-  // Mid-label substring only for longer queries (avoids "ser" -> Users).
-  // Still a label hit — ranks above keywords/aliases.
-  if (q.length >= MIN_SUBSTRING_QUERY_LEN && label.includes(q)) {
+  // Mid-label substring from the first character (e.g. "a" → Sales, "se" → Users).
+  if (label.includes(q)) {
     return 60;
   }
 
-  // Curated aliases (exact "fx" at len 2; related prefixes from len 3).
   const keywordScore = scoreKeywordMatch(item, q);
   if (keywordScore > 0) return keywordScore;
 
@@ -119,7 +111,6 @@ export function scoreNavSearchTerm(item: PlatformNavItem, term: string): number 
   if (q.length <= 2) return 0;
 
   // Path: segment equal or prefix only — never mid-segment includes / full href.
-  // Ranked below keywords so related aliases win over structural path hits.
   if (q.length >= MIN_PATH_QUERY_LEN) {
     if (pathSegments.some((segment) => segment === q)) return 40;
     if (pathSegments.some((segment) => segment.startsWith(q))) return 35;
