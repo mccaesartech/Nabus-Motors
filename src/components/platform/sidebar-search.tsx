@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import type { PlatformNavItem } from "@/lib/platform/nav";
@@ -28,14 +28,16 @@ export function SidebarSearch({
   const [focused, setFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    onQueryChange?.(query);
-  }, [query, onQueryChange]);
-
   const results = useMemo(
     () => rankNavSearchResults(items, query).map((entry) => entry.item),
     [items, query]
   );
+
+  const updateQuery = (next: string) => {
+    setQuery(next);
+    // Propagate immediately so the sidebar tree filters on the same keystroke.
+    onQueryChange?.(next);
+  };
 
   if (collapsed) {
     return (
@@ -70,7 +72,7 @@ export function SidebarSearch({
           id="platform-sidebar-search"
           type="search"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => updateQuery(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setTimeout(() => setFocused(false), 150)}
           placeholder="Search menu…"

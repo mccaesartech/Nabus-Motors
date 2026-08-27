@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { Car, FileText, LayoutDashboard, Mail, Settings, ShoppingCart, UserCog } from "lucide-react";
+import {
+  Car,
+  ClipboardList,
+  FileText,
+  LayoutDashboard,
+  Mail,
+  Settings,
+  ShoppingCart,
+  UserCog,
+} from "lucide-react";
 import type { PlatformNavItem } from "@/lib/platform/nav";
 import {
   navItemMatchesSearch,
@@ -27,6 +36,7 @@ const catalog: PlatformNavItem[] = [
     label: "Sales",
     href: "/platform/sales",
     description: "Deals & quotes",
+    keywords: ["deals", "quotes", "cart", "orders", "selling", "pipeline"],
     icon: ShoppingCart,
   }),
   item({
@@ -51,6 +61,7 @@ const catalog: PlatformNavItem[] = [
     label: "Freight Orders",
     href: "/platform/freight/orders",
     description: "Active shipments",
+    keywords: ["orders", "shipments", "shipping", "freight", "cargo", "booking"],
     icon: ShoppingCart,
   }),
   item({
@@ -67,6 +78,7 @@ const adminCatalog: PlatformNavItem[] = [
     label: "Emails",
     href: "/platform/emails",
     description: "Sent & received correspondence",
+    keywords: ["mail", "inbox", "email", "correspondence", "smtp", "mailbox"],
     icon: Mail,
   }),
   item({
@@ -74,25 +86,28 @@ const adminCatalog: PlatformNavItem[] = [
     href: "/platform/audit-log",
     // Historical description that made "se" hit via Security word-prefix.
     description: "Security & ops activity trail",
-    icon: FileText,
+    keywords: ["security", "activity", "trail", "logs", "history", "compliance", "ops"],
+    icon: ClipboardList,
   }),
   item({
     label: "Users",
     href: "/platform/users",
     description: "Team and permissions",
+    keywords: ["team", "staff", "admin", "admins", "accounts", "permissions", "roles", "members", "admin users"],
     icon: UserCog,
   }),
   item({
     label: "Settings",
     href: "/platform/settings",
     description: "Platform configuration",
+    keywords: ["fx", "rate", "rates", "currency", "exchange", "config", "configuration", "preferences", "setup"],
     icon: Settings,
   }),
 ];
 
 describe("nav-search", () => {
   it("ranks label prefix matches above weaker hits for short queries", () => {
-    // 1–2 char queries are label-word prefix only — path/description must not pull extras.
+    // 1-2 char queries are label-word prefix only — path/description must not pull extras.
     const ranked = rankNavSearchResults(catalog, "in");
     expect(ranked.map((r) => r.item.label)).toEqual(["Inventory"]);
   });
@@ -163,8 +178,51 @@ describe("nav-search", () => {
     expect(navItemMatchesSearch(adminCatalog[1]!, "audit")).toBe(true);
     const ranked = rankNavSearchResults(adminCatalog, "audit");
     expect(ranked.map((r) => r.item.label)).toEqual(["Audit Log"]);
-    expect(navItemMatchesSearch(adminCatalog[1]!, "sec")).toBe(false);
+    // 3-char keyword prefix: security -> Audit Log
+    expect(navItemMatchesSearch(adminCatalog[1]!, "sec")).toBe(true);
     expect(navItemMatchesSearch(adminCatalog[1]!, "log")).toBe(true);
     expect(navItemMatchesSearch(adminCatalog[1]!, "audit log")).toBe(true);
+  });
+
+  it("matches related aliases for meaningful queries", () => {
+    expect(rankNavSearchResults(adminCatalog, "mail").map((r) => r.item.label)).toEqual(["Emails"]);
+    expect(rankNavSearchResults(adminCatalog, "inbox").map((r) => r.item.label)).toEqual(["Emails"]);
+    expect(rankNavSearchResults(adminCatalog, "security").map((r) => r.item.label)).toEqual(["Audit Log"]);
+    expect(rankNavSearchResults(adminCatalog, "activity").map((r) => r.item.label)).toEqual(["Audit Log"]);
+    expect(rankNavSearchResults(adminCatalog, "team").map((r) => r.item.label)).toEqual(["Users"]);
+    expect(rankNavSearchResults(adminCatalog, "staff").map((r) => r.item.label)).toEqual(["Users"]);
+    expect(rankNavSearchResults(adminCatalog, "admin users").map((r) => r.item.label)).toEqual(["Users"]);
+    expect(rankNavSearchResults(adminCatalog, "fx").map((r) => r.item.label)).toEqual(["Settings"]);
+    expect(rankNavSearchResults(adminCatalog, "currency").map((r) => r.item.label)).toEqual(["Settings"]);
+    expect(rankNavSearchResults(adminCatalog, "rate").map((r) => r.item.label)).toEqual(["Settings"]);
+  });
+
+  it("ranks label hits above keyword aliases above description", () => {
+    const emails = item({
+      label: "Emails",
+      href: "/platform/emails",
+      description: "Mailbox correspondence",
+      keywords: ["mail", "inbox"],
+    });
+    const labelScore = scoreNavSearch(emails, "emails");
+    const keywordScore = scoreNavSearch(emails, "mail");
+    const descriptionScore = scoreNavSearch(emails, "mailbox");
+    expect(labelScore).toBeGreaterThan(keywordScore);
+    expect(keywordScore).toBeGreaterThan(descriptionScore);
+    expect(descriptionScore).toBeGreaterThan(0);
+  });
+
+  it("blocks keyword prefixes for 1-2 chars but allows exact curated aliases", () => {
+    expect(navItemMatchesSearch(adminCatalog[0]!, "ma")).toBe(false); // mail prefix
+    expect(navItemMatchesSearch(adminCatalog[2]!, "te")).toBe(false); // team prefix
+    expect(navItemMatchesSearch(adminCatalog[1]!, "se")).toBe(false); // security prefix
+    expect(navItemMatchesSearch(adminCatalog[3]!, "fx")).toBe(true); // exact curated alias
+  });
+
+  it("surfaces order-related pages via keywords and label words", () => {
+    const ranked = rankNavSearchResults(catalog, "order");
+    expect(ranked.map((r) => r.item.label)).toEqual(["Freight Orders", "Sales"]);
+    // Freight Orders wins via label word prefix (80) over Sales keyword (52/50).
+    expect(ranked[0]!.score).toBeGreaterThan(ranked[1]!.score);
   });
 });

@@ -4,23 +4,30 @@ const IGNORED_PATH_SEGMENTS = new Set(["admin", "platform"]);
 
 /**
  * Mid-label substring matching (`.includes` on the full label) requires a longer
- * intentional query. Blocks "se" → Users and "ser" → Users.
+ * intentional query. Blocks "se" -> Users and "ser" -> Users.
  */
 const MIN_SUBSTRING_QUERY_LEN = 4;
 
 /**
+ * Keyword prefix / token matching starts at length 3 (mail, team, currency).
+ * Exact curated aliases may match at length 2 (e.g. "fx") without opening
+ * prefix false-positives for "se".
+ */
+const MIN_KEYWORD_PREFIX_QUERY_LEN = 3;
+
+/**
  * Description word-prefix matching needs a longer intentional query.
- * Blocks short prefixes like "se"/"sec" → "Security" / "Sent".
+ * Blocks short prefixes like "se"/"sec" -> "Security" / "Sent".
  */
 const MIN_DESCRIPTION_QUERY_LEN = 4;
 
 /**
- * Path segment matching is too weak for 1–2 char queries (false friends via
+ * Path segment matching is too weak for 1-2 char queries (false friends via
  * href segments). Allowed from length 3 as equal/prefix on segments only.
  */
 const MIN_PATH_QUERY_LEN = 3;
 
-/** Split label/description/path into searchable word tokens. */
+/** Split label/description/path/keywords into searchable word tokens. */
 export function navSearchTokens(value: string): string[] {
   return value
     .toLowerCase()
@@ -37,15 +44,52 @@ function meaningfulPathSegments(href: string): string[] {
 }
 
 /**
+ * Score keyword / alias relatedness for a single term.
+ * Exact aliases allowed from length 2; prefix/token/includes from length 3+.
+ */
+function scoreKeywordMatch(item: PlatformNavItem, q: string): number {
+  if (!item.keywords?.length || q.length < 2) return 0;
+
+  let best = 0;
+  for (const keyword of item.keywords) {
+    const kw = keyword.trim().toLowerCase();
+    if (!kw) continue;
+
+    if (kw === q) {
+      best = Math.max(best, 52);
+      continue;
+    }
+
+    if (q.length < MIN_KEYWORD_PREFIX_QUERY_LEN) continue;
+
+    if (kw.startsWith(q)) {
+      best = Math.max(best, 50);
+      continue;
+    }
+
+    const tokens = navSearchTokens(kw);
+    if (tokens.some((token) => token.startsWith(q))) {
+      best = Math.max(best, 48);
+      continue;
+    }
+
+    if (q.length >= MIN_SUBSTRING_QUERY_LEN && kw.includes(q)) {
+      best = Math.max(best, 42);
+    }
+  }
+  return best;
+}
+
+/**
  * Score how well a nav item matches a single search term.
  * Returns 0 when there is no meaningful match (caller should hide the item).
  *
- * Priority: exact/prefix label → label word → label substring → path segment → description word.
+ * Priority: label hits -> keyword/alias -> path segment -> description word.
  *
  * Length rules:
- * - 1–2 chars: label exact, full-label prefix, or label-word prefix ONLY
- * - 3 chars: above + path segment equal/prefix (no mid-label, no description)
- * - ≥4 chars: above + mid-label includes + description word-prefix
+ * - 1-2 chars: label exact/prefix/word-prefix, plus exact curated keywords only
+ * - 3 chars: above + keyword prefixes + path segment equal/prefix
+ * - >=4 chars: above + mid-label includes + description word-prefix
  *
  * Path matching never uses mid-segment `.includes` or full-href substrings.
  */
@@ -61,18 +105,24 @@ export function scoreNavSearchTerm(item: PlatformNavItem, term: string): number 
   if (label.startsWith(q)) return 90;
   if (labelTokens.some((token) => token.startsWith(q))) return 80;
 
-  // Short queries: strong label matches only — no path, description, or mid-label.
-  if (q.length <= 2) return 0;
-
-  // Mid-label substring only for longer queries (avoids "ser" → Users).
+  // Mid-label substring only for longer queries (avoids "ser" -> Users).
+  // Still a label hit — ranks above keywords/aliases.
   if (q.length >= MIN_SUBSTRING_QUERY_LEN && label.includes(q)) {
     return 60;
   }
 
+  // Curated aliases (exact "fx" at len 2; related prefixes from len 3).
+  const keywordScore = scoreKeywordMatch(item, q);
+  if (keywordScore > 0) return keywordScore;
+
+  // Short queries stop here — no path or description.
+  if (q.length <= 2) return 0;
+
   // Path: segment equal or prefix only — never mid-segment includes / full href.
+  // Ranked below keywords so related aliases win over structural path hits.
   if (q.length >= MIN_PATH_QUERY_LEN) {
-    if (pathSegments.some((segment) => segment === q)) return 70;
-    if (pathSegments.some((segment) => segment.startsWith(q))) return 55;
+    if (pathSegments.some((segment) => segment === q)) return 40;
+    if (pathSegments.some((segment) => segment.startsWith(q))) return 35;
   }
 
   // Description: word-prefix only, and only for queries long enough to be intentional.

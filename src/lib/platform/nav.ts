@@ -33,6 +33,8 @@ export type PlatformNavItem = {
   href: string;
   icon: LucideIcon;
   description?: string;
+  /** Related search aliases / synonyms (matched from 3+ char queries). */
+  keywords?: string[];
   groupId?: string;
 };
 
@@ -48,6 +50,7 @@ const dashboard: PlatformNavItem = {
   href: platformPath("dashboard"),
   icon: LayoutDashboard,
   description: "Overview & business health",
+  keywords: ["home","overview","stats","metrics","kpi"],
   groupId: "dashboard",
 };
 
@@ -56,6 +59,7 @@ const customers: PlatformNavItem = {
   href: platformPath("customers"),
   icon: Users,
   description: "Buyer profiles & contacts",
+  keywords: ["buyers","clients","contacts","crm","people"],
   groupId: "customers",
 };
 
@@ -69,6 +73,7 @@ const salesGroup: PlatformNavGroup = {
       href: platformPath("sales"),
       icon: ShoppingCart,
       description: "Deals & quotes",
+      keywords: ["deals","quotes","cart","orders","selling","pipeline"],
       groupId: "sales",
     },
     {
@@ -76,6 +81,7 @@ const salesGroup: PlatformNavGroup = {
       href: platformPath("leads"),
       icon: MessageSquare,
       description: "Pre-orders & inquiries",
+      keywords: ["preorders","pre-orders","inquiries","prospects","pipeline"],
       groupId: "sales",
     },
     {
@@ -83,6 +89,7 @@ const salesGroup: PlatformNavGroup = {
       href: platformPath("appointments"),
       icon: Calendar,
       description: "Viewings & test drives",
+      keywords: ["viewings","test drives","calendar","schedule","bookings"],
       groupId: "sales",
     },
     {
@@ -90,6 +97,7 @@ const salesGroup: PlatformNavGroup = {
       href: platformPath("messages"),
       icon: MessageSquare,
       description: "Logged-in customer chat",
+      keywords: ["chat","inbox","customer chat","conversations"],
       groupId: "sales",
     },
   ],
@@ -105,6 +113,7 @@ const operationsGroup: PlatformNavGroup = {
       href: platformPath("tracking"),
       icon: Truck,
       description: "Vehicle shipment status",
+      keywords: ["shipment","shipping","tracking","vehicles","status","logistics"],
       groupId: "operations",
     },
     {
@@ -112,6 +121,7 @@ const operationsGroup: PlatformNavGroup = {
       href: platformPath("documents"),
       icon: FileText,
       description: "Contracts and files",
+      keywords: ["contracts","files","papers","pdf","attachments"],
       groupId: "operations",
     },
   ],
@@ -127,6 +137,7 @@ const inventoryGroup: PlatformNavGroup = {
       href: platformPath("inventory"),
       icon: Car,
       description: "Your vehicles",
+      keywords: ["vehicles","cars","stock","catalogue","fleet"],
       groupId: "inventory",
     },
     {
@@ -134,6 +145,7 @@ const inventoryGroup: PlatformNavGroup = {
       href: platformPath("inventory/movements"),
       icon: ArrowLeftRight,
       description: "In/out records & financial trace",
+      keywords: ["movements","in out","trace","ledger","financial"],
       groupId: "inventory",
     },
     {
@@ -141,6 +153,7 @@ const inventoryGroup: PlatformNavGroup = {
       href: platformPath("inventory/ai-usage"),
       icon: History,
       description: "AI Editor history & cleanup",
+      keywords: ["ai editor","history","cleanup","usage","credits"],
       groupId: "inventory",
     },
   ],
@@ -156,6 +169,7 @@ const freightGroup: PlatformNavGroup = {
       href: platformPath("freight/orders"),
       icon: Ship,
       description: "Active shipments",
+      keywords: ["orders","shipments","shipping","freight","cargo","booking"],
       groupId: "freight",
     },
     {
@@ -163,6 +177,7 @@ const freightGroup: PlatformNavGroup = {
       href: platformPath("freight/quotes"),
       icon: MessageSquare,
       description: "Inbound freight quotes",
+      keywords: ["quotes","freight quotes","inbound","rfq"],
       groupId: "freight",
     },
     {
@@ -170,6 +185,7 @@ const freightGroup: PlatformNavGroup = {
       href: platformPath("freight/tracking"),
       icon: Truck,
       description: "Shipment timeline",
+      keywords: ["shipment","timeline","shipping status","cargo"],
       groupId: "freight",
     },
     {
@@ -177,6 +193,7 @@ const freightGroup: PlatformNavGroup = {
       href: platformPath("freight/documents"),
       icon: FileText,
       description: "BOL, customs, invoices",
+      keywords: ["bol","customs","invoices","paperwork","shipping docs"],
       groupId: "freight",
     },
   ],
@@ -192,6 +209,7 @@ const partsGroup: PlatformNavGroup = {
       href: platformPath("parts/categories"),
       icon: Tags,
       description: "Parts taxonomy",
+      keywords: ["taxonomy","parts categories","tags","classification"],
       groupId: "parts",
     },
     {
@@ -199,6 +217,7 @@ const partsGroup: PlatformNavGroup = {
       href: platformPath("parts/inventory"),
       icon: Package,
       description: "Stock & SKUs",
+      keywords: ["parts","stock","skus","spares","components"],
       groupId: "parts",
     },
     {
@@ -206,6 +225,7 @@ const partsGroup: PlatformNavGroup = {
       href: platformPath("parts/published"),
       icon: FileText,
       description: "Catalogue workflow",
+      keywords: ["catalogue","catalog","publish","drafts","parts listing"],
       groupId: "parts",
     },
   ],
@@ -221,6 +241,7 @@ const financeGroup: PlatformNavGroup = {
       href: platformPath("finance"),
       icon: CreditCard,
       description: "Loan applications",
+      keywords: ["loans","credit","applications","financing","lending"],
       groupId: "finance",
     },
   ],
@@ -236,6 +257,7 @@ const marketingGroup: PlatformNavGroup = {
       href: platformPath("reports"),
       icon: BarChart3,
       description: "Business intelligence",
+      keywords: ["analytics","bi","intelligence","charts","insights"],
       groupId: "marketing",
     },
     {
@@ -243,6 +265,7 @@ const marketingGroup: PlatformNavGroup = {
       href: platformPath("site-content"),
       icon: Palette,
       description: "Edit public website copy & images",
+      keywords: ["website","cms","copy","images","content","landing"],
       groupId: "marketing",
     },
   ],
@@ -258,6 +281,7 @@ const administrationGroup: PlatformNavGroup = {
       href: platformPath("team-chat"),
       icon: MessagesSquare,
       description: "Internal staff chat",
+      keywords: ["staff chat","internal chat","team chat","slack"],
       groupId: "administration",
     },
     {
@@ -265,6 +289,7 @@ const administrationGroup: PlatformNavGroup = {
       href: platformPath("emails"),
       icon: Mail,
       description: "Sent & received correspondence",
+      keywords: ["mail","inbox","email","correspondence","smtp","mailbox"],
       groupId: "administration",
     },
     {
@@ -272,6 +297,7 @@ const administrationGroup: PlatformNavGroup = {
       href: platformPath("account-lifecycle"),
       icon: UserX,
       description: "Deletion requests & retention",
+      keywords: ["deletion","retention","gdpr","close account","privacy"],
       groupId: "administration",
     },
     {
@@ -279,6 +305,7 @@ const administrationGroup: PlatformNavGroup = {
       href: platformPath("trash"),
       icon: Trash2,
       description: "Deleted items & restore",
+      keywords: ["deleted","recycle","bin","restore","recovery"],
       groupId: "administration",
     },
     {
@@ -286,6 +313,7 @@ const administrationGroup: PlatformNavGroup = {
       href: platformPath("audit-log"),
       icon: ClipboardList,
       description: "Immutable activity trail",
+      keywords: ["security","activity","trail","logs","history","compliance","ops"],
       groupId: "administration",
     },
     {
@@ -293,6 +321,7 @@ const administrationGroup: PlatformNavGroup = {
       href: platformPath("users"),
       icon: UserCog,
       description: "Team and permissions",
+      keywords: ["team","staff","admin","admins","accounts","permissions","roles","members","admin users"],
       groupId: "administration",
     },
     {
@@ -300,6 +329,7 @@ const administrationGroup: PlatformNavGroup = {
       href: platformPath("settings"),
       icon: Settings,
       description: "Platform configuration",
+      keywords: ["fx","rate","rates","currency","exchange","config","configuration","preferences","setup"],
       groupId: "administration",
     },
   ],
