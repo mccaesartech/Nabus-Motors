@@ -35,6 +35,7 @@ import {
   type PlatformRole,
 } from "@/lib/platform/permissions";
 import { actorIsOwner, actorRole, actorUserId } from "@/lib/platform/team-messages";
+import { customerFacingStaffSenderName } from "@/lib/customer/public-branding";
 
 type ConversationRow = {
   id: string;
@@ -320,14 +321,17 @@ export function mapCustomerMessage(
   row: MessageRow,
   customerUserId: string
 ): CustomerChatMessage {
+  const isStaff = row.sender_type === "staff";
   return {
     id: row.id,
     conversation_id: row.conversation_id,
     sender_type: row.sender_type,
-    sender_user_id: row.sender_user_id,
-    sender_is_owner: row.sender_is_owner,
-    sender_name: row.sender_name,
-    sender_role_label: row.sender_type === "staff" ? "Team" : undefined,
+    // Hide internal identity from customer API payloads.
+    sender_user_id: isStaff ? null : row.sender_user_id,
+    sender_is_owner: false,
+    sender_name: isStaff ? customerFacingStaffSenderName() : row.sender_name,
+    // Never expose owner/manager/staff role labels to customers.
+    sender_role_label: undefined,
     body: row.body,
     created_at: row.created_at,
     isMine: row.sender_type === "customer",
@@ -740,7 +744,6 @@ export async function loadConversationMessagesForCustomer(
   customerUserId: string,
   conversationId: string
 ): Promise<CustomerChatMessage[]> {
-  const roleMap = await loadRoleMap(supabase);
   const { data, error } = await supabase
     .from("customer_conversation_messages")
     .select("*")
@@ -756,19 +759,9 @@ export async function loadConversationMessagesForCustomer(
     .eq("id", conversationId)
     .eq("user_id", customerUserId);
 
-  return ((data ?? []) as MessageRow[]).map((row) => {
-    const base = mapCustomerMessage(row, customerUserId);
-    if (row.sender_type === "staff") {
-      if (row.sender_is_owner) {
-        base.sender_role_label = ROLE_LABELS.owner;
-      } else if (row.sender_user_id && roleMap.has(row.sender_user_id)) {
-        base.sender_role_label = ROLE_LABELS[roleMap.get(row.sender_user_id)!];
-      } else {
-        base.sender_role_label = "Team";
-      }
-    }
-    return base;
-  });
+  return ((data ?? []) as MessageRow[]).map((row) =>
+    mapCustomerMessage(row, customerUserId)
+  );
 }
 
 async function fetchInquiryDataForCustomers(

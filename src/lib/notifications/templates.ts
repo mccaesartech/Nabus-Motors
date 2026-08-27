@@ -1,4 +1,5 @@
 import { getAutoSiteUrl, getPublicSiteUrl } from "@/lib/site-url";
+import { CUSTOMER_FACING_COMPANY_NAME } from "@/lib/customer/public-branding";
 
 export type CustomerNotifyTemplate =
   | "freight_quote_submitted"
@@ -109,7 +110,7 @@ export function buildCustomerMessage(
         whatsapp: ref
           ? `True Goshen: We received your custom vehicle request for ${vehicle}. Reference: ${ref}. Track at ${trackUrl}.${passwordResetUrl ? ` Set password: ${passwordResetUrl}` : ""}`
           : `True Goshen: We received your custom vehicle request for ${vehicle}. Track at ${trackUrl}. Our team will contact you shortly.`,
-        emailText: `Hi ${name},\n\nThank you for your custom vehicle request for ${vehicle}.${ref ? `\n\nReference: ${ref}` : ""}\n\nOur owners and managers will review whether we can source this vehicle and follow up with you.${accountSuffix}\n\nTrue Goshen Auto`,
+        emailText: `Hi ${name},\n\nThank you for your custom vehicle request for ${vehicle}.${ref ? `\n\nReference: ${ref}` : ""}\n\nOur team at ${CUSTOMER_FACING_COMPANY_NAME} will review whether we can source this vehicle and follow up with you.${accountSuffix}\n\n${CUSTOMER_FACING_COMPANY_NAME}`,
       };
     }
     case "quote_converted_tracking":
@@ -177,11 +178,11 @@ export function buildCustomerMessage(
     case "staff_message": {
       const subject = data.messageSubject?.trim() || "your inquiry";
       const preview = data.messagePreview?.trim() || "You have a new message.";
-      const staff = data.staffName?.trim() || "Our team";
+      const company = CUSTOMER_FACING_COMPANY_NAME;
       return {
-        subject: `New message: ${subject}`,
-        whatsapp: `True Goshen: ${staff} replied about "${subject}": ${preview} View: ${accountUrl()}`,
-        emailText: `Hi ${name},\n\n${staff} sent you a message about "${subject}":\n\n${preview}\n\nView and reply in your account: ${accountUrl()}\n\nTrue Goshen`,
+        subject: `New message from True Goshen: ${subject}`,
+        whatsapp: `True Goshen: New reply about "${subject}": ${preview} View: ${accountUrl()}`,
+        emailText: `Hi ${name},\n\n${company} sent you a message about "${subject}":\n\n${preview}\n\nView and reply in your account: ${accountUrl()}\n\n${company}`,
       };
     }
     case "password_reset": {

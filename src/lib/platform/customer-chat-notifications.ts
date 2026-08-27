@@ -78,7 +78,6 @@ export async function notifyCustomerOfStaffMessage(
       customerName: conversation.customer_name,
       subject: conversation.subject,
       preview,
-      staffName: message.sender_name,
     });
     emailSent = mail.emailSent;
   }
@@ -92,7 +91,6 @@ export async function notifyCustomerOfStaffMessage(
     data: {
       messageSubject: conversation.subject,
       messagePreview: preview,
-      staffName: message.sender_name,
     },
     sourceTable: "customer_conversation_messages",
     sourceId: message.id,

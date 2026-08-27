@@ -1100,12 +1100,7 @@ function AccountContent() {
                           )}
                         >
                           <p className="mb-1 text-xs font-medium text-muted-foreground">
-                            {msg.isMine
-                              ? "You"
-                              : msg.sender_role_label
-                                ? `${msg.sender_name} · ${msg.sender_role_label}`
-                                : msg.sender_name}
-                            {" · "}
+                            {msg.isMine ? "You" : "True Goshen"}{" · "}
                             {new Date(msg.created_at).toLocaleString(undefined, {
                               month: "short",
                               day: "numeric",

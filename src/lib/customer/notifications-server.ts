@@ -11,6 +11,10 @@ import {
   type CustomerNotificationType,
 } from "@/lib/customer/notification-types";
 import { customRequestStatusLabel } from "@/lib/platform/custom-request";
+import {
+  customerFacingStaffReplyTitle,
+  sanitizeCustomerNotificationTitle,
+} from "@/lib/customer/public-branding";
 
 type NotificationRow = {
   id: string;
@@ -30,7 +34,7 @@ export function mapCustomerNotification(row: NotificationRow): CustomerNotificat
   return {
     id: row.id,
     type: row.type,
-    title: row.title,
+    title: sanitizeCustomerNotificationTitle(row.title),
     body: row.body,
     link: row.link,
     sourceTable: row.source_table,
@@ -238,13 +242,14 @@ export async function notifyCustomerStaffMessage(
     subject: string;
     preview: string;
     messageId: string;
-    staffName: string;
+    /** @deprecated Ignored — customers always see company branding. */
+    staffName?: string;
   }
 ): Promise<void> {
   await createCustomerNotification(supabase, {
     userId: params.userId,
     type: "staff_message",
-    title: `Reply from ${params.staffName}`,
+    title: customerFacingStaffReplyTitle(),
     body: params.preview || `New reply on: ${params.subject}`,
     link: accountMessageLink(params.conversationId),
     sourceTable: "customer_conversation_messages",

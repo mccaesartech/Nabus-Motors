@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
 import type { CustomerChatMessage } from "@/lib/customer/types";
+import { customerFacingStaffSenderName } from "@/lib/customer/public-branding";
 
 const POLL_FALLBACK_MS = 30_000;
 
@@ -12,13 +13,20 @@ function mapRealtimeMessage(
   viewer: "customer" | "staff"
 ): CustomerChatMessage {
   const senderType = String(row.sender_type ?? "customer") as "customer" | "staff";
+  const isStaff = senderType === "staff";
+  const hideStaffIdentity = viewer === "customer" && isStaff;
   return {
     id: String(row.id),
     conversation_id: String(row.conversation_id),
     sender_type: senderType,
-    sender_user_id: (row.sender_user_id as string | null) ?? null,
-    sender_is_owner: Boolean(row.sender_is_owner),
-    sender_name: String(row.sender_name ?? ""),
+    sender_user_id: hideStaffIdentity
+      ? null
+      : ((row.sender_user_id as string | null) ?? null),
+    sender_is_owner: hideStaffIdentity ? false : Boolean(row.sender_is_owner),
+    sender_name: hideStaffIdentity
+      ? customerFacingStaffSenderName()
+      : String(row.sender_name ?? ""),
+    sender_role_label: undefined,
     body: String(row.body ?? ""),
     created_at: String(row.created_at ?? new Date().toISOString()),
     isMine: viewer === "customer" ? senderType === "customer" : Boolean(row.isMine),

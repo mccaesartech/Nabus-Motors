@@ -5,6 +5,7 @@ import { Bell, CheckCheck } from "lucide-react";
 import { AccountSectionHeader } from "@/components/account/account-section-header";
 import { Button } from "@/components/ui/button";
 import { useCustomerNotifications } from "@/context/customer-notifications-context";
+import { sanitizeCustomerNotificationTitle } from "@/lib/customer/public-branding";
 import { cn } from "@/lib/utils";
 
 function formatWhen(iso: string): string {
@@ -82,7 +83,7 @@ export function AccountNotificationsSection() {
                     unread ? "font-semibold text-foreground" : "font-medium text-foreground/90"
                   )}
                 >
-                  {notification.title}
+                  {sanitizeCustomerNotificationTitle(notification.title)}
                 </p>
                 <p className="mt-0.5 text-sm text-muted-foreground">{notification.body}</p>
               </div>
