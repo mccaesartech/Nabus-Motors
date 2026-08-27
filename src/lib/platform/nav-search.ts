@@ -2,14 +2,23 @@ import type { PlatformNavItem } from "@/lib/platform/nav";
 
 const IGNORED_PATH_SEGMENTS = new Set(["admin", "platform"]);
 
-/** Mid-label / mid-path substring matching requires at least this many chars. */
-const MIN_SUBSTRING_QUERY_LEN = 3;
+/**
+ * Mid-label substring matching (`.includes` on the full label) requires a longer
+ * intentional query. Blocks "se" → Users and "ser" → Users.
+ */
+const MIN_SUBSTRING_QUERY_LEN = 4;
 
 /**
  * Description word-prefix matching needs a longer intentional query.
- * Blocks short prefixes like "se"/"sec" → "Security".
+ * Blocks short prefixes like "se"/"sec" → "Security" / "Sent".
  */
 const MIN_DESCRIPTION_QUERY_LEN = 4;
+
+/**
+ * Path segment matching is too weak for 1–2 char queries (false friends via
+ * href segments). Allowed from length 3 as equal/prefix on segments only.
+ */
+const MIN_PATH_QUERY_LEN = 3;
 
 /** Split label/description/path into searchable word tokens. */
 export function navSearchTokens(value: string): string[] {
@@ -32,8 +41,13 @@ function meaningfulPathSegments(href: string): string[] {
  * Returns 0 when there is no meaningful match (caller should hide the item).
  *
  * Priority: exact/prefix label → label word → label substring → path segment → description word.
- * Short queries (1–2 chars) only use strong label/path prefix or word matches.
- * Avoids weak full-href / mid-word description matches that surface unrelated pages.
+ *
+ * Length rules:
+ * - 1–2 chars: label exact, full-label prefix, or label-word prefix ONLY
+ * - 3 chars: above + path segment equal/prefix (no mid-label, no description)
+ * - ≥4 chars: above + mid-label includes + description word-prefix
+ *
+ * Path matching never uses mid-segment `.includes` or full-href substrings.
  */
 export function scoreNavSearchTerm(item: PlatformNavItem, term: string): number {
   const q = term.trim().toLowerCase();
@@ -42,30 +56,24 @@ export function scoreNavSearchTerm(item: PlatformNavItem, term: string): number 
   const label = item.label.toLowerCase();
   const labelTokens = navSearchTokens(item.label);
   const pathSegments = meaningfulPathSegments(item.href);
-  const shortQuery = q.length <= 2;
 
   if (label === q) return 100;
   if (label.startsWith(q)) return 90;
   if (labelTokens.some((token) => token.startsWith(q))) return 80;
 
-  // Mid-label substring only for longer queries (avoids "or" → Reports).
-  if (!shortQuery && q.length >= MIN_SUBSTRING_QUERY_LEN && label.includes(q)) {
+  // Short queries: strong label matches only — no path, description, or mid-label.
+  if (q.length <= 2) return 0;
+
+  // Mid-label substring only for longer queries (avoids "ser" → Users).
+  if (q.length >= MIN_SUBSTRING_QUERY_LEN && label.includes(q)) {
     return 60;
   }
 
-  if (pathSegments.some((segment) => segment === q)) return 70;
-  if (pathSegments.some((segment) => segment.startsWith(q))) return 55;
-  // Mid-segment path match only for longer queries (e.g. "move" → movements).
-  if (
-    !shortQuery &&
-    q.length >= MIN_SUBSTRING_QUERY_LEN &&
-    pathSegments.some((segment) => segment.includes(q))
-  ) {
-    return 40;
+  // Path: segment equal or prefix only — never mid-segment includes / full href.
+  if (q.length >= MIN_PATH_QUERY_LEN) {
+    if (pathSegments.some((segment) => segment === q)) return 70;
+    if (pathSegments.some((segment) => segment.startsWith(q))) return 55;
   }
-
-  // 1–2 char queries: label/path strong matches only — no description.
-  if (shortQuery) return 0;
 
   // Description: word-prefix only, and only for queries long enough to be intentional.
   if (item.description && q.length >= MIN_DESCRIPTION_QUERY_LEN) {
