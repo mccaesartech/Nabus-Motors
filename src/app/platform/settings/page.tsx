@@ -455,14 +455,9 @@ export default function SettingsPage() {
         <SettingsSection
           icon={Coins}
           title="Currency"
-          description="Live ExchangeRate-API feed for storefront prices. Owner/Super Admin may set a manual display override when needed."
+          description="Live ExchangeRate-API feed for storefront prices. Owner/Super Admin can save a manual GHS display rate or revert to live."
         >
-          <CurrencySettingsPanel
-            settings={settings}
-            update={update}
-            updateBool={updateBool}
-            isOn={isOn}
-          />
+          <CurrencySettingsPanel settings={settings} update={update} />
         </SettingsSection>
 
         <SettingsSection
