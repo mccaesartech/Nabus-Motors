@@ -20,3 +20,9 @@ export {
 export { formatAuditLocation } from "./types";
 export { auditLogToCsv, auditLogToPrintableHtml } from "./export";
 export { auditHttpStatusResponse } from "./http-status";
+export {
+  filterOutTrashedAuditLogs,
+  listTrashedAuditLogIds,
+  softDeleteAuditLog,
+  softDeleteAuditLogs,
+} from "./trash";

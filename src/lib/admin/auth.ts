@@ -397,6 +397,11 @@ export function canViewAuditLog(auth: PlatformAuthContext): boolean {
   return isPlatformOwnerActor(auth) || auth.role === "super_admin";
 }
 
+/** Owner or super_admin may move audit log entries to trash. */
+export function canDeleteAuditLog(auth: PlatformAuthContext): boolean {
+  return canViewAuditLog(auth);
+}
+
 /** Owner, super admin, manager, and staff with customers access can send customer password resets. */
 export function canSendCustomerPasswordReset(auth: PlatformAuthContext): boolean {
   if (isPlatformOwnerActor(auth) || auth.role === "super_admin" || auth.role === "manager") {

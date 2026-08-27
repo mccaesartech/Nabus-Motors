@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Download, FileText, Search } from "lucide-react";
+import { Download, FileText, Search, Trash2 } from "lucide-react";
+import {
+  ConfirmDialog,
+  DELETE_CONFIRM_PHRASE,
+} from "@/components/platform/confirm-dialog";
 import { PageHeader } from "@/components/platform/page-header";
 import { PlatformDateTime } from "@/components/platform/platform-datetime";
 import { adminLoginPath } from "@/lib/admin/paths";
@@ -14,6 +18,7 @@ import {
   isAuditAction,
 } from "@/lib/audit/actions";
 import { formatAuditLocation, type AuditLogRow } from "@/lib/audit/types";
+import { cn } from "@/lib/utils";
 
 function actionLabel(action: string): string {
   return isAuditAction(action) ? AUDIT_ACTION_LABELS[action] : action;
@@ -24,6 +29,7 @@ export default function AuditLogPage() {
   const session = usePlatformSession();
   const canView =
     session?.role === "owner" || session?.role === "super_admin";
+  const canDelete = canView;
 
   const [logs, setLogs] = useState<AuditLogRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,6 +43,12 @@ export default function AuditLogPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const printRef = useRef<HTMLDivElement>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [deleteTarget, setDeleteTarget] = useState<AuditLogRow | null>(null);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [toastError, setToastError] = useState(false);
 
   const load = useCallback(async () => {
     if (!canView) {
@@ -68,6 +80,7 @@ export default function AuditLogPage() {
     setLogs(json.logs ?? []);
     setMigrationRequired(Boolean(json.migrationRequired));
     setMessage(typeof json.message === "string" ? json.message : "");
+    setSelectedIds(new Set());
     setLoading(false);
   }, [router, canView, q, action, success, actor, targetType, dateFrom, dateTo]);
 
@@ -84,6 +97,9 @@ export default function AuditLogPage() {
       [...new Set(logs.map((row) => row.target_type).filter(Boolean) as string[])].sort(),
     [logs]
   );
+
+  const allVisibleSelected =
+    logs.length > 0 && logs.every((row) => selectedIds.has(row.id));
 
   function exportUrl(format: "csv" | "xlsx" | "html") {
     const params = new URLSearchParams();
@@ -123,6 +139,99 @@ export default function AuditLogPage() {
     }
   }
 
+  async function deleteAuditLogs(targets: AuditLogRow[]) {
+    if (targets.length === 0 || !canDelete) return;
+
+    const ids = targets.map((row) => row.id);
+    const snapshots: Record<string, Record<string, unknown>> = {};
+    for (const row of targets) {
+      snapshots[row.id] = { ...row };
+    }
+
+    const snapshotLogs = logs;
+    const idSet = new Set(ids);
+
+    setDeleteTarget(null);
+    setBulkDeleteConfirm(false);
+    setLogs((prev) => prev.filter((row) => !idSet.has(row.id)));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) next.delete(id);
+      return next;
+    });
+    setDeleting(true);
+    setToastError(false);
+    setToast(
+      ids.length === 1
+        ? "Moving audit log entry to trash…"
+        : `Moving ${ids.length} audit log entries to trash…`
+    );
+
+    try {
+      const res = await fetch("/api/admin/audit-log", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, snapshots }),
+      });
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setLogs(snapshotLogs);
+        setToastError(true);
+        setToast(json.message ?? "Could not delete audit log entry.");
+        return;
+      }
+
+      const deleted = (
+        Array.isArray(json.deletedIds) ? json.deletedIds.map(String) : ids
+      ) as string[];
+      const deletedSet = new Set(deleted);
+      const failedRollback = targets.filter((row) => !deletedSet.has(row.id));
+      if (failedRollback.length > 0) {
+        setLogs((prev) => {
+          const existing = new Set(prev.map((row) => row.id));
+          const restored = failedRollback.filter((row) => !existing.has(row.id));
+          return [...restored, ...prev].sort(
+            (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+          );
+        });
+      }
+
+      setToastError(Boolean(json.failed?.length));
+      setToast(
+        json.message ??
+          (deleted.length === 1
+            ? "Audit log entry moved to trash."
+            : `${deleted.length} audit log entries moved to trash.`)
+      );
+    } catch {
+      setLogs(snapshotLogs);
+      setToastError(true);
+      setToast("Could not delete audit log entry.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllVisible() {
+    if (allVisibleSelected) {
+      setSelectedIds(new Set());
+      return;
+    }
+    setSelectedIds(new Set(logs.map((row) => row.id)));
+  }
+
+  const selectedTargets = logs.filter((row) => selectedIds.has(row.id));
+
   if (session && !canView) {
     return null;
   }
@@ -131,13 +240,27 @@ export default function AuditLogPage() {
     <div className="space-y-6">
       <PageHeader
         title="Audit Log"
-        description="Immutable security and operations trail. Owner and Super Admin only — read-only."
+        description="Security and operations trail. Owner and Super Admin only. Entries can be moved to Trash; restore or permanently delete from there."
       />
 
       {migrationRequired && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           {message ||
             "Run supabase/migrations/093_audit_logs.sql in the Supabase SQL Editor to enable persistence."}
+        </div>
+      )}
+
+      {toast && (
+        <div
+          role="status"
+          className={cn(
+            "rounded-lg border px-4 py-3 text-sm",
+            toastError
+              ? "border-red-500/40 bg-red-500/10 text-red-800"
+              : "border-[var(--platform-success)]/30 bg-[rgba(16,185,129,0.08)] text-[var(--platform-success)]"
+          )}
+        >
+          {toast}
         </div>
       )}
 
@@ -257,6 +380,17 @@ export default function AuditLogPage() {
           >
             <FileText className="h-4 w-4" /> PDF
           </button>
+          {canDelete && selectedIds.size > 0 && (
+            <button
+              type="button"
+              disabled={deleting}
+              onClick={() => setBulkDeleteConfirm(true)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm font-medium text-red-900"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete selected ({selectedIds.size})
+            </button>
+          )}
         </div>
       </div>
 
@@ -267,6 +401,17 @@ export default function AuditLogPage() {
         <table className="min-w-full text-left text-sm">
           <thead className="bg-[var(--platform-bg-secondary)] text-[var(--platform-muted)]">
             <tr>
+              {canDelete && (
+                <th className="w-10 px-3 py-2">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all visible audit log entries"
+                    checked={allVisibleSelected && logs.length > 0}
+                    onChange={toggleSelectAllVisible}
+                    disabled={loading || logs.length === 0}
+                  />
+                </th>
+              )}
               <th className="px-3 py-2 font-medium">Time</th>
               <th className="px-3 py-2 font-medium">Action</th>
               <th className="px-3 py-2 font-medium">Result</th>
@@ -275,18 +420,25 @@ export default function AuditLogPage() {
               <th className="px-3 py-2 font-medium">IP / Location</th>
               <th className="px-3 py-2 font-medium">Client</th>
               <th className="px-3 py-2 font-medium">Error</th>
+              {canDelete && <th className="px-3 py-2 font-medium"> </th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-[var(--platform-muted)]">
+                <td
+                  colSpan={canDelete ? 10 : 8}
+                  className="px-3 py-8 text-center text-[var(--platform-muted)]"
+                >
                   Loading audit events…
                 </td>
               </tr>
             ) : logs.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-[var(--platform-muted)]">
+                <td
+                  colSpan={canDelete ? 10 : 8}
+                  className="px-3 py-8 text-center text-[var(--platform-muted)]"
+                >
                   No audit events match these filters.
                 </td>
               </tr>
@@ -300,6 +452,16 @@ export default function AuditLogPage() {
                       : "border-t border-red-200 bg-red-50/80 text-red-950"
                   }
                 >
+                  {canDelete && (
+                    <td className="px-3 py-2 align-top">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select audit log entry ${actionLabel(row.action)}`}
+                        checked={selectedIds.has(row.id)}
+                        onChange={() => toggleSelected(row.id)}
+                      />
+                    </td>
+                  )}
                   <td className="whitespace-nowrap px-3 py-2 align-top">
                     <PlatformDateTime value={row.timestamp} />
                   </td>
@@ -335,12 +497,54 @@ export default function AuditLogPage() {
                   <td className="max-w-xs px-3 py-2 align-top text-xs">
                     {row.error_message ?? ""}
                   </td>
+                  {canDelete && (
+                    <td className="px-3 py-2 align-top">
+                      <button
+                        type="button"
+                        disabled={deleting}
+                        onClick={() => setDeleteTarget(row)}
+                        className="rounded-md p-1.5 text-[var(--platform-muted)] hover:bg-red-50 hover:text-red-700"
+                        aria-label="Move audit log entry to trash"
+                        title="Move to trash"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))
             )}
           </tbody>
         </table>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="Move audit log entry to trash?"
+        description="The entry will be removed from this list and moved to Trash. You can restore it from Trash or permanently delete it there (Owner / Super Admin only)."
+        confirmLabel="Move to trash"
+        busyLabel="Moving to trash…"
+        destructive
+        confirmPhrase={DELETE_CONFIRM_PHRASE}
+        onConfirm={() => {
+          if (deleteTarget) void deleteAuditLogs([deleteTarget]);
+        }}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteConfirm}
+        onOpenChange={setBulkDeleteConfirm}
+        title={`Move ${selectedTargets.length} audit log entries to trash?`}
+        description="Selected entries will be removed from this list and moved to Trash. You can restore or permanently delete them from Trash."
+        confirmLabel="Move to trash"
+        busyLabel="Moving to trash…"
+        destructive
+        confirmPhrase={DELETE_CONFIRM_PHRASE}
+        onConfirm={() => void deleteAuditLogs(selectedTargets)}
+      />
     </div>
   );
 }

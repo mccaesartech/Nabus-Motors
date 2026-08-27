@@ -19,6 +19,7 @@ export const TRASH_ENTITY_TYPES = [
   "freight_quote",
   "appointment",
   "sent_email",
+  "audit_log",
 ] as const;
 
 export type TrashEntityType = (typeof TRASH_ENTITY_TYPES)[number];
@@ -44,6 +45,7 @@ export const TRASH_ENTITY_LABELS: Record<TrashEntityType, string> = {
   freight_quote: "Freight quote",
   appointment: "Appointment",
   sent_email: "Sent email log",
+  audit_log: "Audit log entry",
 };
 
 export const INQUIRY_TRASH_TYPES: Record<string, TrashEntityType> = {

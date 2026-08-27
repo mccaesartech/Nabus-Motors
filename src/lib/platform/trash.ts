@@ -42,6 +42,7 @@ const ENTITY_TABLE: Record<TrashEntityType, string | null> = {
   freight_quote: "freight_quote_requests",
   appointment: "vehicle_appointments",
   sent_email: "notification_log",
+  audit_log: "audit_logs",
 };
 
 export type TrashListFilters = {
@@ -160,6 +161,15 @@ export function buildEntityLabel(
       const template = String(row.template ?? "").trim();
       if (recipient && template) return `${template} → ${recipient}`;
       return recipient || template || TRASH_ENTITY_LABELS.sent_email;
+    }
+    case "audit_log": {
+      const action = String(row.action ?? "Audit event");
+      const actor = String(row.actor_name ?? row.actor_role ?? "").trim();
+      const target = String(row.target_name ?? row.target_id ?? "").trim();
+      if (actor && target) return `${action} — ${actor} → ${target}`;
+      if (actor) return `${action} — ${actor}`;
+      if (target) return `${action} — ${target}`;
+      return action;
     }
     default:
       return TRASH_ENTITY_LABELS[entityType];
@@ -728,6 +738,32 @@ export async function restoreTrashEntry(
       recipient: snapshot.recipient,
       detail: snapshot.detail ?? null,
       created_at: snapshot.created_at,
+    });
+    if (insertError) {
+      return { ok: false, message: insertError.message, status: 500 };
+    }
+  } else if (entityType === "audit_log") {
+    const { error: insertError } = await supabase.from("audit_logs").insert({
+      id: entityId,
+      timestamp: snapshot.timestamp,
+      actor_user_id: snapshot.actor_user_id ?? null,
+      actor_name: snapshot.actor_name ?? null,
+      actor_role: snapshot.actor_role ?? null,
+      action: snapshot.action,
+      target_type: snapshot.target_type ?? null,
+      target_id: snapshot.target_id ?? null,
+      target_name: snapshot.target_name ?? null,
+      ip_address: snapshot.ip_address ?? null,
+      user_agent: snapshot.user_agent ?? null,
+      browser: snapshot.browser ?? null,
+      operating_system: snapshot.operating_system ?? null,
+      request_id: snapshot.request_id ?? null,
+      success: snapshot.success ?? true,
+      error_message: snapshot.error_message ?? null,
+      metadata: snapshot.metadata ?? {},
+      country: snapshot.country ?? null,
+      region: snapshot.region ?? null,
+      city: snapshot.city ?? null,
     });
     if (insertError) {
       return { ok: false, message: insertError.message, status: 500 };

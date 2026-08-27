@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { canViewAuditLog, requireAdmin } from "@/lib/admin/auth";
+import { canDeleteAuditLog, canViewAuditLog, requireAdmin } from "@/lib/admin/auth";
 import { dbFailure } from "@/lib/errors/api";
 import {
   AUDIT_ACTIONS,
   AUDIT_LOG_TABLE,
   auditLogToCsv,
   auditLogToPrintableHtml,
+  filterOutTrashedAuditLogs,
+  listTrashedAuditLogIds,
+  softDeleteAuditLogs,
   type AuditLogRow,
 } from "@/lib/audit";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { enqueueAuditLog } from "@/lib/audit/write";
+import { normalizeBatchIds } from "@/lib/platform/trash";
 
 export const dynamic = "force-dynamic";
 
@@ -120,7 +124,10 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const rows = (data ?? []) as AuditLogRow[];
+  const rows = filterOutTrashedAuditLogs(
+    (data ?? []) as AuditLogRow[],
+    await listTrashedAuditLogIds(supabase)
+  );
 
   if (format === "csv" || format === "xlsx") {
     enqueueAuditLog({
@@ -163,5 +170,84 @@ export async function GET(req: NextRequest) {
     logs: rows,
     actions: [...AUDIT_ACTIONS],
     targetTypes: [...new Set(rows.map((r) => r.target_type).filter(Boolean))].sort(),
+  });
+}
+
+export async function DELETE(req: NextRequest) {
+  const auth = await requireAdmin();
+  if (!auth.ok) {
+    return NextResponse.json({ ok: false, message: auth.message }, { status: auth.status });
+  }
+
+  if (!canDeleteAuditLog(auth.auth)) {
+    return NextResponse.json(
+      { ok: false, message: "Only the owner or super admin can delete audit log entries." },
+      { status: 403 }
+    );
+  }
+
+  const supabase = createAdminSupabase();
+  if (!supabase) {
+    return NextResponse.json({ ok: false, message: "Not configured" }, { status: 503 });
+  }
+
+  const queryId = req.nextUrl.searchParams.get("id");
+  let ids: string[] = [];
+  let snapshotsById: Record<string, Record<string, unknown>> | undefined;
+
+  if (queryId?.trim()) {
+    ids = [queryId.trim()];
+  } else {
+    const body = (await req.json().catch(() => ({}))) as {
+      ids?: unknown;
+      id?: unknown;
+      snapshots?: unknown;
+    };
+    if (typeof body.id === "string" && body.id.trim()) {
+      ids = [body.id.trim()];
+    } else {
+      ids = normalizeBatchIds(body.ids);
+    }
+    if (body.snapshots && typeof body.snapshots === "object" && !Array.isArray(body.snapshots)) {
+      snapshotsById = body.snapshots as Record<string, Record<string, unknown>>;
+    }
+  }
+
+  if (ids.length === 0) {
+    return NextResponse.json({ ok: false, message: "Missing id" }, { status: 400 });
+  }
+
+  const batch = await softDeleteAuditLogs(supabase, auth.auth, ids, snapshotsById);
+
+  if (batch.deletedIds.length === 0) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: batch.failed[0]?.message ?? "Could not move audit log entry to trash.",
+        failed: batch.failed,
+        deletedIds: [],
+      },
+      { status: batch.failed[0]?.message?.includes("not found") ? 404 : 500 }
+    );
+  }
+
+  enqueueAuditLog({
+    action: "audit_log_deleted",
+    success: true,
+    actor: auth.auth,
+    targetType: "audit_log",
+    targetName: batch.deletedIds.length === 1 ? batch.deletedIds[0] : `${batch.deletedIds.length} entries`,
+    metadata: { count: batch.deletedIds.length, ids: batch.deletedIds },
+    request: req,
+  });
+
+  return NextResponse.json({
+    ok: true,
+    deletedIds: batch.deletedIds,
+    failed: batch.failed,
+    message:
+      batch.deletedIds.length === 1
+        ? "Audit log entry moved to trash."
+        : `${batch.deletedIds.length} audit log entries moved to trash.`,
   });
 }
