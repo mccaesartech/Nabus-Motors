@@ -401,10 +401,10 @@ export async function softDeleteEntity(
   return { ok: true, trashId: trash.id, publicSlug };
 }
 
-const BATCH_CONCURRENCY = 6;
+export const BATCH_CONCURRENCY = 6;
 const MAX_BATCH_IDS = 100;
 
-async function mapPool<T, R>(
+export async function mapPool<T, R>(
   items: T[],
   concurrency: number,
   fn: (item: T, index: number) => Promise<R>
@@ -428,8 +428,9 @@ async function mapPool<T, R>(
   return results;
 }
 
-export function normalizeBatchIds(raw: unknown): string[] {
+export function normalizeBatchIds(raw: unknown, maxIds = MAX_BATCH_IDS): string[] {
   if (!Array.isArray(raw)) return [];
+  const limit = Math.max(1, maxIds);
   const seen = new Set<string>();
   const ids: string[] = [];
   for (const value of raw) {
@@ -438,7 +439,7 @@ export function normalizeBatchIds(raw: unknown): string[] {
     if (!id || seen.has(id)) continue;
     seen.add(id);
     ids.push(id);
-    if (ids.length >= MAX_BATCH_IDS) break;
+    if (ids.length >= limit) break;
   }
   return ids;
 }
@@ -846,7 +847,8 @@ export async function permanentlyDeleteTrashEntry(
     if (!purged.ok) {
       return { ok: false, message: purged.message, status: 500 };
     }
-  } else {
+  } else if (entityType !== "audit_log") {
+    // audit_log rows are hard-deleted when moved to trash; only stamp the tombstone here.
     const deleted = await hardDeleteEntity(supabase, entityType, entityId);
     if (!deleted.ok) {
       return { ok: false, message: deleted.message, status: 500 };

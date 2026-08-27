@@ -102,3 +102,22 @@ describe("writeAuditLog", () => {
     expect(row.success).toBe(true);
   });
 });
+
+describe("audit log trash helpers", () => {
+  it("filterOutTrashedAuditLogs removes trashed ids", async () => {
+    const { filterOutTrashedAuditLogs } = await import("@/lib/audit/trash");
+    const rows = [{ id: "a" }, { id: "b" }, { id: "c" }];
+    expect(filterOutTrashedAuditLogs(rows, new Set(["b"]))).toEqual([
+      { id: "a" },
+      { id: "c" },
+    ]);
+  });
+
+  it("normalizeBatchIds allows audit bulk limit above default 100", async () => {
+    const { normalizeBatchIds } = await import("@/lib/platform/trash");
+    const { AUDIT_LOG_DELETE_BATCH_MAX } = await import("@/lib/audit/trash");
+    const ids = Array.from({ length: 152 }, (_, i) => `id-${i}`);
+    expect(normalizeBatchIds(ids).length).toBe(100);
+    expect(normalizeBatchIds(ids, AUDIT_LOG_DELETE_BATCH_MAX).length).toBe(152);
+  });
+});

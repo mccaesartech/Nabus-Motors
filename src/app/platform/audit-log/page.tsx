@@ -204,7 +204,7 @@ export default function AuditLogPage() {
         });
       }
 
-      setToastError(Boolean(json.failed?.length));
+      setToastError(Boolean(json.partial || json.failed?.length));
       setToast(
         json.message ??
           (deleted.length === 1

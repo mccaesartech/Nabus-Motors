@@ -14,6 +14,7 @@ import {
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { enqueueAuditLog } from "@/lib/audit/write";
 import { normalizeBatchIds } from "@/lib/platform/trash";
+import { AUDIT_LOG_DELETE_BATCH_MAX } from "@/lib/audit/trash";
 
 export const dynamic = "force-dynamic";
 
@@ -206,7 +207,7 @@ export async function DELETE(req: NextRequest) {
     if (typeof body.id === "string" && body.id.trim()) {
       ids = [body.id.trim()];
     } else {
-      ids = normalizeBatchIds(body.ids);
+      ids = normalizeBatchIds(body.ids, AUDIT_LOG_DELETE_BATCH_MAX);
     }
     if (body.snapshots && typeof body.snapshots === "object" && !Array.isArray(body.snapshots)) {
       snapshotsById = body.snapshots as Record<string, Record<string, unknown>>;
@@ -226,28 +227,52 @@ export async function DELETE(req: NextRequest) {
         message: batch.failed[0]?.message ?? "Could not move audit log entry to trash.",
         failed: batch.failed,
         deletedIds: [],
+        truncatedCount: batch.truncatedCount,
       },
       { status: batch.failed[0]?.message?.includes("not found") ? 404 : 500 }
     );
   }
 
+  const failureCount = batch.failed.filter((f) => f.id !== "*").length;
+  const partial = failureCount > 0 || batch.truncatedCount > 0;
+
   enqueueAuditLog({
     action: "audit_log_deleted",
-    success: true,
+    success: !partial,
     actor: auth.auth,
     targetType: "audit_log",
     targetName: batch.deletedIds.length === 1 ? batch.deletedIds[0] : `${batch.deletedIds.length} entries`,
-    metadata: { count: batch.deletedIds.length, ids: batch.deletedIds },
+    metadata: {
+      count: batch.deletedIds.length,
+      failedCount: failureCount,
+      truncatedCount: batch.truncatedCount,
+      ids: batch.deletedIds,
+    },
     request: req,
   });
 
+  let message =
+    batch.deletedIds.length === 1
+      ? "Audit log entry moved to trash."
+      : `${batch.deletedIds.length} audit log entries moved to trash.`;
+
+  if (partial) {
+    const parts: string[] = [];
+    if (failureCount > 0) {
+      parts.push(`${failureCount} failed`);
+    }
+    if (batch.truncatedCount > 0) {
+      parts.push(`${batch.truncatedCount} omitted (batch limit ${AUDIT_LOG_DELETE_BATCH_MAX})`);
+    }
+    message = `${message} ${parts.join("; ")}.`;
+  }
+
   return NextResponse.json({
     ok: true,
+    partial,
     deletedIds: batch.deletedIds,
     failed: batch.failed,
-    message:
-      batch.deletedIds.length === 1
-        ? "Audit log entry moved to trash."
-        : `${batch.deletedIds.length} audit log entries moved to trash.`,
+    truncatedCount: batch.truncatedCount,
+    message,
   });
 }

@@ -4,10 +4,15 @@ import { AUDIT_ACTION_LABELS, isAuditAction } from "@/lib/audit/actions";
 import { AUDIT_LOG_TABLE } from "@/lib/audit/write";
 import type { AuditLogRow } from "@/lib/audit/types";
 import {
+  BATCH_CONCURRENCY,
   buildEntityLabel,
+  mapPool,
   normalizeBatchIds,
   recordTrashEntry,
 } from "@/lib/platform/trash";
+
+/** Audit log bulk delete allows larger batches than generic trash ops (default 100). */
+export const AUDIT_LOG_DELETE_BATCH_MAX = 500;
 
 function auditLogLabel(row: Record<string, unknown>): string {
   const actionRaw = String(row.action ?? "Audit event");
@@ -16,9 +21,9 @@ function auditLogLabel(row: Record<string, unknown>): string {
     : actionRaw;
   const actor = String(row.actor_name ?? row.actor_role ?? "").trim();
   const target = String(row.target_name ?? row.target_id ?? "").trim();
-  if (actor && target) return `${action} — ${actor} → ${target}`;
-  if (actor) return `${action} — ${actor}`;
-  if (target) return `${action} — ${target}`;
+  if (actor && target) return `${action} - ${actor} -> ${target}`;
+  if (actor) return `${action} - ${actor}`;
+  if (target) return `${action} - ${target}`;
   return action;
 }
 
@@ -33,9 +38,17 @@ async function findActiveAuditLogTrash(
     .eq("entity_id", entityId)
     .is("restored_at", null)
     .is("permanently_deleted_at", null)
+    .limit(1)
     .maybeSingle();
 
   return data?.id ? String(data.id) : null;
+}
+
+async function rollbackAuditLogTrashEntry(
+  supabase: SupabaseClient,
+  trashId: string
+): Promise<void> {
+  await supabase.from("platform_trash").delete().eq("id", trashId);
 }
 
 /** Audit log ids currently in trash (includes permanently deleted tombstones). */
@@ -112,6 +125,7 @@ export async function softDeleteAuditLog(
 
   const { error: deleteError } = await supabase.from(AUDIT_LOG_TABLE).delete().eq("id", logId);
   if (deleteError) {
+    await rollbackAuditLogTrashEntry(supabase, trash.id);
     return { ok: false, message: deleteError.message, status: 500 };
   }
 
@@ -126,24 +140,46 @@ export async function softDeleteAuditLogs(
 ): Promise<{
   deletedIds: string[];
   failed: Array<{ id: string; message: string }>;
+  truncatedCount: number;
 }> {
-  const normalized = normalizeBatchIds(ids);
+  const normalized = normalizeBatchIds(ids, AUDIT_LOG_DELETE_BATCH_MAX);
+  const requestedUnique = normalizeBatchIds(ids, Number.MAX_SAFE_INTEGER).length;
+  const truncatedCount = Math.max(0, requestedUnique - normalized.length);
   const deletedIds: string[] = [];
   const failed: Array<{ id: string; message: string }> = [];
 
-  for (const id of normalized) {
+  if (truncatedCount > 0) {
+    failed.push({
+      id: "*",
+      message: `Only the first ${AUDIT_LOG_DELETE_BATCH_MAX} unique ids were processed (${truncatedCount} omitted). Delete in smaller batches or run again.`,
+    });
+  }
+
+  if (normalized.length === 0) {
+    return { deletedIds, failed, truncatedCount };
+  }
+
+  const results = await mapPool(normalized, BATCH_CONCURRENCY, async (id) => {
     const result = await softDeleteAuditLog(
       supabase,
       auth,
       id,
       snapshotsById?.[id]
     );
-    if (result.ok) deletedIds.push(id);
-    else if (/already in trash/i.test(result.message)) deletedIds.push(id);
-    else failed.push({ id, message: result.message });
+    return { id, result };
+  });
+
+  for (const { id, result } of results) {
+    if (result.ok) {
+      deletedIds.push(id);
+    } else if (/already in trash/i.test(result.message)) {
+      deletedIds.push(id);
+    } else {
+      failed.push({ id, message: result.message });
+    }
   }
 
-  return { deletedIds, failed };
+  return { deletedIds, failed, truncatedCount };
 }
 
 /** Build a label when snapshot is partial (UI optimistic delete). */

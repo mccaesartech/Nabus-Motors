@@ -54,6 +54,7 @@ export default function TrashPage() {
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
   const [toast, setToast] = useState("");
+  const [toastError, setToastError] = useState(false);
   const [restoreTarget, setRestoreTarget] = useState<PlatformTrashRow | null>(null);
   const [restoreStatus, setRestoreStatus] = useState<string>("available");
   const [deleteTarget, setDeleteTarget] = useState<PlatformTrashRow | null>(null);
@@ -136,6 +137,7 @@ export default function TrashPage() {
   }
 
   async function restoreItem(id: string, vehicleStatus?: string) {
+    setToastError(false);
     setToast("Restoring…");
     setItems((prev) => prev.filter((item) => item.id !== id));
     setTotal((prev) => Math.max(0, prev - 1));
@@ -172,12 +174,14 @@ export default function TrashPage() {
     if (res.ok && json.ok !== false) {
       setToast("Item restored.");
     } else {
+      setToastError(true);
       setToast(adminErrorMessage(json, "Could not restore item."));
       void load();
     }
   }
 
   async function permanentlyDelete(id: string) {
+    setToastError(false);
     setToast("Deleting…");
     setItems((prev) => prev.filter((item) => item.id !== id));
     setTotal((prev) => Math.max(0, prev - 1));
@@ -212,6 +216,7 @@ export default function TrashPage() {
     if (res.ok && json.ok !== false) {
       setToast("Item permanently deleted.");
     } else {
+      setToastError(true);
       setToast(adminErrorMessage(json, "Could not delete item."));
       void load();
     }
@@ -222,6 +227,7 @@ export default function TrashPage() {
     if (ids.length === 0 || !canRestore) return;
     setBulkActing(true);
     setBulkRestoreConfirm(false);
+    setToastError(false);
     setToast(`Restoring ${ids.length} item${ids.length === 1 ? "" : "s"}…`);
     const idSet = new Set(ids);
     setItems((prev) => prev.filter((item) => !idSet.has(item.id)));
@@ -234,7 +240,6 @@ export default function TrashPage() {
     });
     const json = await parseAdminResponse(res);
     setBulkActing(false);
-    await load();
 
     const restoredCount = Array.isArray(json.restoredIds)
       ? json.restoredIds.length
@@ -248,11 +253,15 @@ export default function TrashPage() {
     if (res.ok && json.ok !== false && failedCount === 0) {
       setToast(`Restored ${ids.length} item${ids.length === 1 ? "" : "s"}.`);
     } else if (restoredCount > 0) {
+      setToastError(true);
       setToast(
         `Restored ${restoredCount} of ${ids.length} items. Some restores failed.`
       );
+      await load();
     } else {
+      setToastError(true);
       setToast(adminErrorMessage(json, "Could not restore items."));
+      await load();
     }
   }
 
@@ -261,6 +270,7 @@ export default function TrashPage() {
     if (ids.length === 0 || !canPermanentDelete) return;
     setBulkActing(true);
     setBulkDeleteConfirm(false);
+    setToastError(false);
     setToast(
       `Permanently deleting ${ids.length} item${ids.length === 1 ? "" : "s"}…`
     );
@@ -275,7 +285,6 @@ export default function TrashPage() {
     });
     const json = await parseAdminResponse(res);
     setBulkActing(false);
-    await load();
 
     const deletedCount = Array.isArray(json.deletedIds)
       ? json.deletedIds.length
@@ -291,11 +300,15 @@ export default function TrashPage() {
         `Permanently deleted ${ids.length} item${ids.length === 1 ? "" : "s"}.`
       );
     } else if (deletedCount > 0) {
+      setToastError(true);
       setToast(
         `Permanently deleted ${deletedCount} of ${ids.length} items. Some deletions failed.`
       );
+      await load();
     } else {
+      setToastError(true);
       setToast(adminErrorMessage(json, "Could not delete items."));
+      await load();
     }
   }
 
@@ -329,7 +342,13 @@ export default function TrashPage() {
       />
 
       {toast && (
-        <div className="rounded-lg border border-[var(--platform-success)]/30 bg-[rgba(16,185,129,0.08)] px-4 py-3 text-sm text-[var(--platform-success)] print:hidden">
+        <div
+          className={`rounded-lg border px-4 py-3 text-sm print:hidden ${
+            toastError
+              ? "border-red-500/40 bg-red-500/10 text-red-800"
+              : "border-[var(--platform-success)]/30 bg-[rgba(16,185,129,0.08)] text-[var(--platform-success)]"
+          }`}
+        >
           {toast}
         </div>
       )}
