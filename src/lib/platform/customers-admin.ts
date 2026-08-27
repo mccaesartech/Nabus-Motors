@@ -375,6 +375,13 @@ async function loadDeletedCustomerEmails(supabase: SupabaseClient) {
   return deletedAtByEmail;
 }
 
+function isCustomerPermanentlyRemoved(
+  customerEmail: string,
+  permanentlyDeletedEmails: Set<string>
+): boolean {
+  return permanentlyDeletedEmails.has(emailKey(customerEmail));
+}
+
 function isCustomerDeleted(
   customerEmail: string,
   profileDeletedAt: string | null | undefined,
@@ -382,6 +389,8 @@ function isCustomerDeleted(
   permanentlyDeletedEmails: Set<string>
 ): boolean {
   const key = emailKey(customerEmail);
+  // Permanently purged customers are excluded separately — they are neither
+  // active nor soft-deleted ("Show deleted").
   if (permanentlyDeletedEmails.has(key)) return false;
   if (profileDeletedAt) return true;
   return deletedAtByEmail.has(key);
@@ -467,6 +476,8 @@ export async function fetchAdminCustomers(
   for (const profile of profileRows) {
     if (!profile.email) continue;
     const profileEmail = profile.email;
+    // Permanent trash delete must never resurrect via profiles or activity.
+    if (isCustomerPermanentlyRemoved(profileEmail, permanentlyDeletedEmails)) continue;
     const deleted = isCustomerDeleted(
       profileEmail,
       profile.deleted_at,
@@ -521,6 +532,8 @@ export async function fetchAdminCustomers(
       (c) => emailKey(c.email) === normalized
     );
     if (existingByUser || existingByEmail) return;
+
+    if (isCustomerPermanentlyRemoved(row.email, permanentlyDeletedEmails)) return;
 
     const deleted = isCustomerDeleted(
       row.email,
@@ -854,6 +867,11 @@ export async function fetchAdminCustomerDetail(
       };
 
   if (!seed.email) return null;
+
+  // Permanent trash delete: never return in detail (active or "Show deleted").
+  if (isCustomerPermanentlyRemoved(seed.email, permanentlyDeletedEmails)) {
+    return null;
+  }
 
   const deletedAt = customerDeletedAt(
     seed.email,

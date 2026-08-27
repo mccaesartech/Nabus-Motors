@@ -38,12 +38,13 @@ export function ephemeralNotificationLogId(logId: string): string {
 export async function listTrashedAdminNotificationIds(
   supabase: SupabaseClient
 ): Promise<Set<string>> {
+  // Include permanently deleted so notification synthesis cannot resurrect
+  // items after Trash → permanent delete.
   const { data, error } = await supabase
     .from("platform_trash")
     .select("entity_id")
     .eq("entity_type", "admin_notification")
-    .is("restored_at", null)
-    .is("permanently_deleted_at", null);
+    .is("restored_at", null);
 
   if (error) {
     console.error("[admin_notification trash] list failed:", error.message);
@@ -57,12 +58,13 @@ export async function listTrashedAdminNotificationIds(
 export async function listTrashedSentEmailIds(
   supabase: SupabaseClient
 ): Promise<Set<string>> {
+  // Include permanently deleted so failed-delivery synthesis cannot resurrect
+  // after Trash → permanent delete.
   const { data, error } = await supabase
     .from("platform_trash")
     .select("entity_id")
     .eq("entity_type", "sent_email")
-    .is("restored_at", null)
-    .is("permanently_deleted_at", null);
+    .is("restored_at", null);
 
   if (error) {
     console.error("[sent_email trash] list failed:", error.message);
@@ -116,6 +118,22 @@ async function findActiveAdminNotificationTrash(
   return data?.id ? String(data.id) : null;
 }
 
+async function wasPermanentlyDeletedAdminNotification(
+  supabase: SupabaseClient,
+  entityId: string
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("platform_trash")
+    .select("id")
+    .eq("entity_type", "admin_notification")
+    .eq("entity_id", entityId)
+    .is("restored_at", null)
+    .not("permanently_deleted_at", "is", null)
+    .limit(1)
+    .maybeSingle();
+  return Boolean(data?.id);
+}
+
 async function findActiveSentEmailTrash(
   supabase: SupabaseClient,
   entityId: string
@@ -167,6 +185,10 @@ export async function softDeleteAdminNotification(
   const already = await findActiveAdminNotificationTrash(supabase, notificationId);
   if (already) {
     return { ok: false, message: "Notification is already in trash.", status: 400 };
+  }
+
+  if (await wasPermanentlyDeletedAdminNotification(supabase, notificationId)) {
+    return { ok: false, message: "Notification was permanently deleted.", status: 400 };
   }
 
   if (isPersistedAdminNotificationId(notificationId)) {
@@ -355,7 +377,7 @@ export async function hideEphemeralDeliveryNotification(
       ephemeral: true,
     }
   );
-  if (!result.ok && !/already in trash/i.test(result.message)) {
+  if (!result.ok && !/already in trash|permanently deleted/i.test(result.message)) {
     console.error(
       "[admin_notification trash] hide ephemeral failed:",
       result.message
@@ -434,7 +456,7 @@ export async function softDeleteAdminNotifications(
       snapshotsById?.[id]
     );
     if (result.ok) deletedIds.push(id);
-    else if (/already in trash/i.test(result.message)) deletedIds.push(id);
+    else if (/already in trash|permanently deleted/i.test(result.message)) deletedIds.push(id);
     else failed.push({ id, message: result.message });
   }
 

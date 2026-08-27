@@ -227,11 +227,15 @@ async function hardDeleteEntity(
   supabase: SupabaseClient,
   entityType: TrashEntityType,
   entityId: string
-) {
+): Promise<{ ok: true } | { ok: false; message: string }> {
   const table = ENTITY_TABLE[entityType];
-  if (!table) return;
+  if (!table) return { ok: true };
 
-  await supabase.from(table).delete().eq("id", entityId);
+  const { error } = await supabase.from(table).delete().eq("id", entityId);
+  if (error) {
+    return { ok: false, message: error.message };
+  }
+  return { ok: true };
 }
 
 function customerEmailFromTrashEntry(
@@ -255,18 +259,22 @@ async function purgeCustomerPermanentDeleteMarkers(
   supabase: SupabaseClient,
   entityId: string,
   snapshot: Record<string, unknown>
-) {
+): Promise<{ ok: true } | { ok: false; message: string }> {
   const profile = snapshot.profile as Record<string, unknown> | undefined;
   if (profile?.id) {
-    await supabase.from("profiles").delete().eq("id", profile.id);
+    const { error } = await supabase.from("profiles").delete().eq("id", profile.id);
+    if (error) return { ok: false, message: error.message };
   } else if (!entityId.startsWith("email:")) {
-    await supabase.from("profiles").delete().eq("id", entityId);
+    const { error } = await supabase.from("profiles").delete().eq("id", entityId);
+    if (error) return { ok: false, message: error.message };
   }
 
   const email = customerEmailFromTrashEntry(entityId, snapshot);
   if (email) {
-    await supabase.from("deleted_customer_emails").delete().eq("email", email);
+    const { error } = await supabase.from("deleted_customer_emails").delete().eq("email", email);
+    if (error) return { ok: false, message: error.message };
   }
+  return { ok: true };
 }
 
 async function restoreCustomer(
@@ -798,9 +806,35 @@ export async function permanentlyDeleteTrashEntry(
 
   if (entityType === "customer") {
     const snapshot = (entry.snapshot ?? {}) as Record<string, unknown>;
-    await purgeCustomerPermanentDeleteMarkers(supabase, entityId, snapshot);
+    const purged = await purgeCustomerPermanentDeleteMarkers(supabase, entityId, snapshot);
+    if (!purged.ok) {
+      return { ok: false, message: purged.message, status: 500 };
+    }
   } else {
-    await hardDeleteEntity(supabase, entityType, entityId);
+    const deleted = await hardDeleteEntity(supabase, entityType, entityId);
+    if (!deleted.ok) {
+      return { ok: false, message: deleted.message, status: 500 };
+    }
+  }
+
+  // Hide forever any linked ephemeral delivery notification when a sent email
+  // is permanently purged (soft-delete already removed notification_log).
+  if (entityType === "sent_email") {
+    const ephemeralId = `notification-log-${entityId}`;
+    const { data: ephemeralTrash } = await supabase
+      .from("platform_trash")
+      .select("id")
+      .eq("entity_type", "admin_notification")
+      .eq("entity_id", ephemeralId)
+      .is("restored_at", null)
+      .is("permanently_deleted_at", null)
+      .maybeSingle();
+    if (ephemeralTrash?.id) {
+      await supabase
+        .from("platform_trash")
+        .update({ permanently_deleted_at: new Date().toISOString() })
+        .eq("id", ephemeralTrash.id);
+    }
   }
 
   const needsRevalidate =
@@ -816,7 +850,14 @@ export async function permanentlyDeleteTrashEntry(
   }
 
   const now = new Date().toISOString();
-  await supabase.from("platform_trash").update({ permanently_deleted_at: now }).eq("id", trashId);
+  const { error: stampError } = await supabase
+    .from("platform_trash")
+    .update({ permanently_deleted_at: now })
+    .eq("id", trashId);
+
+  if (stampError) {
+    return { ok: false, message: stampError.message, status: 500 };
+  }
 
   await logPlatformActivity(auth, "item_permanently_deleted", entry.entity_label, {
     entityType,
