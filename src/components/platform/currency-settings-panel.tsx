@@ -90,7 +90,9 @@ export function CurrencySettingsPanel({
   const canOverride = session ? canViewFinance(session.role) : false;
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [liveMeta, setLiveMeta] = useState<AdminRatesResponse["live"]>(null);
+  const [liveMeta, setLiveMeta] = useState<AdminRatesResponse["live"] | undefined>(
+    undefined
+  );
   const [status, setStatus] = useState("");
 
   const manualRates = useMemo(
