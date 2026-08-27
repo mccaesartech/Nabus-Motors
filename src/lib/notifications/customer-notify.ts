@@ -177,9 +177,9 @@ export async function notifyCustomer(
     result.whatsappStatus = "skipped";
     result.whatsappReason = "WhatsApp not sent (no phone on file)";
   } else if (preferSms) {
-    // Arkesel SMS primary — leave WhatsApp dormant when SMS is the configured path.
+    // SMS primary — leave WhatsApp dormant. Keep provider routing in server logs only.
     result.whatsappStatus = "skipped";
-    result.whatsappReason = "SMS preferred (Arkesel)";
+    console.info("[notifyCustomer] WhatsApp skipped; SMS preferred as primary channel");
     await trySmsDelivery(phone, content.whatsapp, params, result);
   } else if (!whatsappCapable) {
     result.whatsappStatus = "skipped";

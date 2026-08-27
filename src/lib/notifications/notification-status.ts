@@ -39,7 +39,7 @@ export function maskPhoneForDisplay(phone: string | null | undefined): string | 
   return `${visibleStart}***${visibleEnd}`;
 }
 
-/** Strip sensitive tokens from provider error messages before showing in UI. */
+/** Strip secrets and provider/gateway names before showing reasons in the UI. */
 export function sanitizeNotificationReason(reason: string | undefined): string | undefined {
   if (!reason) return undefined;
   let sanitized = reason
@@ -49,21 +49,43 @@ export function sanitizeNotificationReason(reason: string | undefined): string |
     .replace(/sk_[a-z0-9]+/gi, "[api-key]")
     .replace(/TWILIO_[A-Z_]+/g, "[env-var]")
     .replace(/WHATSAPP_[A-Z_]+/g, "[env-var]")
+    .replace(/ARKESEL_[A-Z_]+/g, "[env-var]")
+    .replace(/RESEND_[A-Z_]+/g, "[env-var]")
+    .replace(/TERMII_[A-Z_]+/g, "[env-var]")
     .trim();
 
   if (sanitized.includes("WhatsApp API not configured")) {
     return "WhatsApp API not configured";
   }
-  if (/Twilio error/i.test(sanitized)) {
-    return "WhatsApp provider error — check Twilio configuration";
+  if (/Twilio error|Meta WhatsApp error/i.test(sanitized)) {
+    return "WhatsApp could not be delivered — check messaging configuration";
   }
-  if (/Meta WhatsApp error/i.test(sanitized)) {
-    return "WhatsApp provider error — check Meta configuration";
+  if (/Arkesel|Termii/i.test(sanitized)) {
+    return "SMS could not be delivered — check messaging configuration";
   }
+  if (/Resend/i.test(sanitized)) {
+    return "Email could not be delivered — check email configuration";
+  }
+
+  // Belt-and-suspenders: never leave gateway brand names in UI copy.
+  sanitized = sanitized
+    .replace(/\bArkesel\b/gi, "SMS")
+    .replace(/\bTermii\b/gi, "SMS")
+    .replace(/\bResend\b/gi, "email")
+    .replace(/\bTwilio\b/gi, "WhatsApp")
+    .replace(/\bSMS preferred\b/gi, "Message routed")
+    .trim();
+
   if (sanitized.length > 120) {
     sanitized = `${sanitized.slice(0, 117)}…`;
   }
   return sanitized;
+}
+
+function withTrailingPeriod(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) return trimmed;
+  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
 }
 
 function describeWhatsApp(result: CustomerNotificationPayload): string | null {
@@ -77,8 +99,17 @@ function describeWhatsApp(result: CustomerNotificationPayload): string | null {
       return result.whatsappReason
         ? `WhatsApp failed: ${result.whatsappReason}`
         : "WhatsApp failed";
-    case "skipped":
-      return result.whatsappReason ?? "WhatsApp not sent (no phone on file)";
+    case "skipped": {
+      const reason = result.whatsappReason ?? "";
+      if (/opted out/i.test(reason)) {
+        return "WhatsApp not sent (customer opted out)";
+      }
+      if (/no phone/i.test(reason) || !result.phone) {
+        return "WhatsApp not sent (no phone on file)";
+      }
+      // Internal routing (SMS preferred, etc.) — omit from admin/customer toasts.
+      return null;
+    }
     default:
       return null;
   }
@@ -94,7 +125,15 @@ function describeEmail(
     case "failed":
       return result.emailReason ? `Email failed: ${result.emailReason}` : "Email failed";
     case "skipped":
-      return result.emailReason ?? "Email not sent (no email on file)";
+      // Only surface actionable skips (missing address). Hide "Email skipped" noise.
+      if (/no email/i.test(result.emailReason ?? "") || !result.emailReason) {
+        // When SMS/WhatsApp already delivered, don't nag about missing email on success toasts.
+        if (result.whatsappSent || result.channels.includes("sms")) {
+          return null;
+        }
+        return result.emailReason ?? "Email not sent (no email on file)";
+      }
+      return null;
     default:
       return null;
   }
@@ -121,7 +160,7 @@ export function formatCustomerNotificationFeedback(
         variant: "neutral",
       };
     }
-    return { message: prefix, variant: "success" };
+    return { message: withTrailingPeriod(prefix), variant: "success" };
   }
 
   const parts: string[] = [];
@@ -130,15 +169,12 @@ export function formatCustomerNotificationFeedback(
   if (wa) parts.push(wa);
   if (email) parts.push(email);
 
-  if (parts.length === 0) {
-    return { message: prefix, variant: "success" };
-  }
-
-  const anySent = result.whatsappSent || result.emailSent;
+  const smsSent = result.channels.includes("sms");
+  const anySent = result.whatsappSent || result.emailSent || smsSent;
   const anyFailed =
     result.whatsappStatus === "failed" ||
     result.emailStatus === "failed" ||
-    (result.whatsappStatus === "deferred" && !result.emailSent);
+    (result.whatsappStatus === "deferred" && !result.emailSent && !smsSent);
 
   const variant: NotificationFeedbackVariant = anySent
     ? anyFailed
@@ -147,6 +183,10 @@ export function formatCustomerNotificationFeedback(
     : anyFailed
       ? "warning"
       : "neutral";
+
+  if (parts.length === 0) {
+    return { message: withTrailingPeriod(prefix), variant };
+  }
 
   return {
     message: `${prefix}. ${parts.join(". ")}.`,
@@ -182,6 +222,13 @@ export function formatPublicCustomerNotificationFeedback(
       message:
         "We sent a confirmation to your email. WhatsApp could not be delivered automatically — our team will follow up if needed.",
       variant: "warning",
+    };
+  }
+
+  if (result.channels.includes("sms")) {
+    return {
+      message: "We sent a confirmation by text message.",
+      variant: "success",
     };
   }
 

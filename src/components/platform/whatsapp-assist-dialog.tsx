@@ -198,7 +198,7 @@ export function WhatsAppAssistDialog({
           : "Opened WhatsApp Web with your message. Send it from there to complete delivery."
       );
     } else if (json.sent) {
-      setSendNotice("Message sent via WhatsApp API.");
+      setSendNotice("Message sent.");
       onOpenChange(false);
     } else {
       setSendNotice("Message logged. Complete sending in WhatsApp if prompted.");
