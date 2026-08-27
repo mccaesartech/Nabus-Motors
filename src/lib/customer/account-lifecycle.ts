@@ -9,8 +9,11 @@ import { accountReauthCodeEmail } from "@/lib/email/branded-templates";
 import { hashToken } from "@/lib/platform/password";
 import {
   isMissingRelationError,
+  isSchemaCacheStaleError,
   isSchemaMissing,
   markSchemaMissing,
+  markSchemaPresent,
+  SCHEMA_CACHE_STALE_TTL_MS,
   SCHEMA_CAPS,
 } from "@/lib/observability/schema-capability";
 import { reportSchemaIssue } from "@/lib/observability/schema-issue";
@@ -60,10 +63,14 @@ const REAUTH_TABLE = "customer_reauth_codes";
 const REAUTH_SCHEMA_KEY = SCHEMA_CAPS.customerReauthCodes;
 
 function reportMissingReauthTable(message: string, source: string) {
-  markSchemaMissing(REAUTH_SCHEMA_KEY);
+  // Schema-cache lag recovers after NOTIFY / a short wait — do not sticky-fail forever.
+  const ttlMs = isSchemaCacheStaleError(message)
+    ? SCHEMA_CACHE_STALE_TTL_MS
+    : undefined;
+  markSchemaMissing(REAUTH_SCHEMA_KEY, ttlMs);
   reportSchemaIssue({
     table: REAUTH_TABLE,
-    migration: "102_customer_reauth_codes.sql",
+    migration: "102_customer_reauth_codes.sql / 103_customer_reauth_codes_grants.sql",
     source,
     message,
   });
@@ -135,6 +142,7 @@ export async function createCustomerReauthCode(params: {
     return { ok: false, reason: "db_error" };
   }
 
+  markSchemaPresent(REAUTH_SCHEMA_KEY);
   return { ok: true, code, expiresAt };
 }
 
@@ -218,7 +226,12 @@ export async function sendCustomerReauthCodeEmail(params: {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Email send failed";
     console.error("[account-lifecycle] reauth code email failed:", message);
-    return { emailSent: false, emailError: message };
+    // Prefer actionable Resend wording for the account UI; keep length bounded.
+    const emailError =
+      message.includes("RESEND_") || message.startsWith("Resend rejected")
+        ? message.slice(0, 280)
+        : "Could not send the verification email. Please try again in a moment.";
+    return { emailSent: false, emailError };
   }
 }
 

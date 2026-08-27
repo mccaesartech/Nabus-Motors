@@ -26,6 +26,7 @@ export default function RestoreDeletionPage() {
 
   async function sendCode() {
     setError("");
+    setSuccess("");
     setSendingCode(true);
 
     const token = await getAccessToken();
@@ -37,7 +38,7 @@ export default function RestoreDeletionPage() {
       headers,
       body: JSON.stringify({ email: email.trim().toLowerCase() }),
     });
-    const json = await res.json();
+    const json = await res.json().catch(() => ({}));
     if (!res.ok) {
       setError(json.message ?? "Could not send verification code.");
       setSendingCode(false);
@@ -45,6 +46,10 @@ export default function RestoreDeletionPage() {
     }
 
     setVerificationSent(true);
+    setSuccess(
+      json.message ??
+        "A 6-digit code was sent to your email. Check inbox and spam."
+    );
     setSendingCode(false);
   }
 

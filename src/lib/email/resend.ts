@@ -125,50 +125,112 @@ export async function sendEmail({
     ].join("\n")
   );
 
-  const { data, error } = await resend.emails.send({
-    from: from.header,
-    to: recipients,
-    subject,
-    html,
-    ...(text ? { text } : {}),
-  });
+  const maxAttempts = 3;
+  let lastFailure: {
+    message?: string;
+    name?: string;
+    statusCode?: number | null;
+  } | null = null;
 
-  if (error) {
-    const failure = error as { message?: string; name?: string; statusCode?: number | null };
-    enqueueAuditLog({
-      action: "email_failed",
-      success: false,
-      targetType: "email",
-      errorMessage: (failure.message?.trim() || "Resend failed to send email.").slice(0, 500),
-      metadata: { subject, recipientCount: recipients.length },
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const { data, error } = await resend.emails.send({
+      from: from.header,
+      to: recipients,
+      subject,
+      html,
+      ...(text ? { text } : {}),
     });
-    throw new ResendSendError({
-      providerMessage: failure.message?.trim() || "Resend failed to send email.",
-      providerCode: failure.name ?? null,
-      statusCode: failure.statusCode ?? null,
-      from,
+
+    if (!error && data?.id) {
+      enqueueAuditLog({
+        action: "email_sent",
+        success: true,
+        targetType: "email",
+        metadata: { subject, recipientCount: recipients.length, attempt },
+      });
+      return { messageId: data.id };
+    }
+
+    if (error) {
+      lastFailure = error as {
+        message?: string;
+        name?: string;
+        statusCode?: number | null;
+      };
+    } else {
+      lastFailure = {
+        message: "Resend accepted the request but returned no provider message ID.",
+      };
+    }
+
+    const providerMessage = lastFailure.message?.trim() || "Resend failed to send email.";
+    const transient = isTransientResendFailure({
+      message: providerMessage,
+      code: lastFailure.name ?? null,
+      statusCode: lastFailure.statusCode ?? null,
     });
+
+    if (!transient || attempt === maxAttempts) {
+      break;
+    }
+
+    console.warn(
+      JSON.stringify({
+        event: "resend_send_retry",
+        attempt,
+        maxAttempts,
+        providerMessage: providerMessage.slice(0, 200),
+      })
+    );
+    await sleep(300 * attempt);
   }
 
-  if (!data?.id) {
-    enqueueAuditLog({
-      action: "email_failed",
-      success: false,
-      targetType: "email",
-      errorMessage: "Resend accepted the request but returned no provider message ID.",
-      metadata: { subject, recipientCount: recipients.length },
-    });
-    throw new ResendSendError({
-      providerMessage: "Resend accepted the request but returned no provider message ID.",
-      from,
-    });
-  }
-
+  const failureMessage =
+    lastFailure?.message?.trim() || "Resend failed to send email.";
   enqueueAuditLog({
-    action: "email_sent",
-    success: true,
+    action: "email_failed",
+    success: false,
     targetType: "email",
+    errorMessage: failureMessage.slice(0, 500),
     metadata: { subject, recipientCount: recipients.length },
   });
-  return { messageId: data.id };
+  throw new ResendSendError({
+    providerMessage: failureMessage,
+    providerCode: lastFailure?.name ?? null,
+    statusCode: lastFailure?.statusCode ?? null,
+    from,
+  });
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Network / provider blips that often succeed on a quick retry. */
+function isTransientResendFailure(params: {
+  message: string;
+  code: string | null;
+  statusCode: number | null;
+}): boolean {
+  const lower = params.message.toLowerCase();
+  if (
+    lower.includes("unable to fetch data") ||
+    lower.includes("could not be resolved") ||
+    lower.includes("timeout") ||
+    lower.includes("timed out") ||
+    lower.includes("econnreset") ||
+    lower.includes("fetch failed") ||
+    lower.includes("network") ||
+    lower.includes("temporarily") ||
+    lower.includes("try again")
+  ) {
+    return true;
+  }
+  if (params.code === "application_error" || params.code === "internal_server_error") {
+    return true;
+  }
+  if (params.statusCode != null && params.statusCode >= 500) {
+    return true;
+  }
+  return false;
 }

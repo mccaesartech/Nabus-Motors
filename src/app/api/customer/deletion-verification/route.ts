@@ -124,13 +124,18 @@ export async function POST(req: NextRequest) {
     );
     const message =
       created.reason === "schema_missing"
-        ? "Verification is temporarily unavailable. Please try again later or contact support."
+        ? "Verification is temporarily unavailable while the database finishes updating. Wait about 30 seconds and try again. If it keeps failing, ask support to run NOTIFY pgrst, 'reload schema';"
         : created.reason === "not_configured"
-          ? "Verification is not available right now."
-          : "Could not send verification code. Please try again.";
+          ? "Verification is not available right now (server configuration)."
+          : created.reason === "db_error"
+            ? "Could not create a verification code (database error). Please try again."
+            : "Could not send verification code. Please try again.";
     const status =
       created.reason === "schema_missing" || created.reason === "not_configured" ? 503 : 500;
-    return NextResponse.json({ ok: false, message }, { status });
+    return NextResponse.json(
+      { ok: false, message, reason: created.reason },
+      { status }
+    );
   }
 
   const sent = await sendCustomerReauthCodeEmail({
@@ -150,7 +155,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         ok: false,
-        message: sent.emailError ?? "Could not send verification code. Please try again.",
+        reason: "email_failed",
+        message:
+          sent.emailError ??
+          "Could not send verification code email. Please try again in a moment.",
       },
       { status: 500 }
     );
@@ -158,6 +166,6 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     ok: true,
-    message: "A verification code has been sent to your email.",
+    message: `A 6-digit verification code was sent to ${resolved.email}. Check inbox and spam (from noreply@truegoshengh.com).`,
   });
 }

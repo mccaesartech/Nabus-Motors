@@ -39,3 +39,7 @@ CREATE POLICY "No public access to customer reauth codes"
 
 COMMENT ON TABLE public.customer_reauth_codes IS
   'Hashed one-time 6-digit codes for customer re-authentication (deletion, restore).';
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.customer_reauth_codes TO service_role;
+
+NOTIFY pgrst, 'reload schema';

@@ -54,6 +54,7 @@ export function DeleteAccountSection({ retentionDays = 30 }: DeleteAccountSectio
   const [feedbackText, setFeedbackText] = useState("");
   const [authMethod, setAuthMethod] = useState<"password" | "otp">("password");
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
 
@@ -67,6 +68,7 @@ export function DeleteAccountSection({ retentionDays = 30 }: DeleteAccountSectio
 
   async function sendVerificationCode() {
     setError("");
+    setInfo("");
     setSendingCode(true);
 
     const token = await getAccessToken();
@@ -76,22 +78,38 @@ export function DeleteAccountSection({ retentionDays = 30 }: DeleteAccountSectio
       return;
     }
 
-    const res = await fetch("/api/customer/deletion-verification", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: "{}",
-    });
-    const json = await res.json();
-    if (!res.ok) {
-      setError(json.message ?? "Could not send verification code.");
+    let json: { ok?: boolean; message?: string; reason?: string } = {};
+    try {
+      const res = await fetch("/api/customer/deletion-verification", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: "{}",
+      });
+      json = (await res.json().catch(() => ({}))) as typeof json;
+      if (!res.ok) {
+        setError(
+          json.message ??
+            (res.status === 429
+              ? "Too many verification requests. Please try again later."
+              : "Could not send verification code.")
+        );
+        setSendingCode(false);
+        return;
+      }
+    } catch {
+      setError("Network error while sending the verification code. Please try again.");
       setSendingCode(false);
       return;
     }
 
     setVerificationSent(true);
+    setInfo(
+      json.message ??
+        "A 6-digit code was sent to your email. Check inbox and spam."
+    );
     setSendingCode(false);
   }
 
@@ -145,6 +163,7 @@ export function DeleteAccountSection({ retentionDays = 30 }: DeleteAccountSectio
       setVerificationToken("");
       setVerificationSent(false);
       setError("");
+      setInfo("");
     }
   }
 
@@ -325,6 +344,7 @@ export function DeleteAccountSection({ retentionDays = 30 }: DeleteAccountSectio
             </p>
           </div>
 
+          {info && !error ? <p className="text-sm text-foreground">{info}</p> : null}
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
           <DialogFooter className="gap-2 sm:gap-0">
