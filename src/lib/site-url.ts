@@ -84,10 +84,14 @@ export function resolvePublicSiteUrl(
   const fallback = development
     ? DEV_LOCALHOST_URL
     : emergency ?? PRODUCTION_PUBLIC_SITE_URL;
+  const trimmed = configuredUrl?.trim();
+  const hasExplicitConfig = Boolean(trimmed && trimmed.startsWith("https://"));
   const origin = normalizeOrigin(configuredUrl, fallback, development);
 
   if (!development) {
     if (emergency) return emergency;
+    // Explicit NEXT_PUBLIC_SITE_URL (including *.vercel.app pre-launch) wins.
+    if (hasExplicitConfig) return origin;
     const hostname = new URL(origin).hostname;
     if (isNonCanonicalPublicHost(hostname)) {
       return PRODUCTION_PUBLIC_SITE_URL;

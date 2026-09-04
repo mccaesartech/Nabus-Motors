@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { PRODUCTION_PUBLIC_SITE_URL } from "@/lib/site-url";
+import { getPublicSiteUrl } from "@/lib/site-url";
 
 const DEFAULT_AUTO_DIVISION_HOSTS = [
   "auto.nabusmotors.com",
@@ -71,7 +71,18 @@ export function resolveLegacyVercelHostRedirect(
   const { pathname, search } = req.nextUrl;
   if (pathname.startsWith("/_next/")) return null;
 
-  const dest = new URL(`${pathname}${search}`, PRODUCTION_PUBLIC_SITE_URL);
+  const canonical = getPublicSiteUrl();
+  let canonicalHost: string;
+  try {
+    canonicalHost = new URL(canonical).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+
+  // Already on the canonical host (e.g. nabus-motors.vercel.app during pre-launch).
+  if (hostname === canonicalHost) return null;
+
+  const dest = new URL(`${pathname}${search}`, canonical);
   return NextResponse.redirect(dest, 308);
 }
 

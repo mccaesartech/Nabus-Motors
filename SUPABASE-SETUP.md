@@ -22,17 +22,20 @@ You already created the project. Keep these handy from **Project Settings → AP
 
 ## Step 2 — Run database setup (SQL)
 
-### Option A — One file (recommended for fresh project)
+> **Important:** Run setup **before** `seed-vehicles.sql`.  
+> If you see `relation "vehicles" does not exist`, you skipped Step 1.
+
+### Option A — Full platform (recommended)
 
 1. Open **`supabase/nabus-full-setup.sql`** in Cursor
 2. Select all → Copy
 3. Supabase Dashboard → **SQL Editor** → **New query** → Paste → **Run**
-4. Wait for success (may take 1–2 minutes)
+4. Wait for **Success** (may take 1–2 minutes). If it errors, copy the error message — do not run the seed yet.
 
-### Option B — Manual two-step (legacy)
+### Option B — Quick inventory only (minimal)
 
-1. Run **`supabase/setup.sql`**
-2. Run every file in **`supabase/migrations/`** in numeric order (001 → 103)
+1. Run **`supabase/setup.sql`** first (creates `vehicles` and basic tables)
+2. For admin/platform features, you still need Option A later on a fresh project
 
 ---
 
@@ -122,6 +125,9 @@ npm run dev
 
 **Admin shows “Supabase not connected”**  
 → Add `SUPABASE_SERVICE_ROLE_KEY` and restart.
+
+**`relation "vehicles" does not exist` when running seed**  
+→ You ran `seed-vehicles.sql` before setup. Run **`supabase/nabus-full-setup.sql`** (or **`setup.sql`**) first, wait for success, then run the seed again.
 
 **SQL errors on nabus-full-setup.sql**  
 → Use a **fresh** Supabase project. If re-running, some “already exists” notices are OK; real errors usually mean the project was partially set up — create a new project or drop tables first.

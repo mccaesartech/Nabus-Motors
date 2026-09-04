@@ -32,17 +32,19 @@ describe("canonical public site URL", () => {
     expect(PRODUCTION_PUBLIC_SITE_URL).toBe("https://www.nabusmotors.com");
   });
 
-  it("rewrites legacy Vercel deployment hostnames to the canonical domain", () => {
+  it("honors an explicit Vercel pre-launch URL", () => {
     delete process.env.PUBLIC_SITE_URL_EMERGENCY_FALLBACK;
     expect(resolvePublicSiteUrl("https://nabus-motors.vercel.app")).toBe(
-      PRODUCTION_PUBLIC_SITE_URL
+      "https://nabus-motors.vercel.app"
     );
-    expect(
-      resolvePublicSiteUrl("https://nabus-motors.vercel.app")
-    ).toBe(PRODUCTION_PUBLIC_SITE_URL);
+  });
+
+  it("rewrites preview vercel.app hostnames only when not explicitly configured", () => {
+    delete process.env.PUBLIC_SITE_URL_EMERGENCY_FALLBACK;
+    expect(resolvePublicSiteUrl(undefined)).toBe(PRODUCTION_PUBLIC_SITE_URL);
     expect(
       resolvePublicSiteUrl("https://nabus-motors-abc123.vercel.app")
-    ).toBe(PRODUCTION_PUBLIC_SITE_URL);
+    ).toBe("https://nabus-motors-abc123.vercel.app");
   });
 
   it("preserves a valid explicitly configured custom production origin", () => {

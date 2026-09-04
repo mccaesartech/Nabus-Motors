@@ -1,6 +1,6 @@
--- True Goshen Auto — full database setup
+-- Nabus Motors — database setup (Step 1 of 2)
 -- Run this ONCE in Supabase Dashboard → SQL Editor → New query → Run
--- Account: mccaesartechtraining@gmail.com
+-- THEN run supabase/seed-vehicles.sql (Step 2)
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 

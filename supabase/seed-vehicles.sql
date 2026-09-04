@@ -1,5 +1,8 @@
 -- Auto-generated: 75 vehicles (2026-09-04)
--- Run after supabase/setup.sql in Supabase SQL Editor
+-- ⚠️ STEP 2 ONLY — run AFTER schema setup succeeds.
+-- Step 1: supabase/nabus-full-setup.sql  (full platform — recommended)
+--    OR:  supabase/setup.sql              (basic tables only — inventory + forms)
+-- Step 2: this file (seed-vehicles.sql)
 
 INSERT INTO vehicles (
   slug, make, model, year, trim, price, mileage,
