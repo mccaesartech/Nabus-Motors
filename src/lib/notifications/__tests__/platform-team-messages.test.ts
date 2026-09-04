@@ -17,7 +17,7 @@ describe("team invite / password message builders", () => {
   it("invite SMS URL matches buildPlatformInviteUrl (same as Copy link)", () => {
     const inviteUrl = buildPlatformInviteUrl("abc", PRODUCTION_PUBLIC_SITE_URL);
     expect(inviteUrl).toBe(
-      "https://www.truegoshengh.com/admin/platform/invite/abc"
+      "https://www.nabusmotors.com/admin/platform/invite/abc"
     );
 
     const text = buildTeamInviteMessage({
@@ -71,7 +71,7 @@ describe("team invite / password message builders", () => {
     expect(text).toContain("Temporary password: TempPass-Example");
     expect(text).toContain(loginUrl);
     expect(text).toMatch(/Sign in at/i);
-    expect(loginUrl).toBe("https://www.truegoshengh.com/admin");
+    expect(loginUrl).toBe("https://www.nabusmotors.com/admin");
   });
 
   it("infers invite linkKind from invite acceptance URL path", () => {
@@ -90,12 +90,12 @@ describe("team invite / password message builders", () => {
     expect(text).toContain("Accept invite:");
     expect(text).toContain(inviteUrl);
     expect(text).not.toMatch(
-      /Sign in at https:\/\/www\.truegoshengh\.com\/admin(?!\/platform\/invite)/
+      /Sign in at https:\/\/www\.nabusmotors\.com\/admin(?!\/platform\/invite)/
     );
   });
 
   it("password-set SMS omits password when not provided", () => {
-    const loginUrl = "https://www.truegoshengh.com/admin";
+    const loginUrl = "https://www.nabusmotors.com/admin";
     const text = buildTeamPasswordSetMessage({
       name: "Kojo",
       role: "staff",
@@ -110,7 +110,7 @@ describe("team invite / password message builders", () => {
 
   it("login alert SMS includes role, time, IP, and security link", () => {
     const securityUrl =
-      "https://www.truegoshengh.com/admin/platform/account/security";
+      "https://www.nabusmotors.com/admin/platform/account/security";
     const text = buildTeamLoginAlertMessage({
       name: "Ama",
       role: "manager",
@@ -128,7 +128,7 @@ describe("team invite / password message builders", () => {
 
   it("failed login alert SMS includes role, device, IP, and security link", () => {
     const securityUrl =
-      "https://www.truegoshengh.com/admin/platform/account/security";
+      "https://www.nabusmotors.com/admin/platform/account/security";
     const text = buildTeamFailedLoginAlertMessage({
       name: "Ama",
       role: "manager",
@@ -147,7 +147,7 @@ describe("team invite / password message builders", () => {
 
   it("password-changed SMS confirms change without including the new password", () => {
     const securityUrl =
-      "https://www.truegoshengh.com/admin/platform/account/security";
+      "https://www.nabusmotors.com/admin/platform/account/security";
     const text = buildTeamPasswordChangedMessage({
       name: "Ama",
       when: "Aug 4, 2026, 9:51 PM",

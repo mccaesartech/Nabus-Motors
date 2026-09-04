@@ -47,17 +47,17 @@ describe("SSRF / open-redirect URL controls", () => {
 
   it("auth service URL is origin-only (no user-controlled fetch path)", () => {
     process.env.NEXT_PUBLIC_AUTH_SERVICE_URL =
-      "https://auth.truegoshengh.com/extra/path?q=1";
-    expect(getAuthServiceUrl()).toBe("https://auth.truegoshengh.com");
+      "https://auth.nabusmotors.com/extra/path?q=1";
+    expect(getAuthServiceUrl()).toBe("https://auth.nabusmotors.com");
     const sessionUrl = new URL("/api/auth/session", getAuthServiceUrl());
-    expect(sessionUrl.origin).toBe("https://auth.truegoshengh.com");
+    expect(sessionUrl.origin).toBe("https://auth.nabusmotors.com");
     expect(sessionUrl.pathname).toBe("/api/auth/session");
   });
 
   it("OAuth callback keeps sanitized redirect on the public app origin", () => {
-    process.env.NEXT_PUBLIC_SITE_URL = "https://www.truegoshengh.com";
+    process.env.NEXT_PUBLIC_SITE_URL = "https://www.nabusmotors.com";
     const callback = new URL(buildOAuthCallbackUrl("//evil.example"));
-    expect(callback.origin).toBe("https://www.truegoshengh.com");
+    expect(callback.origin).toBe("https://www.nabusmotors.com");
     expect(callback.pathname).toBe("/auth/callback");
     expect(callback.searchParams.get("redirect")).toBe("/account");
   });

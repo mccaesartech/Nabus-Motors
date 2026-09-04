@@ -36,7 +36,7 @@ export function getWebAuthnRpId(): string {
 }
 
 export function getWebAuthnRpName(): string {
-  return process.env.WEBAUTHN_RP_NAME?.trim() || "True Goshen Admin";
+  return process.env.WEBAUTHN_RP_NAME?.trim() || "Nabus Motors Admin";
 }
 
 export function getExpectedOrigins(requestOrigin?: string | null): string[] {

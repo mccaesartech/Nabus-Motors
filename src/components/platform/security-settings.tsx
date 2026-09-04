@@ -133,7 +133,7 @@ export function SecuritySettings({ forcedChange = false }: { forcedChange?: bool
   function downloadBackupCodes() {
     if (!generatedCodes?.length) return;
     const text = [
-      "True Goshen Admin — backup recovery codes",
+      "Nabus Motors Admin — backup recovery codes",
       "Each code works once. Store securely.",
       "",
       ...generatedCodes,
@@ -142,7 +142,7 @@ export function SecuritySettings({ forcedChange = false }: { forcedChange?: bool
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = "true-goshen-admin-backup-codes.txt";
+    anchor.download = "nabus-motors-admin-backup-codes.txt";
     anchor.click();
     URL.revokeObjectURL(url);
   }

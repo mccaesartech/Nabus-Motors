@@ -16,7 +16,7 @@ import { normalizeRole } from "@/lib/platform/permissions";
 
 export const OWNER_FALLBACK = {
   name: "Owner",
-  email: process.env.OWNER_EMAIL ?? "owner@truegoshenauto.com",
+  email: process.env.OWNER_EMAIL ?? "owner@nabusmotors.com",
   role: "owner" as const,
 };
 

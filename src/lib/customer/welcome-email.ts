@@ -300,8 +300,8 @@ export async function maybeSendCustomerWelcomeEmail(params: {
       const { sendArkeselSms } = await import("@/lib/notifications/arkesel");
       const ref = params.registrationId?.trim();
       const smsBody = ref
-        ? `True Goshen: Welcome${displayName ? ` ${displayName}` : ""}! Account ${ref} is ready. Open: ${accountUrl}`
-        : `True Goshen: Welcome${displayName ? ` ${displayName}` : ""}! Your account is ready. Open: ${accountUrl}`;
+        ? `Nabus Motors: Welcome${displayName ? ` ${displayName}` : ""}! Account ${ref} is ready. Open: ${accountUrl}`
+        : `Nabus Motors: Welcome${displayName ? ` ${displayName}` : ""}! Your account is ready. Open: ${accountUrl}`;
       const sms = await sendArkeselSms(phone, smsBody);
       if (sms.sent) {
         smsSent = true;

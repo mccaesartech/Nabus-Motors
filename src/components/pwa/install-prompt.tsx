@@ -62,7 +62,7 @@ export function InstallPrompt({ variant: variantProp }: InstallPromptProps = {})
   const copy = useMemo(() => {
     if (variant === "admin") {
       return {
-        title: "Install True Goshen Admin",
+        title: "Install Nabus Motors Admin",
         body: "Open the platform dashboard from your home screen with a secure, app-like experience.",
         benefits: [
           "Quick access to inventory and operations",
@@ -72,7 +72,7 @@ export function InstallPrompt({ variant: variantProp }: InstallPromptProps = {})
       };
     }
     return {
-      title: "Install True Goshen",
+      title: "Install Nabus Motors",
       body: "Browse vehicles, track freight, and shop parts with a faster, app-like experience.",
       benefits: [
         "One-tap access from your home screen",
@@ -233,7 +233,7 @@ export function InstallPrompt({ variant: variantProp }: InstallPromptProps = {})
             <div className="mt-3 rounded-lg border border-amber-300/60 bg-amber-50 p-2 text-xs text-amber-950 dark:border-amber-700/50 dark:bg-amber-950/40 dark:text-amber-100">
               <p>
                 You have the <strong>customer</strong> app installed. Install{" "}
-                <strong>True Goshen Admin</strong> separately from{" "}
+                <strong>Nabus Motors Admin</strong> separately from{" "}
                 <a href={adminLoginPath()} className="font-medium underline">
                   {adminLoginPath()}
                 </a>{" "}
@@ -245,7 +245,7 @@ export function InstallPrompt({ variant: variantProp }: InstallPromptProps = {})
           {wrongAdminInstallUrl ? (
             <div className="mt-3 rounded-lg border border-amber-300/60 bg-amber-50 p-2 text-xs text-amber-950 dark:border-amber-700/50 dark:bg-amber-950/40 dark:text-amber-100">
               <p>
-                Install <strong>True Goshen Admin</strong> from{" "}
+                Install <strong>Nabus Motors Admin</strong> from{" "}
                 <a href={adminLoginPath()} className="font-medium underline">
                   {adminLoginPath()}
                 </a>{" "}
@@ -265,14 +265,14 @@ export function InstallPrompt({ variant: variantProp }: InstallPromptProps = {})
                   </>
                 ) : (
                   <>
-                    On iPhone or iPad: open the True Goshen home page in Safari, tap{" "}
+                    On iPhone or iPad: open the Nabus Motors home page in Safari, tap{" "}
                     <strong>Share</strong>, then <strong>Add to Home Screen</strong>.
                   </>
                 )}{" "}
                 {otherVariantInstalled && variant === "customer" ? (
                   <>
                     If you already have the Admin shortcut, add this one too — choose{" "}
-                    <strong>True Goshen</strong> (not TG Admin).
+                    <strong>Nabus Motors</strong> (not TG Admin).
                   </>
                 ) : null}{" "}
                 The shortcut uses the{" "}
@@ -293,14 +293,14 @@ export function InstallPrompt({ variant: variantProp }: InstallPromptProps = {})
                     If the browser says the app is already installed, it may mean only the{" "}
                     <strong>Admin</strong> app is on your home screen. Open this home page in
                     Chrome, tap <strong>⋮</strong>, then <strong>Install app</strong> or{" "}
-                    <strong>Add to Home screen</strong> to add <strong>True Goshen</strong>{" "}
+                    <strong>Add to Home screen</strong> to add <strong>Nabus Motors</strong>{" "}
                     separately.
                   </>
                 ) : (
                   <>
                     This browser did not offer automatic installation. In Chrome or Edge, open{" "}
                     <strong>⋮</strong> and choose{" "}
-                    <strong>Install True Goshen Admin</strong> or <strong>Install app</strong>.
+                    <strong>Install Nabus Motors Admin</strong> or <strong>Install app</strong>.
                   </>
                 )}
               </p>

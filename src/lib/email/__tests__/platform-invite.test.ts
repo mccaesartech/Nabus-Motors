@@ -6,14 +6,14 @@ import { buildPlatformInviteEmailContent } from "@/lib/email/platform-invite";
 import { buildPlatformInviteUrl } from "@/lib/platform/invite-url";
 import { PRODUCTION_PUBLIC_SITE_URL } from "@/lib/site-url";
 
-const LOGIN_URL = "https://www.truegoshengh.com/admin";
+const LOGIN_URL = "https://www.nabusmotors.com/admin";
 const INVITE_TOKEN = "token123";
 const INVITE_URL = buildPlatformInviteUrl(INVITE_TOKEN, PRODUCTION_PUBLIC_SITE_URL);
 
 describe("buildPlatformInviteEmailContent", () => {
   it("invite-without-password email URL matches buildPlatformInviteUrl / Copy link", () => {
     expect(INVITE_URL).toBe(
-      "https://www.truegoshengh.com/admin/platform/invite/token123"
+      "https://www.nabusmotors.com/admin/platform/invite/token123"
     );
 
     const mail = buildPlatformInviteEmailContent({
@@ -22,7 +22,7 @@ describe("buildPlatformInviteEmailContent", () => {
       inviteUrl: INVITE_URL,
     });
 
-    expect(mail.subject).toBe("You're invited to True Goshen as Manager");
+    expect(mail.subject).toBe("You're invited to Nabus Motors as Manager");
     expect(mail.html).toContain("You're invited as Manager");
     expect(mail.text).toContain(INVITE_URL);
     expect(mail.html).toContain(`href="${INVITE_URL}"`);
@@ -30,7 +30,7 @@ describe("buildPlatformInviteEmailContent", () => {
     expect(mail.text).not.toMatch(/Temporary password/i);
     expect(mail.html).not.toMatch(/Temporary password/i);
     expect(mail.html).toContain("Accept invitation");
-    expect(mail.html).not.toMatch(/href="https:\/\/www\.truegoshengh\.com\/admin"/);
+    expect(mail.html).not.toMatch(/href="https:\/\/www\.nabusmotors\.com\/admin"/);
     expect(mail.text).not.toContain("vercel.app");
     expect(mail.html).not.toMatch(/admin account/i);
     expect(mail.subject).not.toMatch(/Admin account/i);
@@ -45,7 +45,7 @@ describe("buildPlatformInviteEmailContent", () => {
       linkKind: "invite",
     });
 
-    expect(mail.subject).toBe("Your True Goshen Staff account");
+    expect(mail.subject).toBe("Your Nabus Motors Staff account");
     expect(mail.html).toContain("You're invited — set up your Staff account");
     expect(mail.html).not.toMatch(/admin account/i);
     expect(mail.subject).not.toMatch(/Admin account/i);
@@ -54,14 +54,14 @@ describe("buildPlatformInviteEmailContent", () => {
     expect(mail.text).toMatch(/Accept your invitation here:/i);
     expect(mail.text).not.toMatch(/Sign in here:/i);
     expect(mail.text).not.toMatch(
-      /Sign in at https:\/\/www\.truegoshengh\.com\/admin(?!\/platform\/invite)/
+      /Sign in at https:\/\/www\.nabusmotors\.com\/admin(?!\/platform\/invite)/
     );
 
     expect(mail.html).toContain("Temporary password:");
     expect(mail.html).toContain("TempPass-Example");
     expect(mail.html).toContain(INVITE_URL);
     expect(mail.html).toContain("Accept invitation");
-    expect(mail.html).not.toMatch(/href="https:\/\/www\.truegoshengh\.com\/admin"/);
+    expect(mail.html).not.toMatch(/href="https:\/\/www\.nabusmotors\.com\/admin"/);
   });
 
   it("uses role-specific subjects for Manager, Super Admin, and Owner", () => {
@@ -73,7 +73,7 @@ describe("buildPlatformInviteEmailContent", () => {
         temporaryPassword: "x",
         linkKind: "invite",
       }).subject
-    ).toBe("Your True Goshen Manager account");
+    ).toBe("Your Nabus Motors Manager account");
 
     expect(
       buildPlatformInviteEmailContent({
@@ -83,7 +83,7 @@ describe("buildPlatformInviteEmailContent", () => {
         temporaryPassword: "x",
         linkKind: "invite",
       }).subject
-    ).toBe("Your True Goshen Super Admin account");
+    ).toBe("Your Nabus Motors Super Admin account");
 
     expect(
       buildPlatformInviteEmailContent({
@@ -93,7 +93,7 @@ describe("buildPlatformInviteEmailContent", () => {
         temporaryPassword: "x",
         linkKind: "login",
       }).subject
-    ).toBe("Your True Goshen Owner account");
+    ).toBe("Your Nabus Motors Owner account");
   });
 
   it("active-account password-reset credentials email may use /admin login", () => {
@@ -105,7 +105,7 @@ describe("buildPlatformInviteEmailContent", () => {
       linkKind: "login",
     });
 
-    expect(mail.subject).toBe("Your True Goshen Staff account");
+    expect(mail.subject).toBe("Your Nabus Motors Staff account");
     expect(mail.html).toContain("Your Staff account is ready");
     expect(mail.html).not.toMatch(/admin account/i);
     expect(mail.text).toContain("Temporary password: TempPass-Example");
@@ -125,7 +125,7 @@ describe("buildPlatformInviteEmailContent", () => {
 
     expect(mail.text).toContain(INVITE_URL);
     expect(mail.html).toContain(`href="${INVITE_URL}"`);
-    expect(mail.html).not.toMatch(/href="https:\/\/www\.truegoshengh\.com\/admin"/);
+    expect(mail.html).not.toMatch(/href="https:\/\/www\.nabusmotors\.com\/admin"/);
     expect(mail.text).toMatch(/\/admin\/platform\/invite\//);
   });
 

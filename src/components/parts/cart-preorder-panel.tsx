@@ -81,7 +81,7 @@ export function CartPreorderPanel({
   const [clearingNotice, setClearingNotice] = useState("");
   const [preorderTerms, setPreorderTerms] = useState({
     a: "Option A — I will arrange my own shipping and clearing",
-    b: "Option B — True Goshen handles freight forwarding & clearing",
+    b: "Option B — Nabus Motors handles freight forwarding & clearing",
     c: "Option C — I need consultation before deciding",
   });
   const [submitting, setSubmitting] = useState(false);

@@ -66,7 +66,7 @@ function parseSuggestResponse(raw: string): WhatsAppSuggestResult {
   }
 }
 
-const SYSTEM_PROMPT = `You are a WhatsApp communication assistant for True Goshen Auto staff in Ghana.
+const SYSTEM_PROMPT = `You are a WhatsApp communication assistant for Nabus Motors staff in Ghana.
 
 You will receive a JSON object named FACTS containing ONLY verified database records about a customer.
 You must NEVER invent prices, dates, tracking numbers, payment amounts, vehicle specs, or delivery status.
@@ -84,7 +84,7 @@ Rules:
 - Write in warm, professional English suitable for Ghana business WhatsApp.
 - Keep suggestedMessage under 600 characters unless staff instructions ask for more detail.
 - Use the customer's first name when known.
-- Sign off as True Goshen Company Limited (not as AI, and never as owner, manager, staff, or any internal role).
+- Sign off as Nabus Motors and Trading (not as AI, and never as owner, manager, staff, or any internal role).
 - Never mention internal roles (owner, super admin, manager, staff) or individual staff names in suggestedMessage.
 - If FACTS lack information needed for a specific claim (payment received, exact quote amount, delivery date, clearing status), set needsClarification true and start suggestedMessage with "Need clarification:" listing what staff must confirm.
 - Do NOT guess payment status, shipment ETA, or quote pricing — only state what appears in FACTS.
@@ -119,8 +119,8 @@ export async function generateWhatsAppSuggestion(
 
   if (!apiKey) {
     const fallbackMessage = facts.customer.name
-      ? `Hi ${facts.customer.name.split(/\s+/)[0]}, this is True Goshen following up on your inquiry. Please let us know if you have any questions.`
-      : "Hi, this is True Goshen following up on your inquiry. Please let us know if you have any questions.";
+      ? `Hi ${facts.customer.name.split(/\s+/)[0]}, this is Nabus Motors following up on your inquiry. Please let us know if you have any questions.`
+      : "Hi, this is Nabus Motors following up on your inquiry. Please let us know if you have any questions.";
 
     void logAiUsage({
       auth,

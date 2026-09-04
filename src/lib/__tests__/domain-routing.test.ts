@@ -24,9 +24,9 @@ describe("resolveLegacyVercelHostRedirect", () => {
     delete process.env.PUBLIC_SITE_URL_EMERGENCY_FALLBACK;
 
     for (const host of [
-      "truegoshen.vercel.app",
-      "truegoshenauto.vercel.app",
-      "truegoshenauto-abc123-mccaesartech.vercel.app",
+      "nabus-motors.vercel.app",
+      "nabus-motors.vercel.app",
+      "nabusmotors-abc123-mccaesartech.vercel.app",
     ]) {
       const res = resolveLegacyVercelHostRedirect(
         request(host, "/api/customer/notifications?limit=50")
@@ -42,14 +42,14 @@ describe("resolveLegacyVercelHostRedirect", () => {
   it("308-redirects service worker and account paths on vercel.app", () => {
     delete process.env.PUBLIC_SITE_URL_EMERGENCY_FALLBACK;
     const sw = resolveLegacyVercelHostRedirect(
-      request("truegoshen.vercel.app", "/serwist/sw.js")
+      request("nabus-motors.vercel.app", "/serwist/sw.js")
     );
     expect(sw?.headers.get("location")).toBe(
       `${PRODUCTION_PUBLIC_SITE_URL}/serwist/sw.js`
     );
 
     const account = resolveLegacyVercelHostRedirect(
-      request("truegoshen.vercel.app", "/account/settings")
+      request("nabus-motors.vercel.app", "/account/settings")
     );
     expect(account?.headers.get("location")).toBe(
       `${PRODUCTION_PUBLIC_SITE_URL}/account/settings`
@@ -60,17 +60,17 @@ describe("resolveLegacyVercelHostRedirect", () => {
     delete process.env.PUBLIC_SITE_URL_EMERGENCY_FALLBACK;
     expect(
       resolveLegacyVercelHostRedirect(
-        request("www.truegoshengh.com", "/api/customer/notifications")
+        request("www.nabusmotors.com", "/api/customer/notifications")
       )
     ).toBeNull();
   });
 
   it("honors emergency vercel fallback host", () => {
     process.env.PUBLIC_SITE_URL_EMERGENCY_FALLBACK =
-      "https://truegoshen.vercel.app";
+      "https://nabus-motors.vercel.app";
     expect(
       resolveLegacyVercelHostRedirect(
-        request("truegoshen.vercel.app", "/account")
+        request("nabus-motors.vercel.app", "/account")
       )
     ).toBeNull();
     expect(

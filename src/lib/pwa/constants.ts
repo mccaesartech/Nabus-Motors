@@ -30,12 +30,12 @@ export const ADMIN_PWA = {
  */
 export const ADMIN_PWA_INSTALL_PATHS = ["/admin", "/admin/platform"] as const;
 
-export const INSTALL_PROMPT_DISMISS_KEY_CUSTOMER = "tg-pwa-install-dismissed-customer";
-export const INSTALL_PROMPT_DISMISS_KEY_ADMIN = "tg-pwa-install-dismissed-admin";
-export const INSTALL_BANNER_DISMISS_KEY_ADMIN = "tg-pwa-install-banner-dismissed-admin";
-export const INSTALL_BANNER_SESSION_KEY_ADMIN = "tg-pwa-install-banner-session-admin";
-export const INSTALL_BANNER_DISMISS_KEY_CUSTOMER = "tg-pwa-customer-install-dismissed";
-export const INSTALL_BANNER_SESSION_KEY_CUSTOMER = "tg-pwa-customer-install-session";
+export const INSTALL_PROMPT_DISMISS_KEY_CUSTOMER = "nm-pwa-install-dismissed-customer";
+export const INSTALL_PROMPT_DISMISS_KEY_ADMIN = "nm-pwa-install-dismissed-admin";
+export const INSTALL_BANNER_DISMISS_KEY_ADMIN = "nm-pwa-install-banner-dismissed-admin";
+export const INSTALL_BANNER_SESSION_KEY_ADMIN = "nm-pwa-install-banner-session-admin";
+export const INSTALL_BANNER_DISMISS_KEY_CUSTOMER = "nm-pwa-customer-install-dismissed";
+export const INSTALL_BANNER_SESSION_KEY_CUSTOMER = "nm-pwa-customer-install-session";
 /** @deprecated Use variant-specific keys */
 export const INSTALL_PROMPT_DISMISS_KEY = INSTALL_PROMPT_DISMISS_KEY_CUSTOMER;
 export const INSTALL_PROMPT_DISMISS_DAYS = 14;

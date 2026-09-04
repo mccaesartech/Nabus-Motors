@@ -16,31 +16,31 @@ afterEach(() => {
 });
 
 describe("external customer authentication URLs", () => {
-  it("honors auth.truegoshengh.com when configured as the auth service URL", () => {
+  it("honors auth.nabusmotors.com when configured as the auth service URL", () => {
     process.env.NEXT_PUBLIC_AUTH_SERVICE_URL =
-      "https://auth.truegoshengh.com";
-    process.env.NEXT_PUBLIC_SITE_URL = "https://www.truegoshengh.com";
+      "https://auth.nabusmotors.com";
+    process.env.NEXT_PUBLIC_SITE_URL = "https://www.nabusmotors.com";
 
-    expect(getAuthServiceUrl()).toBe("https://auth.truegoshengh.com");
+    expect(getAuthServiceUrl()).toBe("https://auth.nabusmotors.com");
 
     const login = new URL(getGoogleLoginUrl());
     expect(login.origin + login.pathname).toBe(
-      "https://www.truegoshengh.com/login"
+      "https://www.nabusmotors.com/login"
     );
-    expect(login.hostname).not.toBe("auth.truegoshengh.com");
+    expect(login.hostname).not.toBe("auth.nabusmotors.com");
     expect(login.searchParams.get("oauth")).toBe("google");
   });
 
   it("falls back to NEXT_PUBLIC_SUPABASE_URL for auth service origin", () => {
     delete process.env.NEXT_PUBLIC_AUTH_SERVICE_URL;
-    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://auth.truegoshengh.com";
-    expect(getAuthServiceUrl()).toBe("https://auth.truegoshengh.com");
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://auth.nabusmotors.com";
+    expect(getAuthServiceUrl()).toBe("https://auth.nabusmotors.com");
   });
 
   it("uses the app auth callback on the public site origin", () => {
-    process.env.NEXT_PUBLIC_SITE_URL = "https://www.truegoshengh.com";
+    process.env.NEXT_PUBLIC_SITE_URL = "https://www.nabusmotors.com";
     expect(externalAuthCallbackUrl()).toBe(
-      "https://www.truegoshengh.com/auth/callback"
+      "https://www.nabusmotors.com/auth/callback"
     );
   });
 });

@@ -8,7 +8,7 @@ describe("security / price-drop customer templates", () => {
       vehicleTitle: "2024 Toyota Camry",
       oldPrice: "28,000",
       newPrice: "25,500",
-      vehicleUrl: "https://www.truegoshengh.com/auto/inventory/camry",
+      vehicleUrl: "https://www.nabusmotors.com/auto/inventory/camry",
     });
     expect(msg.subject).toContain("Price drop");
     expect(msg.emailText).toContain("25,500");

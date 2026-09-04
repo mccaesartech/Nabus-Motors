@@ -9,7 +9,7 @@ describe("XSS defenses", () => {
   it("HTML-escapes untrusted names in branded email templates", () => {
     const mail = welcomeEmail(
       `<img src=x onerror=alert(1)>`,
-      "https://www.truegoshengh.com/account"
+      "https://www.nabusmotors.com/account"
     );
     expect(mail.html).not.toContain("<img");
     expect(mail.html).not.toMatch(/<img[^>]*onerror=/i);

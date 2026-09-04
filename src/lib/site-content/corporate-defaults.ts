@@ -276,7 +276,7 @@ export const DEFAULT_FREIGHT_LANDING: DivisionLandingSiteContent = {
   heroEyebrow: "",
   heroTitle: "Freight Forwarding & Clearing",
   heroSubtitle:
-    "True Goshen's freight division handles international vehicle and cargo logistics — from origin port to your doorstep in Ghana. Specialising in China and Japan vehicle imports, RoRo shipping, and full customs clearance.",
+    "Nabus Motors's freight division handles international vehicle and cargo logistics — from origin port to your doorstep in Ghana. Specialising in China and Japan vehicle imports, RoRo shipping, and full customs clearance.",
   cards: [
     {
       id: "vehicle-shipping",
@@ -368,7 +368,7 @@ export const DEFAULT_SHIPPING_CONSULTATION: DivisionLandingSiteContent = {
 export const DEFAULT_SPARE_PARTS_LANDING: SparePartsLandingSiteContent = {
   title: "Genuine Spare Parts",
   subtitle:
-    "Browse published parts from True Goshen Auto Parts. Request or purchase — our team confirms availability and pricing.",
+    "Browse published parts from Nabus Motors Parts. Request or purchase — our team confirms availability and pricing.",
   cards: [
     {
       id: "engine",
@@ -517,12 +517,12 @@ export const DEFAULT_START_YOUR_JOURNEY: StartYourJourneySiteContent = {
     description:
       "Get personalised guidance on vehicles, shipping, parts, or your next step — by WhatsApp or our contact team.",
     image: "/images/services/personalised-advice.jpg",
-    imageAlt: "True Goshen advisor ready to assist",
+    imageAlt: "Nabus Motors advisor ready to assist",
     primaryLabel: "Talk to an Expert",
     secondaryLabel: "Contact Us",
     secondaryHref: ROUTES.corporate.contact,
     whatsappMessage:
-      "Hello True Goshen, I would like to speak with an advisor about your services.",
+      "Hello Nabus Motors, I would like to speak with an advisor about your services.",
   },
 };
 
@@ -533,7 +533,7 @@ export type CorporateDivisionsSiteContent = {
 };
 
 export const DEFAULT_CORPORATE_DIVISIONS: CorporateDivisionsSiteContent = {
-  title: "True Goshen Company Limited",
+  title: "Nabus Motors and Trading",
   description:
     "One trusted parent company — three specialised divisions serving Ghana and beyond. Whether you are buying a vehicle, shipping imports, or sourcing genuine parts, we deliver with transparency and care.",
   cards: [
@@ -542,7 +542,7 @@ export const DEFAULT_CORPORATE_DIVISIONS: CorporateDivisionsSiteContent = {
       icon: "Car",
       title: "Buy a Vehicle",
       description:
-        "Browse verified inventory, pre-order imports, and drive with confidence through True Goshen Auto.",
+        "Browse verified inventory, pre-order imports, and drive with confidence through Nabus Motors.",
       cta: "View inventory",
       href: ROUTES.auto.inventory,
       image: "/images/services/buy-vehicle.jpg",
@@ -564,7 +564,7 @@ export const DEFAULT_CORPORATE_DIVISIONS: CorporateDivisionsSiteContent = {
       icon: "Package",
       title: "Genuine Spare Parts",
       description:
-        "Quality OEM and aftermarket parts for popular makes — sourced and supplied through True Goshen Auto Parts.",
+        "Quality OEM and aftermarket parts for popular makes — sourced and supplied through Nabus Motors Parts.",
       cta: "Browse parts",
       href: ROUTES.auto.spareParts,
       image: "/images/services/spare-parts.jpg",

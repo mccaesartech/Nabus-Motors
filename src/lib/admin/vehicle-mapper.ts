@@ -78,7 +78,7 @@ export function rowFromInput(
           year: "numeric",
         }),
         title: "Listed",
-        description: "Added to True Goshen inventory",
+        description: "Added to Nabus Motors inventory",
       },
     ],
     status: input.status || "available",

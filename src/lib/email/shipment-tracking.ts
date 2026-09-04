@@ -36,7 +36,7 @@ function buildHtml(params: ShipmentTrackingEmailParams): string {
     <tr><td align="center">
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:520px;background:#ffffff;border-radius:12px;overflow:hidden;">
         <tr><td style="padding:32px 28px;">
-          <p style="margin:0 0 8px;font-size:13px;color:#71717a;text-transform:uppercase;letter-spacing:0.05em;">True Goshen</p>
+          <p style="margin:0 0 8px;font-size:13px;color:#71717a;text-transform:uppercase;letter-spacing:0.05em;">Nabus Motors</p>
           <h1 style="margin:0 0 16px;font-size:22px;font-weight:700;">Your shipment is booked</h1>
           <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#3f3f46;">Hi ${name}, your freight shipment has been booked. Save your tracking number below to follow progress.</p>
           <p style="margin:0 0 8px;font-size:12px;color:#71717a;text-transform:uppercase;letter-spacing:0.05em;">Tracking number</p>
@@ -62,7 +62,7 @@ export async function sendShipmentTrackingEmail(
   try {
     await sendEmail({
       to,
-      subject: `Your True Goshen tracking number: ${params.trackingNumber}`,
+      subject: `Your Nabus Motors tracking number: ${params.trackingNumber}`,
       html: buildHtml(params),
     });
 

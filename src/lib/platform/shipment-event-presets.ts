@@ -82,7 +82,7 @@ export const QUICK_SHIPMENT_EVENT_PRESETS: ShipmentEventPreset[] = [
     title: "Delivered",
     location: "{destination}",
     descriptionTemplate:
-      "Shipment {tracking_number} has been delivered. Thank you for choosing True Goshen.",
+      "Shipment {tracking_number} has been delivered. Thank you for choosing Nabus Motors.",
     suggestedStatus: "delivered",
   },
 ];
@@ -193,7 +193,7 @@ export const SHIPMENT_EVENT_PRESETS: ShipmentEventPreset[] = [
     title: "Delivered",
     location: "{destination}",
     descriptionTemplate:
-      "Shipment {tracking_number} has been delivered. Thank you for choosing True Goshen — we appreciate your business.",
+      "Shipment {tracking_number} has been delivered. Thank you for choosing Nabus Motors — we appreciate your business.",
     suggestedStatus: "delivered",
   },
 ];

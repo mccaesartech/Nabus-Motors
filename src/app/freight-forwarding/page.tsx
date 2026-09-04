@@ -9,7 +9,7 @@ export const revalidate = 60;
 export const metadata = {
   title: "Freight Forwarding & Clearing",
   description:
-    "Vehicle shipping, container logistics, documentation, and Ghana customs clearing by True Goshen Company Limited.",
+    "Vehicle shipping, container logistics, documentation, and Ghana customs clearing by Nabus Motors and Trading.",
 };
 
 const FREIGHT_CARD_SERVICE: Record<string, string> = {

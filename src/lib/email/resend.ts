@@ -53,7 +53,7 @@ const DISPLAY_NAME_PATTERN = /^(.*\S)\s*<([^\s<>]+@[^\s<>]+\.[^\s<>]+)>$/;
 export type ResendFromAddress = {
   /** Value passed to Resend, display name included when configured. */
   header: string;
-  /** Bare mailbox, e.g. noreply@truegoshengh.com. */
+  /** Bare mailbox, e.g. noreply@nabusmotors.com. */
   address: string;
   /** Lower-cased domain that must be verified in Resend. */
   domain: string;

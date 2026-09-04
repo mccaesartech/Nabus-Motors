@@ -5,7 +5,7 @@ import { PartsCartView } from "@/components/parts/parts-cart-view";
 export const metadata = {
   title: "Shopping cart",
   description:
-    "Review vehicles and spare parts in your cart and request a quote from True Goshen.",
+    "Review vehicles and spare parts in your cart and request a quote from Nabus Motors.",
 };
 
 export default function CartPage() {

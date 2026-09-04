@@ -17,10 +17,10 @@ describe("ownerInviteDeliveryError", () => {
     expect(
       ownerInviteDeliveryError({
         emailSent: false,
-        emailHint: "Verify truegoshengh.com at resend.com/domains.",
+        emailHint: "Verify nabusmotors.com at resend.com/domains.",
       })
     ).toBe(
-      "The email could not be sent. Verify truegoshengh.com at resend.com/domains."
+      "The email could not be sent. Verify nabusmotors.com at resend.com/domains."
     );
   });
 

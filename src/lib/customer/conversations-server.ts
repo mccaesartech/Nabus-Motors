@@ -930,7 +930,7 @@ export async function insertStaffMessage(
       };
     }
 
-    const subject = (opts.subject ?? "Message from True Goshen Auto").trim();
+    const subject = (opts.subject ?? "Message from Nabus Motors").trim();
     const category = opts.category ?? "general";
     const now = new Date().toISOString();
 

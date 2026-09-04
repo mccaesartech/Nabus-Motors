@@ -111,7 +111,7 @@ describe("database error mapping", () => {
 
 describe("redaction", () => {
   it("masks emails and phone numbers", () => {
-    expect(maskEmail("owner@truegoshen.com")).toBe("o***@truegoshen.com");
+    expect(maskEmail("owner@nabusmotors.com")).toBe("o***@nabusmotors.com");
     expect(maskPhone("+233 24 123 4567")).toBe("***567");
   });
 
@@ -151,7 +151,7 @@ describe("redaction", () => {
   });
 
   it("keeps query parameter names but redacts secret values", () => {
-    const url = sanitizeUrl("https://truegoshen.vercel.app/api/admin/vehicles?token=abc123&page=2");
+    const url = sanitizeUrl("https://nabus-motors.vercel.app/api/admin/vehicles?token=abc123&page=2");
     expect(url).toBe("/api/admin/vehicles?token=%5Bredacted%5D&page=2");
   });
 

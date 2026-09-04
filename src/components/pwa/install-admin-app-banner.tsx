@@ -73,7 +73,7 @@ export function InstallAdminAppBanner() {
                 id="install-admin-banner-title"
                 className="text-base font-semibold text-[var(--platform-text)]"
               >
-                Install True Goshen Admin on your device
+                Install Nabus Motors Admin on your device
               </h2>
               <p className="mt-1 text-sm text-[var(--platform-text-secondary)]">
                 Add the platform dashboard to your home screen for faster, app-like access every

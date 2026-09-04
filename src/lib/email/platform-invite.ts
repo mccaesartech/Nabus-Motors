@@ -7,8 +7,8 @@ import { logAppError } from "@/lib/errors/logger";
 import { getPublicSiteUrl } from "@/lib/site-url";
 import { platformDashboardPath } from "@/lib/platform/paths";
 
-const ROLE_CHANGED_SUBJECT = "Your True Goshen platform role was updated";
-const TEAM_WELCOME_SUBJECT = "Welcome to True Goshen Platform";
+const ROLE_CHANGED_SUBJECT = "Your Nabus Motors platform role was updated";
+const TEAM_WELCOME_SUBJECT = "Welcome to Nabus Motors Platform";
 
 type InviteEmailParams = {
   to: string;
@@ -32,11 +32,11 @@ export function platformRoleLabel(role: PlatformRole | string): string {
 }
 
 function inviteSubject(role: PlatformRole | string): string {
-  return `You're invited to True Goshen as ${platformRoleLabel(role)}`;
+  return `You're invited to Nabus Motors as ${platformRoleLabel(role)}`;
 }
 
 function credentialsSubject(role: PlatformRole | string): string {
-  return `Your True Goshen ${platformRoleLabel(role)} account`;
+  return `Your Nabus Motors ${platformRoleLabel(role)} account`;
 }
 
 function credentialsHeadline(
@@ -129,9 +129,9 @@ function buildCredentialsHtml({
   const subject = credentialsSubject(role);
   const headline = credentialsHeadline(role, isInvite);
   const body = isInvite
-    ? `You've been invited to join <strong>True Goshen</strong> as <strong>${escapeHtml(label)}</strong>.
+    ? `You've been invited to join <strong>Nabus Motors</strong> as <strong>${escapeHtml(label)}</strong>.
                 Use the temporary password below on the invitation page to activate your account.`
-    : `Your <strong>True Goshen</strong> <strong>${escapeHtml(label)}</strong> password was updated.
+    : `Your <strong>Nabus Motors</strong> <strong>${escapeHtml(label)}</strong> password was updated.
                 Use the temporary password below to sign in, then change it after your next login.`;
   const ctaLabel = isInvite ? "Accept invitation" : "Sign in";
   const afterNote = isInvite
@@ -152,7 +152,7 @@ function buildCredentialsHtml({
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:12px;border:1px solid #e4e4e7;overflow:hidden;">
           <tr>
             <td style="padding:32px 32px 24px;">
-              <p style="margin:0 0 8px;font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#71717a;">True Goshen</p>
+              <p style="margin:0 0 8px;font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#71717a;">Nabus Motors</p>
               <h1 style="margin:0 0 16px;font-size:24px;line-height:1.3;font-weight:700;color:#18181b;">${headline}</h1>
               <p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:#3f3f46;">Hi ${escapeHtml(name)},</p>
               <p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:#3f3f46;">
@@ -211,8 +211,8 @@ function buildCredentialsText({
     `Hi ${name},`,
     "",
     isInvite
-      ? `You've been invited to join True Goshen as ${label}.`
-      : `Your True Goshen ${label} password was updated.`,
+      ? `You've been invited to join Nabus Motors as ${label}.`
+      : `Your Nabus Motors ${label} password was updated.`,
     "",
     `Temporary password: ${temporaryPassword}`,
     "",
@@ -244,11 +244,11 @@ function buildInviteHtml({ name, role, inviteUrl }: InviteEmailParams): string {
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:12px;border:1px solid #e4e4e7;overflow:hidden;">
           <tr>
             <td style="padding:32px 32px 24px;">
-              <p style="margin:0 0 8px;font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#71717a;">True Goshen</p>
+              <p style="margin:0 0 8px;font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#71717a;">Nabus Motors</p>
               <h1 style="margin:0 0 16px;font-size:24px;line-height:1.3;font-weight:700;color:#18181b;">You're invited as ${escapeHtml(label)}</h1>
               <p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:#3f3f46;">Hi ${escapeHtml(name)},</p>
               <p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:#3f3f46;">
-                You've been invited to join <strong>True Goshen</strong> as <strong>${escapeHtml(label)}</strong>.
+                You've been invited to join <strong>Nabus Motors</strong> as <strong>${escapeHtml(label)}</strong>.
                 Use the button below to set your password and activate your account.
               </p>
               <p style="margin:0 0 24px;text-align:center;">
@@ -280,7 +280,7 @@ function buildInviteText({ name, role, inviteUrl }: InviteEmailParams): string {
   return [
     `Hi ${name},`,
     "",
-    `You've been invited to join True Goshen as ${label}.`,
+    `You've been invited to join Nabus Motors as ${label}.`,
     "",
     "Set your password and activate your account using this link:",
     inviteUrl,
@@ -409,13 +409,13 @@ export async function sendPlatformRoleChangedEmail(params: {
   const text = [
     `Hi ${params.name},`,
     "",
-    `Your True Goshen platform role is now ${label}.`,
+    `Your Nabus Motors platform role is now ${label}.`,
     "",
     `Open the dashboard: ${dashboardUrl}`,
   ].join("\n");
   const html = `<!DOCTYPE html><html lang="en"><body style="font-family:sans-serif;color:#18181b;line-height:1.6;padding:24px;">
 <p>Hi ${escapeHtml(params.name)},</p>
-<p>Your True Goshen platform role is now <strong>${escapeHtml(label)}</strong>.</p>
+<p>Your Nabus Motors platform role is now <strong>${escapeHtml(label)}</strong>.</p>
 <p><a href="${escapeHtml(dashboardUrl)}">Open the dashboard</a></p>
 </body></html>`;
 
@@ -459,11 +459,11 @@ export async function sendPlatformPasswordResetEmail(params: {
   expiryLabel?: string;
 }): Promise<SendResult> {
   const expiry = params.expiryLabel?.trim() || "1 hour";
-  const subject = "Reset your True Goshen platform password";
+  const subject = "Reset your Nabus Motors platform password";
   const text = [
     `Hi ${params.name},`,
     "",
-    "We received a request to reset your True Goshen platform password.",
+    "We received a request to reset your Nabus Motors platform password.",
     "",
     "Set a new password using this secure link:",
     params.resetUrl,
@@ -471,7 +471,7 @@ export async function sendPlatformPasswordResetEmail(params: {
     `This link works once and expires in ${expiry}.`,
     "If you did not request this, you can ignore this email — your password will stay the same.",
     "",
-    "True Goshen Company Limited",
+    "Nabus Motors and Trading",
   ].join("\n");
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -487,11 +487,11 @@ export async function sendPlatformPasswordResetEmail(params: {
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:12px;border:1px solid #e4e4e7;overflow:hidden;">
           <tr>
             <td style="padding:32px 32px 24px;">
-              <p style="margin:0 0 8px;font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#71717a;">True Goshen</p>
+              <p style="margin:0 0 8px;font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#71717a;">Nabus Motors</p>
               <h1 style="margin:0 0 16px;font-size:24px;line-height:1.3;font-weight:700;color:#18181b;">Reset your platform password</h1>
               <p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:#3f3f46;">Hi ${escapeHtml(params.name)},</p>
               <p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:#3f3f46;">
-                We received a request to reset your True Goshen platform password.
+                We received a request to reset your Nabus Motors platform password.
                 Use the button below to choose a new password.
               </p>
               <p style="margin:0 0 24px;text-align:center;">
@@ -537,13 +537,13 @@ export async function sendPlatformTeamWelcomeEmail(params: {
   const text = [
     `Hi ${params.name},`,
     "",
-    `Welcome to True Goshen Platform. Your ${label} account is active.`,
+    `Welcome to Nabus Motors Platform. Your ${label} account is active.`,
     "",
     `Open the dashboard: ${dashboardUrl}`,
   ].join("\n");
   const html = `<!DOCTYPE html><html lang="en"><body style="font-family:sans-serif;color:#18181b;line-height:1.6;padding:24px;">
 <p>Hi ${escapeHtml(params.name)},</p>
-<p>Welcome to True Goshen Platform. Your <strong>${escapeHtml(label)}</strong> account is active.</p>
+<p>Welcome to Nabus Motors Platform. Your <strong>${escapeHtml(label)}</strong> account is active.</p>
 <p><a href="${escapeHtml(dashboardUrl)}">Open the dashboard</a></p>
 </body></html>`;
 
@@ -567,13 +567,13 @@ export async function sendPlatformLoginAlertEmail(params: {
   securityUrl: string;
 }): Promise<SendResult> {
   const label = platformRoleLabel(params.role);
-  const subject = `You signed in to your True Goshen ${label} account`;
+  const subject = `You signed in to your Nabus Motors ${label} account`;
   const ipLine = params.ip?.trim() ? `Approximate IP: ${params.ip.trim()}` : null;
   const deviceLine = params.device?.trim() ? `Device: ${params.device.trim()}` : null;
   const text = [
     `Hi ${params.name},`,
     "",
-    `You signed in to your True Goshen ${label} account.`,
+    `You signed in to your Nabus Motors ${label} account.`,
     "",
     `When: ${params.when}`,
     ...(deviceLine ? [deviceLine] : []),
@@ -582,7 +582,7 @@ export async function sendPlatformLoginAlertEmail(params: {
     "If this was you, no action is needed.",
     `If this was not you, change your password here: ${params.securityUrl}`,
     "",
-    "True Goshen Company Limited",
+    "Nabus Motors and Trading",
   ].join("\n");
   const detailRows = [
     `<li><strong>When:</strong> ${escapeHtml(params.when)}</li>`,
@@ -597,7 +597,7 @@ export async function sendPlatformLoginAlertEmail(params: {
     .join("");
   const html = `<!DOCTYPE html><html lang="en"><body style="font-family:sans-serif;color:#18181b;line-height:1.6;padding:24px;">
 <p>Hi ${escapeHtml(params.name)},</p>
-<p>You signed in to your True Goshen <strong>${escapeHtml(label)}</strong> account.</p>
+<p>You signed in to your Nabus Motors <strong>${escapeHtml(label)}</strong> account.</p>
 <ul style="padding-left:20px;">${detailRows}</ul>
 <p>If this was you, no action is needed.</p>
 <p><a href="${escapeHtml(params.securityUrl)}">Change password / security</a></p>
@@ -624,13 +624,13 @@ export async function sendPlatformFailedLoginAlertEmail(params: {
   securityUrl: string;
 }): Promise<SendResult> {
   const label = platformRoleLabel(params.role);
-  const subject = `Failed sign-in attempt on your True Goshen ${label} account`;
+  const subject = `Failed sign-in attempt on your Nabus Motors ${label} account`;
   const ipLine = params.ip?.trim() ? `Approximate IP: ${params.ip.trim()}` : null;
   const deviceLine = params.device?.trim() ? `Device: ${params.device.trim()}` : null;
   const text = [
     `Hi ${params.name},`,
     "",
-    `Someone tried to sign in to your True Goshen ${label} account but did not enter the correct password.`,
+    `Someone tried to sign in to your Nabus Motors ${label} account but did not enter the correct password.`,
     "",
     `When: ${params.when}`,
     ...(deviceLine ? [deviceLine] : []),
@@ -639,7 +639,7 @@ export async function sendPlatformFailedLoginAlertEmail(params: {
     "If this was not you, change your password immediately:",
     params.securityUrl,
     "",
-    "True Goshen Company Limited",
+    "Nabus Motors and Trading",
   ].join("\n");
   const detailRows = [
     `<li><strong>When:</strong> ${escapeHtml(params.when)}</li>`,
@@ -654,7 +654,7 @@ export async function sendPlatformFailedLoginAlertEmail(params: {
     .join("");
   const html = `<!DOCTYPE html><html lang="en"><body style="font-family:sans-serif;color:#18181b;line-height:1.6;padding:24px;">
 <p>Hi ${escapeHtml(params.name)},</p>
-<p>Someone tried to sign in to your True Goshen <strong>${escapeHtml(label)}</strong> account but did not enter the correct password.</p>
+<p>Someone tried to sign in to your Nabus Motors <strong>${escapeHtml(label)}</strong> account but did not enter the correct password.</p>
 <ul style="padding-left:20px;">${detailRows}</ul>
 <p>If this was not you, change your password immediately.</p>
 <p><a href="${escapeHtml(params.securityUrl)}">Change password / security</a></p>

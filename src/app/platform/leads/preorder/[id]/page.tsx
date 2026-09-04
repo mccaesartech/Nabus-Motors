@@ -50,7 +50,7 @@ type LinkedSale = {
 
 function shippingHandlingLabel(value?: string | null) {
   if (value === "customer_arranged") return "Option A — Customer arranges shipping";
-  if (value === "true_goshen") return "Option B — True Goshen handles freight & clearing";
+  if (value === "true_goshen") return "Option B — Nabus Motors handles freight & clearing";
   if (value === "consultation") return "Option C — Consultation requested";
   return "—";
 }

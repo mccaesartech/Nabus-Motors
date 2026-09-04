@@ -219,7 +219,7 @@ export function ProfileSettingsSection() {
             {registrationId ?? "—"}
           </dd>
           <p className="mt-1 text-xs text-muted-foreground">
-            Quote this ID when contacting True Goshen. It is unique to your account.
+            Quote this ID when contacting Nabus Motors. It is unique to your account.
           </p>
         </div>
         <div>

@@ -60,7 +60,7 @@ export async function generateCustomerReplyDraft(
 ): Promise<string> {
   const instruction = intentInstruction(context.intent, context.customPrompt);
 
-  const systemPrompt = `You are a customer success specialist for True Goshen Auto, a premium vehicle dealership in Ghana and West Africa.
+  const systemPrompt = `You are a customer success specialist for Nabus Motors, a premium vehicle dealership in Ghana and West Africa.
 Write a reply email/message to a registered customer. Tone: professional, warm, trustworthy, concise.
 Rules:
 - Address the customer by first name when possible.

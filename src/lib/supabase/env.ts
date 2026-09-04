@@ -11,7 +11,7 @@ function isAllowedSupabaseProjectHost(hostname: string): boolean {
   if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]") {
     return false;
   }
-  // Custom Domain (Pro+): e.g. auth.truegoshengh.com — see docs/GOOGLE_AUTH.md
+  // Custom Domain (Pro+): e.g. auth.nabusmotors.com — see docs/GOOGLE_AUTH.md
   return hostname.includes(".");
 }
 

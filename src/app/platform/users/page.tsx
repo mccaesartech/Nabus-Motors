@@ -287,7 +287,7 @@ function EmailSetupHelp({ compact = false }: { compact?: boolean }) {
           >
             resend.com
           </a>{" "}
-          , add <code>truegoshengh.com</code> under <strong>Domains</strong>, and copy the
+          , add <code>nabusmotors.com</code> under <strong>Domains</strong>, and copy the
           DKIM and SPF records it shows into your DNS. Wait until the domain reads{" "}
           <strong>Verified</strong> — until then Resend only delivers to the account
           owner&apos;s own inbox.
@@ -295,7 +295,7 @@ function EmailSetupHelp({ compact = false }: { compact?: boolean }) {
         <li>
           Create the API key <em>while signed into the same Resend team that lists the
           verified domain</em>. A key from another account or team makes Resend answer
-          &ldquo;the truegoshengh.com domain is not verified&rdquo; even though your
+          &ldquo;the nabusmotors.com domain is not verified&rdquo; even though your
           dashboard shows it Verified.
         </li>
         <li>
@@ -306,7 +306,7 @@ function EmailSetupHelp({ compact = false }: { compact?: boolean }) {
             </li>
             <li>
               <code>RESEND_FROM_EMAIL</code> —{" "}
-              <code>noreply@truegoshengh.com</code>
+              <code>noreply@nabusmotors.com</code>
             </li>
           </ul>
           <p className="mt-1.5">

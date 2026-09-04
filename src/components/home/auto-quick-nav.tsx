@@ -14,7 +14,7 @@ const QUICK_LINKS = [
   {
     href: ROUTES.auto.sell,
     label: "Sell",
-    description: "Get a fair appraisal and sell through True Goshen Auto.",
+    description: "Get a fair appraisal and sell through Nabus Motors.",
     icon: Tag,
   },
   {

@@ -6,7 +6,7 @@ const sendEmail = vi.fn();
 const sendArkeselSms = vi.fn();
 const logAppError = vi.fn();
 const getSiteSettings = vi.fn(async () => ({ email: null, phone: null }));
-const getPublicSiteUrl = vi.fn(() => "https://www.truegoshengh.com");
+const getPublicSiteUrl = vi.fn(() => "https://www.nabusmotors.com");
 
 const notificationSelect = vi.fn();
 const notificationInsert = vi.fn();

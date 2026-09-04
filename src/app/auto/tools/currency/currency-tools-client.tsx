@@ -22,7 +22,7 @@ export function CurrencyToolsClient() {
           </h1>
           <p className="mt-3 max-w-2xl text-base text-white/80 sm:text-lg">
             Convert between currencies using the same live USD rates that power
-            vehicle and parts prices across True Goshen.
+            vehicle and parts prices across Nabus Motors.
           </p>
         </Container>
       </section>

@@ -105,7 +105,7 @@ export function ContactPageClient({ contact, footer }: ContactPageClientProps) {
 
               <div className="aspect-video overflow-hidden border border-border bg-muted">
                 <iframe
-                  title="True Goshen Auto Location"
+                  title="Nabus Motors Location"
                   src="https://maps.google.com/maps?q=Accra,+Ghana&t=&z=12&ie=UTF8&iwloc=&output=embed"
                   className="h-full w-full border-0"
                   loading="lazy"

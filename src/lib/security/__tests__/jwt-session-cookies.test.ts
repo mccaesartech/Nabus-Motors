@@ -58,7 +58,7 @@ describe("JWT validation / credential revocation", () => {
 
 describe("Session signing, fixation, and cookie flags", () => {
   it("uses distinct cookie names for owner vs platform sessions", () => {
-    expect(ADMIN_COOKIE).toBe("tg_admin_session");
+    expect(ADMIN_COOKIE).toBe("nm_admin_session");
     expect(PLATFORM_USER_COOKIE).toBe("tg_platform_session");
     expect(ADMIN_COOKIE).not.toBe(PLATFORM_USER_COOKIE);
   });

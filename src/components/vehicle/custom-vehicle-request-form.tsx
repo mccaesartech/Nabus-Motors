@@ -240,7 +240,7 @@ export function CustomVehicleRequestForm({
             Request a vehicle not listed
           </h2>
           <p className="text-sm text-muted-foreground">
-            Tell us what you want. Our team at True Goshen Company Limited will review
+            Tell us what you want. Our team at Nabus Motors and Trading will review
             sourcing options and follow up by email or WhatsApp.
           </p>
         </div>

@@ -7,7 +7,7 @@ import {
 } from "@/lib/security/csrf";
 
 function requestWith(headers: Record<string, string>): Request {
-  return new Request("https://www.truegoshengh.com/api/admin/login", {
+  return new Request("https://www.nabusmotors.com/api/admin/login", {
     method: "POST",
     headers,
   });
@@ -18,8 +18,8 @@ describe("CSRF — same-origin checks", () => {
     expect(
       assertSameOrigin(
         requestWith({
-          origin: "https://www.truegoshengh.com",
-          host: "www.truegoshengh.com",
+          origin: "https://www.nabusmotors.com",
+          host: "www.nabusmotors.com",
         })
       )
     ).toBe(true);
@@ -30,7 +30,7 @@ describe("CSRF — same-origin checks", () => {
       assertSameOrigin(
         requestWith({
           origin: "https://evil.example",
-          host: "www.truegoshengh.com",
+          host: "www.nabusmotors.com",
         })
       )
     ).toBe(false);
@@ -41,7 +41,7 @@ describe("CSRF — same-origin checks", () => {
       assertSameOrigin(
         requestWith({
           origin: "not-a-url",
-          host: "www.truegoshengh.com",
+          host: "www.nabusmotors.com",
         })
       )
     ).toBe(false);
@@ -51,7 +51,7 @@ describe("CSRF — same-origin checks", () => {
     expect(
       assertSameOrigin(
         requestWith({
-          host: "www.truegoshengh.com",
+          host: "www.nabusmotors.com",
           "sec-fetch-site": "cross-site",
         })
       )
@@ -60,12 +60,12 @@ describe("CSRF — same-origin checks", () => {
 
   it("allows missing Origin for non-browser / same-site clients", () => {
     expect(
-      assertSameOrigin(requestWith({ host: "www.truegoshengh.com" }))
+      assertSameOrigin(requestWith({ host: "www.nabusmotors.com" }))
     ).toBe(true);
     expect(
       assertSameOrigin(
         requestWith({
-          host: "www.truegoshengh.com",
+          host: "www.nabusmotors.com",
           "sec-fetch-site": "same-origin",
         })
       )

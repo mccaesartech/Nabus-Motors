@@ -91,18 +91,18 @@ describe("arkesel payload + send", () => {
       buildArkeselSmsPayload({
         sender: " TrueGoshen ",
         message: "Hello",
-        recipients: ["233244876784", " ", "+233501234567"],
+        recipients: ["233279940200", " ", "+233501234567"],
       })
     ).toEqual({
       sender: "TrueGoshen",
       message: "Hello",
-      recipients: ["233244876784", "+233501234567"],
+      recipients: ["233279940200", "+233501234567"],
     });
   });
 
   it("normalizes Ghana phones for Arkesel", () => {
-    expect(toArkeselPhone("0244876784")).toBe("233244876784");
-    expect(toArkeselPhone("+233 24 487 6784")).toBe("233244876784");
+    expect(toArkeselPhone("0244876784")).toBe("233279940200");
+    expect(toArkeselPhone("+233 27 994 0200")).toBe("233279940200");
   });
 
   it("posts to Arkesel with api-key header", async () => {
@@ -142,7 +142,7 @@ describe("arkesel payload + send", () => {
     expect(JSON.parse(String(init.body))).toEqual({
       sender: "TrueGoshen",
       message: "Test SMS",
-      recipients: ["233244876784"],
+      recipients: ["233279940200"],
     });
   });
 
@@ -154,7 +154,7 @@ describe("arkesel payload + send", () => {
           JSON.stringify({
             status: "success",
             data: [
-              { recipient: "233244876784", id: "9b752841-7ee7-4d40-b4fe-768bfb1da4f0" },
+              { recipient: "233279940200", id: "9b752841-7ee7-4d40-b4fe-768bfb1da4f0" },
             ],
           }),
           { status: 200, headers: { "Content-Type": "application/json" } }
@@ -184,7 +184,7 @@ describe("arkesel payload + send", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
-        new Response(JSON.stringify({ status: "success", data: [{ recipient: "233244876784" }] }), {
+        new Response(JSON.stringify({ status: "success", data: [{ recipient: "233279940200" }] }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         })
@@ -214,7 +214,7 @@ describe("arkesel payload + send", () => {
         new Response(
           JSON.stringify({
             status: "success",
-            data: [{ "invalid numbers": ["233244876784"] }],
+            data: [{ "invalid numbers": ["233279940200"] }],
           }),
           { status: 200, headers: { "Content-Type": "application/json" } }
         )
@@ -233,7 +233,7 @@ describe("arkesel payload + send", () => {
 
     expect(result.sent).toBe(false);
     if (!result.sent) {
-      expect(result.reason).toContain("233244876784");
+      expect(result.reason).toContain("233279940200");
       expect(result.reason).toMatch(/invalid number/i);
     }
   });

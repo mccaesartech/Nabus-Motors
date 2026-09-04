@@ -3,7 +3,7 @@ import { ContactPageClient } from "./contact-client";
 
 export const metadata = {
   title: "Contact",
-  description: "Get in touch with True Goshen Auto for vehicle inquiries and support.",
+  description: "Get in touch with Nabus Motors for vehicle inquiries and support.",
 };
 
 export default async function ContactPage() {

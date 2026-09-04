@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   const phone = String(body.phone ?? "").trim();
   const message =
     String(body.message ?? "").trim() ||
-    "True Goshen: WhatsApp API test message. Configuration looks good.";
+    "Nabus Motors: WhatsApp API test message. Configuration looks good.";
 
   if (!phone || !toWhatsAppE164(phone)) {
     return NextResponse.json({ ok: false, message: "Enter a valid phone number." }, { status: 400 });

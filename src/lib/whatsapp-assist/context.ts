@@ -375,7 +375,7 @@ export function factsToPromptPayload(
   );
 
   return {
-    company: "True Goshen Auto (Ghana)",
+    company: "Nabus Motors (Ghana)",
     customer: facts.customer,
     focusRecord: facts.focus,
     focusLabel: facts.focusLabel,

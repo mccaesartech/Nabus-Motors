@@ -166,6 +166,6 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     ok: true,
-    message: `A 6-digit verification code was sent to ${resolved.email}. Check inbox and spam (from noreply@truegoshengh.com).`,
+    message: `A 6-digit verification code was sent to ${resolved.email}. Check inbox and spam (from noreply@nabusmotors.com).`,
   });
 }

@@ -2,7 +2,7 @@
  * Public route paths — single source of truth for corporate HQ vs divisions.
  *
  * Route map:
- *   /                           → True Goshen Company Limited (corporate HQ)
+ *   /                           → Nabus Motors and Trading (corporate HQ)
  *   /about, /services, /contact → Corporate pages
  *   /auto/*                     → Auto Division (marketplace)
  *   /auto/spare-parts           → Spare Parts (subdivision of Auto)

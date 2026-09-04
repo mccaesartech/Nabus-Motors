@@ -10,7 +10,7 @@ export default function PrivacyPage() {
       <h1 className="text-2xl font-semibold">Privacy Policy</h1>
       <div className="prose prose-sm mt-8 max-w-3xl text-muted-foreground">
         <p>
-          True Goshen Auto (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;) is committed to protecting
+          Nabus Motors (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;) is committed to protecting
           your privacy. This policy describes how we collect, use, and safeguard
           your personal information when you use our website and services.
         </p>
@@ -32,8 +32,8 @@ export default function PrivacyPage() {
         </p>
         <h2 className="mt-8 text-lg font-semibold text-foreground">Contact</h2>
         <p>
-          For privacy-related questions, contact us at info@truegoshenauto.com or
-          +233 24 487 6784.
+          For privacy-related questions, contact us at info@nabusmotors.com or
+          +233 27 994 0200.
         </p>
       </div>
     </Container>

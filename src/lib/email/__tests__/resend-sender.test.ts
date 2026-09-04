@@ -15,24 +15,24 @@ const SANDBOX_ERROR =
 
 describe("parseResendFromAddress", () => {
   it("accepts a bare mailbox", () => {
-    expect(parseResendFromAddress("noreply@truegoshengh.com")).toEqual({
-      header: "noreply@truegoshengh.com",
-      address: "noreply@truegoshengh.com",
-      domain: "truegoshengh.com",
+    expect(parseResendFromAddress("noreply@nabusmotors.com")).toEqual({
+      header: "noreply@nabusmotors.com",
+      address: "noreply@nabusmotors.com",
+      domain: "nabusmotors.com",
     });
   });
 
   it("accepts the display-name form Resend documents", () => {
-    expect(parseResendFromAddress("True Goshen <noreply@truegoshengh.com>")).toEqual({
-      header: "True Goshen <noreply@truegoshengh.com>",
-      address: "noreply@truegoshengh.com",
-      domain: "truegoshengh.com",
+    expect(parseResendFromAddress("Nabus Motors <noreply@nabusmotors.com>")).toEqual({
+      header: "Nabus Motors <noreply@nabusmotors.com>",
+      address: "noreply@nabusmotors.com",
+      domain: "nabusmotors.com",
     });
   });
 
   it("strips quoting and surrounding whitespace from the env value", () => {
-    expect(parseResendFromAddress('  "noreply@truegoshengh.com" ')?.address).toBe(
-      "noreply@truegoshengh.com"
+    expect(parseResendFromAddress('  "noreply@nabusmotors.com" ')?.address).toBe(
+      "noreply@nabusmotors.com"
     );
   });
 
@@ -40,7 +40,7 @@ describe("parseResendFromAddress", () => {
     expect(parseResendFromAddress(undefined)).toBeNull();
     expect(parseResendFromAddress("   ")).toBeNull();
     expect(parseResendFromAddress("not-an-email")).toBeNull();
-    expect(parseResendFromAddress("True Goshen <not-an-email>")).toBeNull();
+    expect(parseResendFromAddress("Nabus Motors <not-an-email>")).toBeNull();
   });
 });
 
@@ -52,7 +52,7 @@ describe("Resend domain-verification failures", () => {
   it("recognises an unverified sending domain", () => {
     expect(
       isResendDomainVerificationError(
-        "The truegoshengh.com domain is not verified. Please, add and verify your domain on https://resend.com/domains"
+        "The nabusmotors.com domain is not verified. Please, add and verify your domain on https://resend.com/domains"
       )
     ).toBe(true);
   });
@@ -66,7 +66,7 @@ describe("Resend domain-verification failures", () => {
   it("explains the fix instead of echoing the provider text", () => {
     const hint = describeResendFailure(SANDBOX_ERROR);
     expect(hint).toContain("resend.com/domains");
-    expect(hint).toContain("RESEND_FROM_EMAIL=noreply@truegoshengh.com");
+    expect(hint).toContain("RESEND_FROM_EMAIL=noreply@nabusmotors.com");
     expect(formatEmailFailureHint(SANDBOX_ERROR)).toBe(hint);
   });
 
@@ -92,12 +92,12 @@ describe("Resend domain-verification failures", () => {
 
   it("names the domain Resend rejected rather than the assumed one", () => {
     const detail =
-      "The truegoshen.com domain is not verified. Please, add and verify your domain on https://resend.com/domains";
-    expect(extractUnverifiedDomain(detail)).toBe("truegoshen.com");
+      "The nabusmotors.com domain is not verified. Please, add and verify your domain on https://resend.com/domains";
+    expect(extractUnverifiedDomain(detail)).toBe("nabusmotors.com");
 
     const hint = describeResendFailure(detail);
-    expect(hint).toContain("truegoshen.com is not verified");
-    expect(hint).toContain("RESEND_FROM_EMAIL=noreply@truegoshen.com");
+    expect(hint).toContain("nabusmotors.com is not verified");
+    expect(hint).toContain("RESEND_FROM_EMAIL=noreply@nabusmotors.com");
   });
 
   it("falls back to the From address we actually sent with", () => {
@@ -117,9 +117,9 @@ describe("Resend domain-verification failures", () => {
 
 describe("ResendSendError", () => {
   const from = {
-    header: "True Goshen <noreply@truegoshengh.com>",
-    address: "noreply@truegoshengh.com",
-    domain: "truegoshengh.com",
+    header: "Nabus Motors <noreply@nabusmotors.com>",
+    address: "noreply@nabusmotors.com",
+    domain: "nabusmotors.com",
   };
 
   it("keeps the provider code, status and sender in the persisted message", () => {
@@ -132,14 +132,14 @@ describe("ResendSendError", () => {
 
     expect(error.message).toContain("validation_error");
     expect(error.message).toContain("HTTP 403");
-    expect(error.message).toContain("noreply@truegoshengh.com");
+    expect(error.message).toContain("noreply@nabusmotors.com");
     expect(error.message).toContain(SANDBOX_ERROR);
     expect(error.providerMessage).toBe(SANDBOX_ERROR);
-    expect(error.fromDomain).toBe("truegoshengh.com");
+    expect(error.fromDomain).toBe("nabusmotors.com");
   });
 
   it("omits the label when Resend gives no code or status", () => {
     const error = new ResendSendError({ providerMessage: "Boom", from });
-    expect(error.message).toBe("Resend rejected the send from noreply@truegoshengh.com: Boom");
+    expect(error.message).toBe("Resend rejected the send from noreply@nabusmotors.com: Boom");
   });
 });

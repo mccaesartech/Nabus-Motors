@@ -1,7 +1,7 @@
 import { isLowStock } from "@/lib/platform/site-settings";
 
 /**
- * Stock model (True Goshen Auto):
+ * Stock model (Nabus Motors):
  * Each listing row carries `stock_quantity` units (migration 082). Legacy rows
  * without the column count as 1 unit (one-row-per-VIN).
  *

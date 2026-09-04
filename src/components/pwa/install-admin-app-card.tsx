@@ -32,7 +32,7 @@ export function InstallAdminAppCard() {
       <div className="rounded-lg border border-[var(--platform-success)]/30 bg-[rgba(16,185,129,0.08)] px-4 py-3 text-sm text-[var(--platform-text)]">
         <p className="font-medium text-[var(--platform-success)]">Admin app installed</p>
         <p className="mt-1 text-[var(--platform-text-secondary)]">
-          You are using the installed True Goshen Admin app. Open it from your home screen for
+          You are using the installed Nabus Motors Admin app. Open it from your home screen for
           quick access.
         </p>
       </div>
@@ -48,7 +48,7 @@ export function InstallAdminAppCard() {
 
       {!canInstallHere ? (
         <div className="rounded-lg border border-amber-400/40 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-          For a separate <strong>True Goshen Admin</strong> icon, install from{" "}
+          For a separate <strong>Nabus Motors Admin</strong> icon, install from{" "}
           <a href={adminLoginPath()} className="font-medium underline">
             {adminLoginPath()}
           </a>{" "}
@@ -88,7 +88,7 @@ export function InstallAdminAppCard() {
           <p>
             On Chrome or Edge: use the button above, or open the browser menu (
             <strong>⋮</strong>) and choose <strong>Install app</strong> or{" "}
-            <strong>Install True Goshen Admin</strong>. If the button does not appear, refresh this
+            <strong>Install Nabus Motors Admin</strong>. If the button does not appear, refresh this
             page and try again.
           </p>
         </div>

@@ -9,7 +9,7 @@ export const revalidate = 60;
 export const metadata = {
   title: "Shipping Consultation",
   description:
-    "Request a personalised shipping consultation from True Goshen — import routes, methods, timelines, and costs for vehicles and cargo to Ghana.",
+    "Request a personalised shipping consultation from Nabus Motors — import routes, methods, timelines, and costs for vehicles and cargo to Ghana.",
 };
 
 export default async function ShippingConsultationPage() {

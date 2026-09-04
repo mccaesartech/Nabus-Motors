@@ -213,7 +213,7 @@ export async function POST(req: NextRequest) {
     }
 
     const messageParts = [
-      "Thank you for choosing True Goshen Company Limited.",
+      "Thank you for choosing Nabus Motors and Trading.",
       `Your quote reference is ${savedReference}. Save this reference to track your request.`,
       "Our freight team will contact you within 1–2 business days.",
     ];

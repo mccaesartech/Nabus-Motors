@@ -6,7 +6,7 @@ import { getSiteContent } from "@/lib/site-content";
 export const metadata = {
   title: "Genuine Spare Parts",
   description:
-    "Browse and request genuine OEM and aftermarket auto parts from True Goshen Auto Parts.",
+    "Browse and request genuine OEM and aftermarket auto parts from Nabus Motors Parts.",
 };
 
 export const revalidate = 60;

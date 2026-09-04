@@ -3,7 +3,7 @@
  * Prefer NEXT_PUBLIC_SITE_URL in Vercel; this is only the unset/invalid fallback.
  * Requires healthy Namecheap DNS — see LAUNCH_DOMAIN_CUTOVER.md (and docs/domain-cutover.md).
  *
- * Emergency only: set PUBLIC_SITE_URL_EMERGENCY_FALLBACK=https://truegoshen.vercel.app
+ * Emergency only: set PUBLIC_SITE_URL_EMERGENCY_FALLBACK=https://nabus-motors.vercel.app
  * while custom DNS is broken. Do not leave that set for launch.
  */
 export const PRODUCTION_PUBLIC_SITE_URL = "https://www.nabusmotors.com";

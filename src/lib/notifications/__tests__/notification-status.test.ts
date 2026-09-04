@@ -1,4 +1,4 @@
-ï»¿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   formatCustomerNotificationFeedback,
   sanitizeNotificationReason,
@@ -14,7 +14,7 @@ function base(overrides: Partial<CustomerNotificationPayload> = {}): CustomerNot
     channels: [],
     whatsappStatus: "not_attempted",
     emailStatus: "not_attempted",
-    phone: "+233244876784",
+    phone: "+233279940200",
     ...overrides,
   };
 }
@@ -68,13 +68,13 @@ describe("formatCustomerNotificationFeedback", () => {
 describe("sanitizeNotificationReason", () => {
   it("strips provider brand names from UI-facing reasons", () => {
     expect(sanitizeNotificationReason("Arkesel error (402): out of credit")).toBe(
-      "SMS could not be delivered â€” check messaging configuration"
+      "SMS could not be delivered — check messaging configuration"
     );
     expect(sanitizeNotificationReason("Resend rejected the send (validation_error)")).toBe(
-      "Email could not be delivered â€” check email configuration"
+      "Email could not be delivered — check email configuration"
     );
     expect(sanitizeNotificationReason("Twilio error (400): bad request")).toBe(
-      "WhatsApp could not be delivered â€” check messaging configuration"
+      "WhatsApp could not be delivered — check messaging configuration"
     );
   });
 });

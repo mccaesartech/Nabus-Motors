@@ -8,7 +8,7 @@ import { getPublicSiteUrl } from "@/lib/site-url";
 export const DEFAULT_AUTH_SERVICE_URL =
   "https://ddrknhvkhmgdtavpuiiq.supabase.co";
 /** Matches PRODUCTION_PUBLIC_SITE_URL (canonical www). */
-export const DEFAULT_PUBLIC_APP_URL = "https://www.truegoshengh.com";
+export const DEFAULT_PUBLIC_APP_URL = "https://www.nabusmotors.com";
 export const CUSTOMER_DASHBOARD_PATH = "/dashboard";
 
 export type ExternalAuthUser = {

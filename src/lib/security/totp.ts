@@ -86,7 +86,7 @@ export function buildOtpAuthUri(params: {
   accountName: string;
   issuer?: string;
 }): string {
-  const issuer = params.issuer ?? "True Goshen";
+  const issuer = params.issuer ?? "Nabus Motors";
   const label = encodeURIComponent(`${issuer}:${params.accountName}`);
   const query = new URLSearchParams({
     secret: params.secret,

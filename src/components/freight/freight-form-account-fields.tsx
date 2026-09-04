@@ -107,7 +107,7 @@ export function FreightSubmitSuccess({
   return (
     <div className="space-y-4 rounded-lg border-2 border-emerald-300 bg-emerald-50 p-6 text-emerald-950">
       <div>
-        <p className="text-lg font-semibold">Thank you for choosing True Goshen Company Limited</p>
+        <p className="text-lg font-semibold">Thank you for choosing Nabus Motors and Trading</p>
         <p className="mt-1 text-sm text-emerald-900/90">
           Your quote request was received. Save your quote reference below — we also send it by
           email or WhatsApp when those channels are configured.

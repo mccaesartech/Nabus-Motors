@@ -757,7 +757,7 @@ export function VehicleAiChat({
 
     if (trimmed === WARRANTY_ACTION) {
       await sendGeminiMessage(
-        "Draft professional warranty_notes suitable for True Goshen Auto. Keep claims editable and avoid inventing specific legal durations unless already provided — use clear placeholders where needed. Staff must Apply."
+        "Draft professional warranty_notes suitable for Nabus Motors. Keep claims editable and avoid inventing specific legal durations unless already provided — use clear placeholders where needed. Staff must Apply."
       );
       return;
     }

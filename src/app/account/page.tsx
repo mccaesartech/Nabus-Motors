@@ -1100,7 +1100,7 @@ function AccountContent() {
                           )}
                         >
                           <p className="mb-1 text-xs font-medium text-muted-foreground">
-                            {msg.isMine ? "You" : "True Goshen"}{" · "}
+                            {msg.isMine ? "You" : "Nabus Motors"}{" · "}
                             {new Date(msg.created_at).toLocaleString(undefined, {
                               month: "short",
                               day: "numeric",

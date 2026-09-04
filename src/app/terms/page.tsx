@@ -10,7 +10,7 @@ export default function TermsPage() {
       <h1 className="text-2xl font-semibold">Terms & Conditions</h1>
       <div className="prose prose-sm mt-8 max-w-3xl text-muted-foreground">
         <p>
-          By accessing and using the True Goshen Auto website, you agree to these
+          By accessing and using the Nabus Motors website, you agree to these
           terms and conditions. Please read them carefully before using our
           services.
         </p>
@@ -35,7 +35,7 @@ export default function TermsPage() {
           Limitation of Liability
         </h2>
         <p>
-          True Goshen Auto shall not be liable for any indirect, incidental, or
+          Nabus Motors shall not be liable for any indirect, incidental, or
           consequential damages arising from the use of this website or purchase
           of vehicles through our platform.
         </p>

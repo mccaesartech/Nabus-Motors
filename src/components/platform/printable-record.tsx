@@ -117,7 +117,7 @@ export function PrintableRecord({
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={retriedUrl ? getPrintLogoUrl() : PRINT_LOGO_DATA_URL}
-                alt="True Goshen Auto"
+                alt="Nabus Motors"
                 width={PRINT_LOGO_WIDTH}
                 height={PRINT_LOGO_HEIGHT}
                 className="h-8 w-auto max-w-[110px] object-contain"
@@ -133,7 +133,7 @@ export function PrintableRecord({
               <div className="flex flex-col leading-tight">
                 <span className="text-xl font-bold italic text-[#7c3aed]">TG</span>
                 <span className="text-sm font-bold tracking-[0.14em] text-[#4c1d95]">
-                  TRUE GOSHEN
+                  Nabus Motors
                 </span>
                 <span className="text-[9px] font-semibold tracking-[0.28em] text-[#9333ea]">
                   AUTO
@@ -142,7 +142,7 @@ export function PrintableRecord({
             )}
             <div>
               <p className="text-xs font-semibold text-[var(--platform-text)]">
-                True Goshen Company Limited
+                Nabus Motors and Trading
               </p>
               <p className="text-[10px] text-[var(--platform-text-secondary)]">
                 Vehicles · Freight · Parts

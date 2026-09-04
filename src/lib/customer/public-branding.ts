@@ -2,8 +2,8 @@
  * Customer-facing identity for outbound messages, emails, SMS, WhatsApp,
  * and in-app chat. Never expose internal roles (owner, manager, staff, etc.).
  */
-export const CUSTOMER_FACING_BRAND = "True Goshen";
-export const CUSTOMER_FACING_COMPANY_NAME = "True Goshen Company Limited";
+export const CUSTOMER_FACING_BRAND = "Nabus Motors";
+export const CUSTOMER_FACING_COMPANY_NAME = "Nabus Motors and Trading";
 
 /** Display name shown to customers for any staff-originated message. */
 export function customerFacingStaffSenderName(): string {
@@ -17,7 +17,7 @@ export function customerFacingStaffReplyTitle(): string {
 
 /**
  * Sanitize already-stored customer notification titles that leaked roles
- * (e.g. "Reply from Owner" -> "Reply from True Goshen").
+   * (e.g. "Reply from Owner" -> "Reply from Nabus Motors").
  */
 export function sanitizeCustomerNotificationTitle(title: string): string {
   const trimmed = title.trim();

@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: PageProps) {
   if (!part) return { title: "Part not found" };
   return {
     title: part.name,
-    description: part.description ?? `Request ${part.name} from True Goshen Auto Parts.`,
+    description: part.description ?? `Request ${part.name} from Nabus Motors Parts.`,
   };
 }
 

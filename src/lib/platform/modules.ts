@@ -130,9 +130,9 @@ export const DEFAULT_SITE_SETTINGS: SiteSettingsMap = {
   hours_saturday: "Sat: 9:00 AM – 5:00 PM",
   hours_sunday: "Sun: Closed",
   clearing_fee_notice:
-    "Clearing fees, duties, and port charges vary by shipment type, vehicle value, and Ghana Customs assessment. True Goshen will provide a detailed breakdown before you commit. Contact our freight team for a personalised quote — prices are not fixed on this notice.",
+    "Clearing fees, duties, and port charges vary by shipment type, vehicle value, and Ghana Customs assessment. Nabus Motors will provide a detailed breakdown before you commit. Contact our freight team for a personalised quote — prices are not fixed on this notice.",
   preorder_terms_a: "Option A — I will arrange my own shipping and clearing",
-  preorder_terms_b: "Option B — True Goshen handles freight forwarding & clearing",
+  preorder_terms_b: "Option B — Nabus Motors handles freight forwarding & clearing",
   preorder_terms_c: "Option C — I need consultation before deciding",
   social_facebook: "",
   social_instagram: "",

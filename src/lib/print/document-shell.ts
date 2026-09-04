@@ -711,7 +711,7 @@ function stampCspNonceOnScripts(html: string): string {
  * Honors __tgaPrintStarted so parent-driven print does not double-open the dialog.
  * Must be nonce-stamped before document.write under production CSP.
  */
-const DEFERRED_PRINT_SCRIPT = `<script>(function(){var done=false;var MAX_WAIT=${PRINT_DIALOG_MAX_WAIT_MS};var IMG_WAIT=${PRINT_IMAGE_MAX_WAIT_MS};function setTitle(){try{var t=document.querySelector('title');var raw=t&&t.textContent?t.textContent.trim():'';if(raw&&!/^about:blank$/i.test(document.title)&&!/^about:blank$/i.test(raw)){document.title=raw;}else{document.title='True Goshen Invoice';}}catch(e){document.title='True Goshen Invoice';}}function go(){if(done||window.__tgaPrintStarted)return;done=true;window.__tgaPrintStarted=true;setTitle();try{window.focus();window.print();}catch(e){window.__tgaPrintStarted=false;}}function whenImagesReady(cb){var imgs=Array.prototype.slice.call(document.images||[]);if(!imgs.length)return cb();var pending=imgs.filter(function(i){return!i.complete;});if(!pending.length)return cb();var left=pending.length,timer=setTimeout(cb,IMG_WAIT);pending.forEach(function(img){img.addEventListener('load',tick,{once:true});img.addEventListener('error',tick,{once:true});});function tick(){if(--left<=0){clearTimeout(timer);cb();}}}function start(){whenImagesReady(go);setTimeout(go,MAX_WAIT);}if(document.readyState==='complete'||document.readyState==='interactive')start();else document.addEventListener('DOMContentLoaded',start,{once:true});})();</script>`;
+const DEFERRED_PRINT_SCRIPT = `<script>(function(){var done=false;var MAX_WAIT=${PRINT_DIALOG_MAX_WAIT_MS};var IMG_WAIT=${PRINT_IMAGE_MAX_WAIT_MS};function setTitle(){try{var t=document.querySelector('title');var raw=t&&t.textContent?t.textContent.trim():'';if(raw&&!/^about:blank$/i.test(document.title)&&!/^about:blank$/i.test(raw)){document.title=raw;}else{document.title='Nabus Motors Invoice';}}catch(e){document.title='Nabus Motors Invoice';}}function go(){if(done||window.__tgaPrintStarted)return;done=true;window.__tgaPrintStarted=true;setTitle();try{window.focus();window.print();}catch(e){window.__tgaPrintStarted=false;}}function whenImagesReady(cb){var imgs=Array.prototype.slice.call(document.images||[]);if(!imgs.length)return cb();var pending=imgs.filter(function(i){return!i.complete;});if(!pending.length)return cb();var left=pending.length,timer=setTimeout(cb,IMG_WAIT);pending.forEach(function(img){img.addEventListener('load',tick,{once:true});img.addEventListener('error',tick,{once:true});});function tick(){if(--left<=0){clearTimeout(timer);cb();}}}function start(){whenImagesReady(go);setTimeout(go,MAX_WAIT);}if(document.readyState==='complete'||document.readyState==='interactive')start();else document.addEventListener('DOMContentLoaded',start,{once:true});})();</script>`;
 
 function withDeferredPrintScript(html: string): string {
   if (html.includes("window.print()")) return html;
@@ -763,7 +763,7 @@ function validatePrintableHtml(html: string): PrintableDocumentResult | null {
 function extractDocumentTitle(html: string): string {
   const match = html.match(/<title[^>]*>([^<]*)<\/title>/i);
   const raw = match?.[1]?.trim() ?? "";
-  if (!raw || /^about:blank$/i.test(raw)) return "True Goshen Invoice";
+  if (!raw || /^about:blank$/i.test(raw)) return "Nabus Motors Invoice";
   return raw
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")

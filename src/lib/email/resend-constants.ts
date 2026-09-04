@@ -8,7 +8,7 @@ export const RESEND_DOMAIN_SETUP_URL = "https://resend.com/domains";
  */
 export const RESEND_DIAGNOSTICS_PATH = "/api/admin/email-diagnostics";
 
-export const RESEND_SENDING_DOMAIN = "truegoshengh.com";
+export const RESEND_SENDING_DOMAIN = "nabusmotors.com";
 export const RESEND_FROM_ADDRESS_EXAMPLE = `noreply@${RESEND_SENDING_DOMAIN}`;
 
 /**
@@ -71,7 +71,7 @@ export function extractUnverifiedDomain(
  * Returns null when the failure is not a domain-verification problem.
  *
  * The domain is taken from Resend's own text (or the address we sent with)
- * rather than assumed, because "verify truegoshengh.com" is useless advice
+ * rather than assumed, because "verify nabusmotors.com" is useless advice
  * when Resend actually rejected a different sender domain.
  */
 export function describeResendFailure(

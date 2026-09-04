@@ -101,7 +101,7 @@ export default function OrderDetailPage() {
     );
     params.set(
       "draft",
-      `Hi ${order.name}, following up on your True Goshen cart order (${order.id.slice(0, 8).toUpperCase()}). `
+      `Hi ${order.name}, following up on your Nabus Motors cart order (${order.id.slice(0, 8).toUpperCase()}). `
     );
     return `/platform/messages?${params.toString()}`;
   }, [order]);

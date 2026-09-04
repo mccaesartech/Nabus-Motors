@@ -25,7 +25,7 @@ describe("CSP builder", () => {
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).toContain("form-action 'self'");
     expect(csp).toContain("upgrade-insecure-requests");
-    expect(csp).toContain("https://auth.truegoshengh.com");
+    expect(csp).toContain("https://auth.nabusmotors.com");
     expect(csp).toContain("https://*.supabase.co");
     expect(csp).toContain("worker-src 'self' blob:");
     expect(csp).toContain("https://www.youtube-nocookie.com");

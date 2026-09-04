@@ -99,7 +99,7 @@ export function maintenanceApiPayload(message: string) {
     ok: false as const,
     message:
       message.trim() ||
-      "True Goshen is temporarily unavailable for scheduled maintenance. Please try again shortly.",
+      "Nabus Motors is temporarily unavailable for scheduled maintenance. Please try again shortly.",
     code: "maintenance" as const,
     errorId,
   };

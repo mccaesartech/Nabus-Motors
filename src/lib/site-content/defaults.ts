@@ -421,7 +421,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
   },
   testimonials: {
     title: "Customer Testimonials",
-    description: "Feedback from customers who purchased through True Goshen Auto.",
+    description: "Feedback from customers who purchased through Nabus Motors.",
     items: [
       {
         id: "1",
@@ -430,7 +430,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
         vehicle: "2024 BYD Atto 3",
         rating: 5,
         quote:
-          "True Goshen made buying my electric SUV straightforward. Transparent pricing, no pressure, and the vehicle was exactly as described. Delivery to Accra was seamless.",
+          "Nabus Motors made buying my electric SUV straightforward. Transparent pricing, no pressure, and the vehicle was exactly as described. Delivery to Accra was seamless.",
         image: "",
         verified: true,
       },
@@ -452,7 +452,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
         vehicle: "2023 Ford F-150",
         rating: 5,
         quote:
-          "Sold my truck through True Goshen and bought a newer model the same week. Fair appraisal, professional team, and excellent follow-up after the sale.",
+          "Sold my truck through Nabus Motors and bought a newer model the same week. Fair appraisal, professional team, and excellent follow-up after the sale.",
         image: "",
         verified: true,
       },
@@ -484,7 +484,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
   corporateTestimonials: {
     title: "What Our Clients Say",
     description:
-      "Feedback from businesses and individuals who rely on True Goshen for imports, freight, and parts.",
+      "Feedback from businesses and individuals who rely on Nabus Motors for imports, freight, and parts.",
     items: [
       {
         id: "c1",
@@ -493,7 +493,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
         vehicle: "Vehicle Import",
         rating: 5,
         quote:
-          "True Goshen handled our fleet import from start to finish — documentation, clearing, and delivery were coordinated under one roof. Professional team and clear communication throughout.",
+          "Nabus Motors handled our fleet import from start to finish — documentation, clearing, and delivery were coordinated under one roof. Professional team and clear communication throughout.",
         image: "",
         verified: true,
       },
@@ -515,7 +515,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
         vehicle: "Genuine Spare Parts",
         rating: 5,
         quote:
-          "We source OEM and aftermarket parts through True Goshen regularly. Genuine stock, fair pricing, and reliable delivery — exactly what our workshop needs.",
+          "We source OEM and aftermarket parts through Nabus Motors regularly. Genuine stock, fair pricing, and reliable delivery — exactly what our workshop needs.",
         image: "",
         verified: true,
       },
@@ -526,7 +526,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
         vehicle: "Logistics & Support",
         rating: 5,
         quote:
-          "From shipping consultation to final delivery, the True Goshen team treated our shipment like their own. Responsive support and a partner we trust for repeat business.",
+          "From shipping consultation to final delivery, the Nabus Motors team treated our shipment like their own. Responsive support and a partner we trust for repeat business.",
         image: "",
         verified: true,
       },

@@ -23,7 +23,7 @@ export function AdminAuthShell({ children }: AdminAuthShellProps) {
       <header className="sticky top-0 z-10 shrink-0 border-b border-[var(--platform-border)] bg-[var(--platform-bg)]/95 backdrop-blur-sm">
         <Container className="flex max-w-md items-center justify-between gap-3 py-3 sm:py-4">
           <BackNav href={ROUTES.corporate.home} label="Back" variant="platform" compact />
-          <Link href={ROUTES.corporate.home} aria-label="True Goshen Company Limited home" className="shrink-0">
+          <Link href={ROUTES.corporate.home} aria-label="Nabus Motors and Trading home" className="shrink-0">
             <Logo variant="purple" height={44} href={false} />
           </Link>
           <span className="w-[5.5rem] shrink-0" aria-hidden />

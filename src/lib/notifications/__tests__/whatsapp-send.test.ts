@@ -53,7 +53,7 @@ describe("whatsapp kill-switch and send path", () => {
     vi.stubEnv("WHATSAPP_PROVIDER", "meta");
 
     const { sendWhatsAppMessage } = await import("@/lib/notifications/whatsapp-send");
-    const result = await sendWhatsAppMessage("+233244876784", "hello");
+    const result = await sendWhatsAppMessage("+233279940200", "hello");
     expect(result.sent).toBe(false);
     if (!result.sent) {
       expect(result.reason).toMatch(/disabled/i);
@@ -74,7 +74,7 @@ describe("whatsapp kill-switch and send path", () => {
       template: "test",
       channel: "whatsapp",
       status: "sent",
-      recipient: "+233244876784",
+      recipient: "+233279940200",
       detail: null,
       provider: "meta",
       provider_message_id: "wamid.ABC",
@@ -86,7 +86,7 @@ describe("whatsapp kill-switch and send path", () => {
 
     const { sendWhatsAppMessage } = await import("@/lib/notifications/whatsapp-send");
     const fetchSpy = vi.spyOn(globalThis, "fetch");
-    const result = await sendWhatsAppMessage("+233244876784", "hello", {
+    const result = await sendWhatsAppMessage("+233279940200", "hello", {
       idempotencyKey: "dedupe-1",
       persistLog: true,
       template: "test",
@@ -111,7 +111,7 @@ describe("whatsapp kill-switch and send path", () => {
     );
 
     const { sendWhatsAppMessage } = await import("@/lib/notifications/whatsapp-send");
-    const result = await sendWhatsAppMessage("+233244876784", "hello world", {
+    const result = await sendWhatsAppMessage("+233279940200", "hello world", {
       persistLog: false,
     });
 

@@ -63,7 +63,7 @@ export function SellPageClient({ hero }: SellPageClientProps) {
               <h2 className="text-xl font-semibold">Why Sell With Us</h2>
               <div className="mt-6 space-y-4 text-sm text-muted-foreground">
                 <p>
-                  True Goshen Auto offers competitive appraisals based on current market data,
+                  Nabus Motors offers competitive appraisals based on current market data,
                   vehicle condition, and demand. Our process is transparent — you receive a
                   detailed valuation breakdown.
                 </p>

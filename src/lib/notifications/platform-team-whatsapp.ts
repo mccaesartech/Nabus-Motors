@@ -203,7 +203,7 @@ export function buildTeamInviteMessage(params: {
   inviteUrl: string;
 }): string {
   const role = roleLabel(params.role);
-  return `True Goshen: Hi ${params.name}, you're invited as ${role}. Accept here: ${params.inviteUrl}`;
+  return `Nabus Motors: Hi ${params.name}, you're invited as ${role}. Accept here: ${params.inviteUrl}`;
 }
 
 export type TeamPasswordLinkKind = "invite" | "login";
@@ -237,14 +237,14 @@ export function buildTeamPasswordSetMessage(params: {
   const label = params.role ? roleLabel(params.role) : "platform";
   if (temporaryPassword) {
     if (kind === "invite") {
-      return `True Goshen: Hi ${params.name}, your ${label} account is ready. Temporary password: ${temporaryPassword}. Accept invite: ${params.loginUrl}`;
+      return `Nabus Motors: Hi ${params.name}, your ${label} account is ready. Temporary password: ${temporaryPassword}. Accept invite: ${params.loginUrl}`;
     }
-    return `True Goshen: Hi ${params.name}, your ${label} password was updated. Temporary password: ${temporaryPassword}. Sign in at ${params.loginUrl}. Change it after signing in.`;
+    return `Nabus Motors: Hi ${params.name}, your ${label} password was updated. Temporary password: ${temporaryPassword}. Sign in at ${params.loginUrl}. Change it after signing in.`;
   }
   if (kind === "invite") {
-    return `True Goshen: Hi ${params.name}, your ${label} password was set. Accept invite: ${params.loginUrl}. If this wasn't you, contact the owner.`;
+    return `Nabus Motors: Hi ${params.name}, your ${label} password was set. Accept invite: ${params.loginUrl}. If this wasn't you, contact the owner.`;
   }
-  return `True Goshen: Hi ${params.name}, your ${label} password was set. Sign in at ${params.loginUrl}. If this wasn't you, contact the owner.`;
+  return `Nabus Motors: Hi ${params.name}, your ${label} password was set. Sign in at ${params.loginUrl}. If this wasn't you, contact the owner.`;
 }
 
 /** Staff login URL used when the account is already active (no pending invite). */
@@ -292,7 +292,7 @@ export async function notifyTeamRoleChangedWhatsApp(params: {
   userId?: string;
 }): Promise<TeamNotifyResult> {
   const role = roleLabel(params.role);
-  const text = `True Goshen: Hi ${params.name}, your platform role is now ${role}.`;
+  const text = `Nabus Motors: Hi ${params.name}, your platform role is now ${role}.`;
   try {
     return await sendTeamWhatsApp({
       phone: params.phone,
@@ -366,7 +366,7 @@ export function notifyTeamWelcomeWhatsApp(params: {
   fireAndForget(async () => {
     const role = roleLabel(params.role);
     const dashboardUrl = `${getPublicSiteUrl()}${platformDashboardPath()}`;
-    const text = `True Goshen: Welcome ${params.name}! Your ${role} account is active. Open the dashboard: ${dashboardUrl}`;
+    const text = `Nabus Motors: Welcome ${params.name}! Your ${role} account is active. Open the dashboard: ${dashboardUrl}`;
     await sendTeamWhatsApp({
       phone: params.phone,
       kind: "team_welcome",
@@ -390,7 +390,7 @@ export function buildTeamPasswordChangedMessage(params: {
   const ipPart = params.ip?.trim()
     ? ` Approximate IP: ${params.ip.trim()}.`
     : "";
-  return `True Goshen: Hi ${params.name}, your platform password was changed at ${params.when}.${ipPart} If this wasn't you, secure your account: ${params.securityUrl}`;
+  return `Nabus Motors: Hi ${params.name}, your platform password was changed at ${params.when}.${ipPart} If this wasn't you, secure your account: ${params.securityUrl}`;
 }
 
 /** SMS body for self-serve platform password reset (link only — never a password). */
@@ -400,7 +400,7 @@ export function buildTeamPasswordResetMessage(params: {
   expiryLabel?: string;
 }): string {
   const expiry = params.expiryLabel?.trim() || "1 hour";
-  return `True Goshen: Hi ${params.name}, reset your platform password here: ${params.resetUrl} (expires in ${expiry}). If you didn't request this, ignore this message.`;
+  return `Nabus Motors: Hi ${params.name}, reset your platform password here: ${params.resetUrl} (expires in ${expiry}). If you didn't request this, ignore this message.`;
 }
 
 /**
@@ -484,7 +484,7 @@ export function buildTeamLoginAlertMessage(params: {
   const ipPart = params.ip?.trim()
     ? ` Approximate IP: ${params.ip.trim()}.`
     : "";
-  return `True Goshen: Hi ${params.name}, you signed in to your ${role} account at ${params.when}.${ipPart} If this wasn't you, change your password: ${params.securityUrl}`;
+  return `Nabus Motors: Hi ${params.name}, you signed in to your ${role} account at ${params.when}.${ipPart} If this wasn't you, change your password: ${params.securityUrl}`;
 }
 
 /** SMS body for failed platform sign-in (no Meta template — Arkesel path). */
@@ -501,7 +501,7 @@ export function buildTeamFailedLoginAlertMessage(params: {
     ? ` Approximate IP: ${params.ip.trim()}.`
     : "";
   const devicePart = params.device?.trim() ? ` Device: ${params.device.trim()}.` : "";
-  return `True Goshen: Hi ${params.name}, someone failed to sign in to your ${role} account at ${params.when}.${devicePart}${ipPart} If this wasn't you, change your password: ${params.securityUrl}`;
+  return `Nabus Motors: Hi ${params.name}, someone failed to sign in to your ${role} account at ${params.when}.${devicePart}${ipPart} If this wasn't you, change your password: ${params.securityUrl}`;
 }
 
 export async function notifyTeamFailedLoginAlert(params: {

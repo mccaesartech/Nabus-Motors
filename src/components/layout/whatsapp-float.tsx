@@ -32,7 +32,7 @@ export function WhatsAppFloat({ whatsappNumber }: { whatsappNumber?: string }) {
   return (
     <a
       href={whatsappUrl(
-        "Hello True Goshen Auto, I would like to inquire about a vehicle.",
+        "Hello Nabus Motors, I would like to inquire about a vehicle.",
         number
       )}
       target="_blank"

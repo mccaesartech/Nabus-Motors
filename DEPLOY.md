@@ -1,10 +1,10 @@
-# Deploy True Goshen Auto (Vercel + Supabase)
+# Deploy Nabus Motors (Vercel + Supabase)
 
 ## Step 1 — Supabase (free database)
 
 1. Go to **[supabase.com/dashboard](https://supabase.com/dashboard)** and sign in (or create an account).
 2. Click **New project**
-   - Name: `true-goshen-auto`
+   - Name: `nabus-motors`
    - Database password: choose a strong password (save it)
    - Region: pick closest to your customers (e.g. `US East`)
 3. Wait ~2 minutes for the project to finish provisioning.
@@ -21,7 +21,7 @@ Your Vercel account is already linked (`mccaesartech`).
 ### Option A — Deploy from this folder (CLI)
 
 ```powershell
-cd "C:\Users\PC1\OneDrive\Desktop\True Goshen\true-goshen-auto"
+cd "C:\Users\PC1\OneDrive\Desktop\Nabus Motors\nabus-motors"
 vercel --prod
 ```
 
@@ -32,10 +32,10 @@ When prompted for environment variables, add:
 | `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your Supabase anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | **Required for Platform admin writes.** Supabase **service_role** secret (Project Settings → API). Never use the anon key here — vehicles RLS is SELECT-only, so an anon key makes updates match 0 rows (“Vehicle not found or update was blocked”). Server-only; never expose to the client. |
-| `NEXT_PUBLIC_SITE_URL` | `https://www.truegoshengh.com` (canonical public app URL used by invites, metadata, and email links) |
-| `NEXT_PUBLIC_AUTO_SITE_URL` | `https://truegoshenauto.com` (optional — Auto Division direct entry) |
-| `AUTO_DIVISION_HOSTS` | `truegoshenauto.com,truegoshenauto.vercel.app,auto.truegoshen.com` |
-| `NEXT_PUBLIC_WHATSAPP_NUMBER` | Your WhatsApp number (digits only, e.g. `233244876784`) |
+| `NEXT_PUBLIC_SITE_URL` | `https://www.nabusmotors.com` (canonical public app URL used by invites, metadata, and email links) |
+| `NEXT_PUBLIC_AUTO_SITE_URL` | `https://nabusmotors.com` (optional — Auto Division direct entry) |
+| `AUTO_DIVISION_HOSTS` | `nabusmotors.com,nabus-motors.vercel.app,auto.truegoshen.com` |
+| `NEXT_PUBLIC_WHATSAPP_NUMBER` | Your WhatsApp number (digits only, e.g. `233279940200`) |
 
 For production WhatsApp Cloud API (outbound notifications + webhook), also set
 `WHATSAPP_PROVIDER=meta`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`,
@@ -54,24 +54,24 @@ not as Vercel secrets. You still need:
 |------|-------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your Supabase anon key |
-| `NEXT_PUBLIC_SITE_URL` | `https://www.truegoshengh.com` |
+| `NEXT_PUBLIC_SITE_URL` | `https://www.nabusmotors.com` |
 
 Setup steps: `docs/GOOGLE_AUTH.md` (consent screen + redirects for
-`www.truegoshengh.com`). Optional branded Auth host
-`auth.truegoshengh.com` only after Custom Domain HTTPS is healthy —
+`www.nabusmotors.com`). Optional branded Auth host
+`auth.nabusmotors.com` only after Custom Domain HTTPS is healthy —
 `docs/SUPABASE_AUTH_DOMAIN.md`. Email signup checks: `docs/EMAIL_VALIDATION.md`.
 
 ### Option B — Vercel Dashboard
 
 1. Go to **[vercel.com/new](https://vercel.com/new)**
 2. Import the project folder (or connect GitHub if you push the repo)
-3. **Root Directory:** `true-goshen-auto` (if importing from parent folder)
+3. **Root Directory:** `nabus-motors` (if importing from parent folder)
 4. Add the environment variables above under **Settings → Environment Variables**
 5. Click **Deploy**
 
 ## Step 3 — Verify
 
-- Open your Vercel URL (e.g. `https://true-goshen-auto-xxx.vercel.app`)
+- Open your Vercel URL (e.g. `https://nabus-motors-xxx.vercel.app`)
 - Check **Inventory** — vehicles should load from Supabase
 - Check `/api/health/live` returns `200` and `/api/health/ready` returns `200`
 - Production fails closed with empty inventory and `503` readiness when required
@@ -92,7 +92,7 @@ and prevention (payment method, usage alerts, Hobby limits, crons): see
 ## Troubleshooting local dev
 
 ```powershell
-cd "C:\Users\PC1\OneDrive\Desktop\True Goshen\true-goshen-auto"
+cd "C:\Users\PC1\OneDrive\Desktop\Nabus Motors\nabus-motors"
 copy .env.example .env.local
 # Edit .env.local with your Supabase URL and anon key
 npm run dev
@@ -113,17 +113,17 @@ Add **both** domains in Vercel → your project → **Settings → Domains**:
 | Domain | Purpose |
 |--------|---------|
 | `truegoshen.com` (+ `www.truegoshen.com`) | Corporate HQ — `/` is the main company homepage |
-| `truegoshenauto.com` (+ `www`, `auto.truegoshen.com`) | Auto Division — visitors go straight to `/auto` |
+| `nabusmotors.com` (+ `www`, `auto.truegoshen.com`) | Auto Division — visitors go straight to `/auto` |
 
 The app uses one deployment. Middleware detects the hostname:
 
 - **truegoshen.com** — normal routing (`/` = corporate, `/auto` = marketplace)
-- **truegoshenauto.com** (and `truegoshenauto.vercel.app`) — `/` redirects to `/auto`; short paths like `/inventory` redirect to `/auto/inventory`
+- **nabusmotors.com** (and `nabus-motors.vercel.app`) — `/` redirects to `/auto`; short paths like `/inventory` redirect to `/auto/inventory`
 
-Set `NEXT_PUBLIC_SITE_URL=https://truegoshen.vercel.app` for the Production
+Set `NEXT_PUBLIC_SITE_URL=https://nabus-motors.vercel.app` for the Production
 environment in Vercel, then redeploy. Do not set it to a preview deployment or
-the legacy `truegoshenauto.vercel.app` Auto Division alias. Platform invitation
+the legacy `nabus-motors.vercel.app` Auto Division alias. Platform invitation
 links, sitemap URLs, metadata, and shared email links all use this canonical
 origin.
 
-`truegoshenauto.vercel.app` keeps working as an Auto Division entry point until you add the custom domain.
+`nabus-motors.vercel.app` keeps working as an Auto Division entry point until you add the custom domain.

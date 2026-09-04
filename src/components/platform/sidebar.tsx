@@ -336,7 +336,7 @@ export function PlatformSidebar({
               href="/platform/dashboard"
               className="flex size-8 max-w-full items-center justify-center"
               onClick={onMobileClose}
-              title="True Goshen Admin"
+              title="Nabus Motors Admin"
             >
               <Logo variant="purple" icon height={32} href={false} priority quality={100} className="size-full max-h-8 max-w-8" />
             </Link>

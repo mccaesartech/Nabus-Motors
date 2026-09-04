@@ -5,22 +5,22 @@ import {
 } from "@/lib/customer/public-branding";
 
 describe("customer public branding", () => {
-  it("uses Reply from True Goshen for staff reply titles", () => {
-    expect(customerFacingStaffReplyTitle()).toBe("Reply from True Goshen");
+  it("uses Reply from Nabus Motors for staff reply titles", () => {
+    expect(customerFacingStaffReplyTitle()).toBe("Reply from Nabus Motors");
   });
 
   it("sanitizes role-leaking Reply from titles", () => {
     expect(sanitizeCustomerNotificationTitle("Reply from Owner")).toBe(
-      "Reply from True Goshen"
+      "Reply from Nabus Motors"
     );
     expect(sanitizeCustomerNotificationTitle("Reply from Manager")).toBe(
-      "Reply from True Goshen"
+      "Reply from Nabus Motors"
     );
     expect(sanitizeCustomerNotificationTitle("Reply from Staff")).toBe(
-      "Reply from True Goshen"
+      "Reply from Nabus Motors"
     );
     expect(sanitizeCustomerNotificationTitle("Reply from Jane")).toBe(
-      "Reply from True Goshen"
+      "Reply from Nabus Motors"
     );
   });
 

@@ -7,7 +7,7 @@ import { SITE_NAME, WHATSAPP_NUMBER, whatsappUrl } from "@/lib/constants";
 
 export const metadata: Metadata = {
   title: `Scheduled maintenance | ${SITE_NAME}`,
-  description: "True Goshen is briefly offline for scheduled maintenance.",
+  description: "Nabus Motors is briefly offline for scheduled maintenance.",
   robots: { index: false, follow: false },
 };
 
@@ -20,7 +20,7 @@ export default async function MaintenancePage() {
   const inMaintenance = settings.maintenanceMode;
   const waNumber = (settings.whatsapp_number || "").trim() || WHATSAPP_NUMBER;
   const waHref = whatsappUrl(
-    "Hello True Goshen — I need help while the site is under maintenance.",
+    "Hello Nabus Motors — I need help while the site is under maintenance.",
     waNumber
   );
 

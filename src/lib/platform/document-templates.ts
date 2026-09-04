@@ -160,7 +160,7 @@ export function buildDocumentHtml(input: DocTemplateInput) {
       "Vehicle price",
       vehiclePrice != null ? formatPlatformPrice(vehiclePrice) : "As quoted",
     ],
-    ["Seller", company.company_name ?? company.company_legal_name ?? "True Goshen Auto"],
+    ["Seller", company.company_name ?? company.company_legal_name ?? "Nabus Motors"],
   ]);
 
   const fxFootnote = `<p class="payment-note">${escapeHtml(fxNote())}</p>`;
@@ -199,7 +199,7 @@ export function buildDocumentHtml(input: DocTemplateInput) {
       ${totalsRows.length > 0 ? sectionBlock("Payment schedule", renderTotalsBox(totalsRows)) : ""}
       ${sectionBlock(
         "Pre-order terms",
-        `<div class="message-block">A 25% down payment secures this pre-order. The remaining balance is due before delivery. ${escapeHtml(company.preorder_terms_b ?? "True Goshen handles freight forwarding & clearing where agreed.")}</div>`
+        `<div class="message-block">A 25% down payment secures this pre-order. The remaining balance is due before delivery. ${escapeHtml(company.preorder_terms_b ?? "Nabus Motors handles freight forwarding & clearing where agreed.")}</div>`
       )}
       ${vehiclePrice != null ? fxFootnote : ""}
       ${signatureBlock("Customer", "Authorised dealer representative")}
@@ -212,7 +212,7 @@ export function buildDocumentHtml(input: DocTemplateInput) {
       ${sectionBlock("Vehicle details", vehicleDetails)}
       ${sectionBlock(
         "Agreement",
-        `<div class="message-block">The buyer agrees to purchase the vehicle described above under ${escapeHtml(company.company_legal_name ?? company.company_name ?? "True Goshen Auto")} standard terms and conditions. All prices are quoted in Ghana Cedis (GHS) unless otherwise stated.</div>`
+        `<div class="message-block">The buyer agrees to purchase the vehicle described above under ${escapeHtml(company.company_legal_name ?? company.company_name ?? "Nabus Motors")} standard terms and conditions. All prices are quoted in Ghana Cedis (GHS) unless otherwise stated.</div>`
       )}
       ${vehiclePrice != null ? fxFootnote : ""}
       ${signatureBlock("Buyer", "Seller")}

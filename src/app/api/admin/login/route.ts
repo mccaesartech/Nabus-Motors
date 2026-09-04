@@ -163,7 +163,7 @@ export async function POST(req: NextRequest) {
       request: req,
     });
     schedulePlatformFailedLoginAlert({
-      email: process.env.OWNER_EMAIL ?? "owner@truegoshenauto.com",
+      email: process.env.OWNER_EMAIL ?? "owner@nabusmotors.com",
       ip: requestIp(req.headers),
       userAgent: req.headers.get("user-agent"),
     });
@@ -173,7 +173,7 @@ export async function POST(req: NextRequest) {
   const ownerAuth = {
     type: "owner" as const,
     name: "Owner",
-    email: process.env.OWNER_EMAIL ?? "owner@truegoshenauto.com",
+    email: process.env.OWNER_EMAIL ?? "owner@nabusmotors.com",
     role: "owner" as const,
   };
 

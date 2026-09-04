@@ -2,7 +2,7 @@ import { ADMIN_PATH } from "./paths";
 
 export { ADMIN_PATH, adminLoginPath, adminDashboardPath } from "./paths";
 
-export const ADMIN_COOKIE = "tg_admin_session";
+export const ADMIN_COOKIE = "nm_admin_session";
 export const PLATFORM_USER_COOKIE = "tg_platform_session";
 
 /** Resolved path may differ if ADMIN_PATH env is set */

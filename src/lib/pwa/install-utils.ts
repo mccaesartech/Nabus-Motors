@@ -12,9 +12,9 @@ import {
 } from "@/lib/pwa/constants";
 import { isAdminAppPath } from "@/lib/pwa/routes";
 
-export const PWA_INSTALL_REQUEST_EVENT = "tg-pwa-install-request";
-export const PWA_DEFERRED_PROMPT_EVENT = "tg-pwa-deferred-prompt";
-export const PWA_INSTALL_TOAST_EVENT = "tg-pwa-install-toast";
+export const PWA_INSTALL_REQUEST_EVENT = "nm-pwa-install-request";
+export const PWA_DEFERRED_PROMPT_EVENT = "nm-pwa-deferred-prompt";
+export const PWA_INSTALL_TOAST_EVENT = "nm-pwa-install-toast";
 
 export type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -172,7 +172,7 @@ export async function triggerPwaInstall(
     showPwaInstallToast(
       resolvedVariant === "customer"
         ? "Use browser menu (⋮) → Install app, or Share → Add to Home Screen"
-        : "Open browser menu (⋮) → Install True Goshen Admin"
+        : "Open browser menu (⋮) → Install Nabus Motors Admin"
     );
     return "unavailable";
   }

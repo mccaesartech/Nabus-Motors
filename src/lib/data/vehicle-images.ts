@@ -327,6 +327,6 @@ export function primaryPhotoFor(vehicle: {
   return poolPhotoFor(vehicle.slug, vehicle.id, vehicle.bodyType);
 }
 
-export const GHANA_PHONE_DISPLAY = "+233 24 487 6784";
-export const GHANA_PHONE_TEL = "+233244876784";
-export const GHANA_WHATSAPP = "233244876784";
+export const GHANA_PHONE_DISPLAY = "+233 27 994 0200";
+export const GHANA_PHONE_TEL = "+233279940200";
+export const GHANA_WHATSAPP = "233279940200";

@@ -16,7 +16,7 @@ const MAX_KEYS = 40;
 
 export const REDACTED = "[redacted]";
 
-/** `owner@truegoshen.com` → `o***@truegoshen.com`. Enough to correlate, not to harvest. */
+/** `owner@nabusmotors.com` → `o***@nabusmotors.com`. Enough to correlate, not to harvest. */
 export function maskEmail(value: string): string {
   const at = value.indexOf("@");
   if (at <= 0) return REDACTED;

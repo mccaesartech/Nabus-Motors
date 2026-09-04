@@ -45,7 +45,7 @@ export async function checkVehicleImageContent(
     return failOpen("Vehicle image check skipped (Gemini not configured).", false);
   }
 
-  const prompt = `You are screening dealership inventory uploads for True Goshen Auto.
+  const prompt = `You are screening dealership inventory uploads for Nabus Motors.
 Decide if this image is primarily a photo of a road vehicle suitable for a car listing (car, SUV, truck, van, bus, motorcycle, or clear vehicle detail: exterior, interior cabin, engine bay, wheel/tire, dashboard, VIN plate).
 Return ONLY valid JSON (no markdown):
 {"isVehicle":true|false,"confidence":"high"|"medium"|"low","reason":"short reason"}

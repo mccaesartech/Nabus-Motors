@@ -24,22 +24,22 @@ afterEach(() => {
 describe("Google OAuth redirect origin", () => {
   it("uses the canonical www site URL on the server", () => {
     delete process.env.PUBLIC_SITE_URL_EMERGENCY_FALLBACK;
-    process.env.NEXT_PUBLIC_SITE_URL = "https://www.truegoshengh.com";
-    expect(resolveOAuthRedirectOrigin()).toBe("https://www.truegoshengh.com");
+    process.env.NEXT_PUBLIC_SITE_URL = "https://www.nabusmotors.com";
+    expect(resolveOAuthRedirectOrigin()).toBe("https://www.nabusmotors.com");
   });
 
   it("never uses vercel.app even when the browser is on that host", () => {
     delete process.env.PUBLIC_SITE_URL_EMERGENCY_FALLBACK;
-    process.env.NEXT_PUBLIC_SITE_URL = "https://www.truegoshengh.com";
+    process.env.NEXT_PUBLIC_SITE_URL = "https://www.nabusmotors.com";
     vi.stubGlobal("window", {
       location: {
-        hostname: "truegoshen.vercel.app",
-        origin: "https://truegoshen.vercel.app",
+        hostname: "nabus-motors.vercel.app",
+        origin: "https://nabus-motors.vercel.app",
       },
     });
-    expect(resolveOAuthRedirectOrigin()).toBe("https://www.truegoshengh.com");
+    expect(resolveOAuthRedirectOrigin()).toBe("https://www.nabusmotors.com");
     const callback = new URL(buildOAuthCallbackUrl("/account"));
-    expect(callback.origin).toBe("https://www.truegoshengh.com");
+    expect(callback.origin).toBe("https://www.nabusmotors.com");
     expect(callback.pathname).toBe("/auth/callback");
     expect(callback.searchParams.get("redirect")).toBe("/account");
     expect(callback.hostname).not.toMatch(/vercel\.app$/);
@@ -47,13 +47,13 @@ describe("Google OAuth redirect origin", () => {
 
   it("rewrites a misconfigured NEXT_PUBLIC_SITE_URL on vercel.app", () => {
     delete process.env.PUBLIC_SITE_URL_EMERGENCY_FALLBACK;
-    process.env.NEXT_PUBLIC_SITE_URL = "https://truegoshen.vercel.app";
-    expect(resolveOAuthRedirectOrigin()).toBe("https://www.truegoshengh.com");
+    process.env.NEXT_PUBLIC_SITE_URL = "https://nabus-motors.vercel.app";
+    expect(resolveOAuthRedirectOrigin()).toBe("https://www.nabusmotors.com");
   });
 
   it("keeps localhost for local auth testing", () => {
     delete process.env.PUBLIC_SITE_URL_EMERGENCY_FALLBACK;
-    process.env.NEXT_PUBLIC_SITE_URL = "https://www.truegoshengh.com";
+    process.env.NEXT_PUBLIC_SITE_URL = "https://www.nabusmotors.com";
     vi.stubGlobal("window", {
       location: {
         hostname: "localhost",

@@ -23,7 +23,7 @@ export function VehicleCompatibleParts({ vehicle }: VehicleCompatiblePartsProps)
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-semibold">Compatible Spare Parts</h2>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            Source genuine parts for your {vehicle.make} {vehicle.model} through True Goshen Auto.
+            Source genuine parts for your {vehicle.make} {vehicle.model} through Nabus Motors.
             Browse our catalog filtered for {vehicle.make}
             {vehicle.model ? ` ${vehicle.model}` : ""} compatibility.
           </p>

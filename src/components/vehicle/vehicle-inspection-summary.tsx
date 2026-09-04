@@ -12,7 +12,7 @@ export function VehicleInspectionSummary({ vehicle }: VehicleInspectionSummaryPr
   const summary =
     vehicle.inspectionSummary?.trim() ||
     (vehicle.condition === "Certified Pre-Owned"
-      ? "This vehicle has passed True Goshen's quality review. Contact our team for the full inspection report and supporting documentation."
+      ? "This vehicle has passed Nabus Motors's quality review. Contact our team for the full inspection report and supporting documentation."
       : null);
 
   const hasBadges = Object.values(badges).some(Boolean);

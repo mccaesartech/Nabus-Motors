@@ -164,7 +164,7 @@ export async function verifyVehicleImagesMatch(
   }
 
   const label = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ");
-  const prompt = `You are verifying dealership inventory photos for True Goshen Auto.
+  const prompt = `You are verifying dealership inventory photos for Nabus Motors.
 Compare each photo to the declared vehicle listing and return ONLY valid JSON (no markdown):
 {
   "summary": "one short sentence",

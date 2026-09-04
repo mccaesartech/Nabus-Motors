@@ -96,7 +96,7 @@ function ResetPasswordForm() {
         </div>
         <h1 className="text-2xl font-semibold">Set new password</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Choose a new password for your True Goshen account.
+          Choose a new password for your Nabus Motors account.
         </p>
 
         {!ready && !success && (

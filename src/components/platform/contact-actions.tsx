@@ -263,8 +263,8 @@ export function ContactWhatsAppAction({
 }: ContactWhatsAppActionProps) {
   const e164 = toWhatsAppE164(phone);
   const defaultMessage = customerName
-    ? `Hi ${customerName}, this is True Goshen following up on your inquiry.`
-    : "Hi, this is True Goshen following up on your inquiry.";
+    ? `Hi ${customerName}, this is Nabus Motors following up on your inquiry.`
+    : "Hi, this is Nabus Motors following up on your inquiry.";
   const href = whatsappUrl(message ?? defaultMessage, e164.replace("+", ""));
 
   if (variant === "button") {

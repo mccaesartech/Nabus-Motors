@@ -3,10 +3,9 @@ import { NextResponse } from "next/server";
 import { PRODUCTION_PUBLIC_SITE_URL } from "@/lib/site-url";
 
 const DEFAULT_AUTO_DIVISION_HOSTS = [
-  "truegoshenauto.com",
-  "www.truegoshenauto.com",
-  "truegoshenauto.vercel.app",
-  "auto.truegoshen.com",
+  "auto.nabusmotors.com",
+  "www.auto.nabusmotors.com",
+  "nabus-motors.vercel.app",
 ];
 
 /** Auto section paths served at `/auto/*` on the main domain; short paths on the auto host. */
@@ -35,7 +34,7 @@ export function getAutoDivisionHosts(): string[] {
 
 export function isAutoDivisionHost(hostname: string): boolean {
   const normalized = hostname.toLowerCase().split(":")[0];
-  if (normalized.includes("truegoshenauto")) return true;
+  if (normalized.includes("nabusmotors") || normalized.includes("nabus-motors")) return true;
   return getAutoDivisionHosts().includes(normalized);
 }
 

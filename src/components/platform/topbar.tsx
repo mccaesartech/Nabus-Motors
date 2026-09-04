@@ -113,7 +113,7 @@ export function PlatformTopbar({
         <Link
           href="/platform/dashboard"
           className="hidden shrink-0 items-center sm:flex lg:hidden"
-          aria-label="True Goshen Admin"
+          aria-label="Nabus Motors Admin"
         >
           <Logo
             variant="purple"

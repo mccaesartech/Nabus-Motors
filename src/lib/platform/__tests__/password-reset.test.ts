@@ -24,19 +24,19 @@ describe("platform password reset helpers", () => {
   });
 
   it("builds public reset and forgot URLs", () => {
-    const reset = buildPlatformPasswordResetUrl("abc123token", "https://www.truegoshengh.com");
+    const reset = buildPlatformPasswordResetUrl("abc123token", "https://www.nabusmotors.com");
     expect(reset).toBe(
-      "https://www.truegoshengh.com/admin/reset-password?token=abc123token"
+      "https://www.nabusmotors.com/admin/reset-password?token=abc123token"
     );
-    expect(buildPlatformForgotPasswordUrl("https://www.truegoshengh.com")).toBe(
-      "https://www.truegoshengh.com/admin/forgot-password"
+    expect(buildPlatformForgotPasswordUrl("https://www.nabusmotors.com")).toBe(
+      "https://www.nabusmotors.com/admin/forgot-password"
     );
   });
 
   it("builds SMS copy with reset URL and no password", () => {
     const text = buildTeamPasswordResetMessage({
       name: "Ama",
-      resetUrl: "https://www.truegoshengh.com/admin/reset-password?token=x",
+      resetUrl: "https://www.nabusmotors.com/admin/reset-password?token=x",
       expiryLabel: "1 hour",
     });
     expect(text).toContain("Ama");

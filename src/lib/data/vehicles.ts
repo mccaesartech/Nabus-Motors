@@ -100,7 +100,7 @@ export const testimonials: Testimonial[] = [
     vehicle: "2024 BYD Atto 3",
     rating: 5,
     quote:
-      "True Goshen made buying my electric SUV straightforward. Transparent pricing, no pressure, and the vehicle was exactly as described. Delivery to Accra was seamless.",
+      "Nabus Motors made buying my electric SUV straightforward. Transparent pricing, no pressure, and the vehicle was exactly as described. Delivery to Accra was seamless.",
     image: vehicleImages.portrait1,
     verified: true,
   },
@@ -122,7 +122,7 @@ export const testimonials: Testimonial[] = [
     vehicle: "2023 Ford F-150",
     rating: 5,
     quote:
-      "Sold my truck through True Goshen and bought a newer model the same week. Fair appraisal, professional team, and excellent follow-up after the sale.",
+      "Sold my truck through Nabus Motors and bought a newer model the same week. Fair appraisal, professional team, and excellent follow-up after the sale.",
     image: vehicleImages.portrait3,
     verified: true,
   },

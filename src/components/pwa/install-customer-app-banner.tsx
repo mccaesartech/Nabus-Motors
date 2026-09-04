@@ -109,10 +109,10 @@ export function InstallCustomerAppBanner() {
                   id="install-customer-banner-title"
                   className="text-base font-semibold text-white sm:text-lg"
                 >
-                  Install True Goshen App
+                  Install Nabus Motors App
                 </h2>
                 <p className="mt-1 text-sm text-white/75">
-                  Add True Goshen to your home screen — no login required. Browse now and sign in
+                  Add Nabus Motors to your home screen — no login required. Browse now and sign in
                   from the app whenever you are ready.
                 </p>
               </div>
@@ -148,7 +148,7 @@ export function InstallCustomerAppBanner() {
                 <Share className="mt-0.5 size-4 shrink-0 text-brand-cta-gold" aria-hidden />
                 <p>
                   On iPhone or iPad (Safari): tap <strong>Share</strong>, then{" "}
-                  <strong>Add to Home Screen</strong>. Choose <strong>True Goshen</strong> (not TG
+                  <strong>Add to Home Screen</strong>. Choose <strong>Nabus Motors</strong> (not TG
                   Admin). The shortcut uses the{" "}
                   <a href={CUSTOMER_PWA.manifestPath} className="text-brand-cta-gold underline">
                     customer manifest
@@ -164,7 +164,7 @@ export function InstallCustomerAppBanner() {
                 <p>
                   If Chrome says already installed, open <strong>⋮</strong> →{" "}
                   <strong>Install app</strong> or <strong>Add to Home screen</strong> on this home
-                  page to add <strong>True Goshen</strong> alongside your Admin shortcut.
+                  page to add <strong>Nabus Motors</strong> alongside your Admin shortcut.
                 </p>
               </div>
             ) : null}

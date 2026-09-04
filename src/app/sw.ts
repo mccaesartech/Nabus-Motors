@@ -152,7 +152,7 @@ self.addEventListener("push", (event) => {
     }
   })();
 
-  const title = data?.title ?? "True Goshen";
+  const title = data?.title ?? "Nabus Motors";
   const body = data?.body ?? "You have a new notification.";
   const url = data?.url ?? "/";
 

@@ -67,7 +67,7 @@ export default function ForgotPasswordPage() {
         <p className="mt-3 rounded-lg border border-brand-purple/20 bg-brand-purple/5 px-4 py-3 text-sm text-foreground">
           Need help right away?{" "}
           <a
-            href={whatsappUrl("Hi, I need help resetting my True Goshen account password.", WHATSAPP_NUMBER)}
+            href={whatsappUrl("Hi, I need help resetting my Nabus Motors account password.", WHATSAPP_NUMBER)}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 font-medium text-brand-purple hover:underline"

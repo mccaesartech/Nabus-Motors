@@ -3,7 +3,7 @@ import { CorporateAbout, CorporateContactCta, CorporateFaq, CorporateHero, Corpo
 import { LocallyAvailableCarsBanner } from "@/components/vehicle/locally-available-cars-banner";
 import { Testimonials } from "@/components/home/testimonials";
 import { WhyChooseUs } from "@/components/home/why-choose-us";
-import { WhyBuyFromTrueGoshen } from "@/components/home/why-buy-from-true-goshen";
+import { WhyBuyFromNabus } from "@/components/home/why-buy-from-nabus";
 import { DeferredSection } from "@/components/shared/deferred-section";
 import { getSiteContent } from "@/lib/site-content";
 import { getLocallyAvailableVehicles } from "@/lib/supabase/vehicles";
@@ -19,9 +19,9 @@ const StartYourJourney = dynamic(
 export const revalidate = 120;
 
 export const metadata = {
-  title: "True Goshen Company Limited",
+  title: "Nabus Motors and Trading",
   description:
-    "True Goshen Company Limited — vehicle imports, freight forwarding, customs clearing, and genuine spare parts for Ghana and beyond.",
+    "Nabus Motors and Trading — vehicle imports, freight forwarding, customs clearing, and genuine spare parts for Ghana and beyond.",
 };
 
 export default async function CorporateHomePage() {
@@ -37,7 +37,7 @@ export default async function CorporateHomePage() {
       <LocallyAvailableCarsBanner vehicles={localVehicles} />
       <CorporateAbout content={content.corporateHomepage} />
       <CorporateServices content={content.corporateServices} />
-      <WhyBuyFromTrueGoshen variant="compact" />
+      <WhyBuyFromNabus variant="compact" />
       <WhyChooseUs content={content.whyChooseUs} />
       <DeferredSection fallback={<div className="min-h-[12rem] border-b border-border bg-brand-primary" aria-hidden />}>
         <CorporateStats content={content.corporateStats} />

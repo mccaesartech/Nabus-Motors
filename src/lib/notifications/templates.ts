@@ -73,15 +73,15 @@ export function buildCustomerMessage(
   switch (template) {
     case "freight_quote_submitted":
       return {
-        subject: `Your True Goshen quote reference — ${reference}`,
-        whatsapp: `Thank you for choosing True Goshen! Your quote reference is ${reference}. Track at ${trackingUrl()}. We'll contact you shortly.${resetSuffix}`,
-        emailText: `Hi ${name},\n\nThank you for choosing True Goshen Company Limited.\n\nYour quote reference is: ${reference}\nTrack your request: ${trackingUrl()}\n\nOur freight team will contact you within 1–2 business days.${passwordResetUrl ? `\n\nYour account is ready. Set your password anytime: ${passwordResetUrl}\nForgot password later? ${forgotPasswordUrl()}` : ""}\n\nTrue Goshen Company Limited`,
+        subject: `Your Nabus Motors quote reference — ${reference}`,
+        whatsapp: `Thank you for choosing Nabus Motors! Your quote reference is ${reference}. Track at ${trackingUrl()}. We'll contact you shortly.${resetSuffix}`,
+        emailText: `Hi ${name},\n\nThank you for choosing Nabus Motors and Trading.\n\nYour quote reference is: ${reference}\nTrack your request: ${trackingUrl()}\n\nOur freight team will contact you within 1–2 business days.${passwordResetUrl ? `\n\nYour account is ready. Set your password anytime: ${passwordResetUrl}\nForgot password later? ${forgotPasswordUrl()}` : ""}\n\nNabus Motors and Trading`,
       };
     case "shipping_consultation_submitted":
       return {
-        subject: `Your True Goshen consultation reference — ${reference}`,
-        whatsapp: `Thank you for choosing True Goshen! Your quote reference is ${reference}. Track at ${trackingUrl()}. We'll contact you shortly to schedule your consultation.${resetSuffix}`,
-        emailText: `Hi ${name},\n\nThank you for choosing True Goshen Company Limited.\n\nYour quote reference is: ${reference}\nTrack: ${trackingUrl()}\n\nOur freight team will reach out shortly to schedule your consultation.${passwordResetUrl ? `\n\nYour account is ready. Set your password anytime: ${passwordResetUrl}\nForgot password later? ${forgotPasswordUrl()}` : ""}\n\nTrue Goshen Company Limited`,
+        subject: `Your Nabus Motors consultation reference — ${reference}`,
+        whatsapp: `Thank you for choosing Nabus Motors! Your quote reference is ${reference}. Track at ${trackingUrl()}. We'll contact you shortly to schedule your consultation.${resetSuffix}`,
+        emailText: `Hi ${name},\n\nThank you for choosing Nabus Motors and Trading.\n\nYour quote reference is: ${reference}\nTrack: ${trackingUrl()}\n\nOur freight team will reach out shortly to schedule your consultation.${passwordResetUrl ? `\n\nYour account is ready. Set your password anytime: ${passwordResetUrl}\nForgot password later? ${forgotPasswordUrl()}` : ""}\n\nNabus Motors and Trading`,
       };
     case "preorder_submitted": {
       const accountReadySuffix = passwordResetUrl
@@ -92,11 +92,11 @@ export function buildCustomerMessage(
       return {
         subject: `Pre-order confirmation${registrationId ? ` — ${registrationId}` : ""}`,
         whatsapp: registrationId
-          ? `True Goshen: Pre-order confirmed for ${vehicle}. Reference: ${registrationId}${accountReadySuffix}`
-          : `True Goshen: Pre-order confirmed for ${vehicle}. Our team will contact you shortly.${resetSuffix}`,
+          ? `Nabus Motors: Pre-order confirmed for ${vehicle}. Reference: ${registrationId}${accountReadySuffix}`
+          : `Nabus Motors: Pre-order confirmed for ${vehicle}. Our team will contact you shortly.${resetSuffix}`,
         emailText: registrationId
-          ? `Hi ${name},\n\nYour pre-order for ${vehicle} is confirmed.\n\nAccount reference: ${registrationId}\nTrack in your account: ${accountUrl()}${passwordResetUrl ? `\nSet your password anytime: ${passwordResetUrl}\nForgot password? ${forgotPasswordUrl()}` : ""}\n\nTrue Goshen`
-          : `Hi ${name},\n\nYour pre-order for ${vehicle} is confirmed. Our team will contact you shortly.${passwordResetUrl ? `\n\nSet your password anytime: ${passwordResetUrl}` : ""}\n\nTrue Goshen`,
+          ? `Hi ${name},\n\nYour pre-order for ${vehicle} is confirmed.\n\nAccount reference: ${registrationId}\nTrack in your account: ${accountUrl()}${passwordResetUrl ? `\nSet your password anytime: ${passwordResetUrl}\nForgot password? ${forgotPasswordUrl()}` : ""}\n\nNabus Motors`
+          : `Hi ${name},\n\nYour pre-order for ${vehicle} is confirmed. Our team will contact you shortly.${passwordResetUrl ? `\n\nSet your password anytime: ${passwordResetUrl}` : ""}\n\nNabus Motors`,
       };
     }
     case "custom_request_submitted": {
@@ -108,16 +108,16 @@ export function buildCustomerMessage(
       return {
         subject: `Custom vehicle request received${ref ? ` — ${ref}` : ""}`,
         whatsapp: ref
-          ? `True Goshen: We received your custom vehicle request for ${vehicle}. Reference: ${ref}. Track at ${trackUrl}.${passwordResetUrl ? ` Set password: ${passwordResetUrl}` : ""}`
-          : `True Goshen: We received your custom vehicle request for ${vehicle}. Track at ${trackUrl}. Our team will contact you shortly.`,
+          ? `Nabus Motors: We received your custom vehicle request for ${vehicle}. Reference: ${ref}. Track at ${trackUrl}.${passwordResetUrl ? ` Set password: ${passwordResetUrl}` : ""}`
+          : `Nabus Motors: We received your custom vehicle request for ${vehicle}. Track at ${trackUrl}. Our team will contact you shortly.`,
         emailText: `Hi ${name},\n\nThank you for your custom vehicle request for ${vehicle}.${ref ? `\n\nReference: ${ref}` : ""}\n\nOur team at ${CUSTOMER_FACING_COMPANY_NAME} will review whether we can source this vehicle and follow up with you.${accountSuffix}\n\n${CUSTOMER_FACING_COMPANY_NAME}`,
       };
     }
     case "quote_converted_tracking":
       return {
         subject: `Shipment tracking ${trackingNumber}`,
-        whatsapp: `True Goshen: Your shipment is live. Tracking: ${trackingNumber}. Track at ${trackingUrl()}`,
-        emailText: `Hi ${name},\n\nYour freight quote has been converted to a shipment.\n\nTracking number: ${trackingNumber}\nTrack: ${trackingUrl()}\n\nTrue Goshen`,
+        whatsapp: `Nabus Motors: Your shipment is live. Tracking: ${trackingNumber}. Track at ${trackingUrl()}`,
+        emailText: `Hi ${name},\n\nYour freight quote has been converted to a shipment.\n\nTracking number: ${trackingNumber}\nTrack: ${trackingUrl()}\n\nNabus Motors`,
       };
     case "shipment_status_update": {
       const statusPart = statusLabel ? ` is now ${statusLabel}` : "";
@@ -125,15 +125,15 @@ export function buildCustomerMessage(
         statusNote && statusNote !== statusLabel ? ` — ${statusNote}` : statusNote && !statusLabel ? ` — ${statusNote}` : "";
       return {
         subject: `Shipment update ${trackingNumber}`,
-        whatsapp: `True Goshen: ${trackingNumber}${statusPart}${notePart}. Track at ${trackingUrl()}`,
-        emailText: `Hi ${name},\n\nUpdate on shipment ${trackingNumber}${statusLabel ? ` — now ${statusLabel}` : ""}${statusNote ? `:\n${statusNote}` : "."}\n\nTrack: ${trackingUrl()}\n\nTrue Goshen`,
+        whatsapp: `Nabus Motors: ${trackingNumber}${statusPart}${notePart}. Track at ${trackingUrl()}`,
+        emailText: `Hi ${name},\n\nUpdate on shipment ${trackingNumber}${statusLabel ? ` — now ${statusLabel}` : ""}${statusNote ? `:\n${statusNote}` : "."}\n\nTrack: ${trackingUrl()}\n\nNabus Motors`,
       };
     }
     case "appointment_confirmed":
       return {
         subject: "Appointment confirmed",
-        whatsapp: `True Goshen: Your appointment${appointmentDate ? ` on ${appointmentDate}` : ""}${branch ? ` at ${branch}` : ""} is confirmed.`,
-        emailText: `Hi ${name},\n\nYour appointment${appointmentDate ? ` on ${appointmentDate}` : ""}${branch ? ` at ${branch}` : ""} is confirmed.\n\nTrue Goshen`,
+        whatsapp: `Nabus Motors: Your appointment${appointmentDate ? ` on ${appointmentDate}` : ""}${branch ? ` at ${branch}` : ""} is confirmed.`,
+        emailText: `Hi ${name},\n\nYour appointment${appointmentDate ? ` on ${appointmentDate}` : ""}${branch ? ` at ${branch}` : ""} is confirmed.\n\nNabus Motors`,
       };
     case "appointment_request_received": {
       const timePart = data.appointmentTime?.trim()
@@ -141,8 +141,8 @@ export function buildCustomerMessage(
         : "";
       return {
         subject: "Showroom visit request received",
-        whatsapp: `True Goshen: We received your showroom visit request${appointmentDate ? ` for ${appointmentDate}${timePart}` : ""}${branch ? ` at ${branch}` : ""}. Our team will confirm shortly. Manage in your account: ${accountUrl()}`,
-        emailText: `Hi ${name},\n\nWe received your request to visit our showroom${appointmentDate ? ` on ${appointmentDate}${timePart}` : ""}${branch ? ` at ${branch}` : ""}.\n\nOur team will confirm your appointment and help you view and pay for your vehicle.\n\nTrack status in your account: ${accountUrl()}\n\nTrue Goshen`,
+        whatsapp: `Nabus Motors: We received your showroom visit request${appointmentDate ? ` for ${appointmentDate}${timePart}` : ""}${branch ? ` at ${branch}` : ""}. Our team will confirm shortly. Manage in your account: ${accountUrl()}`,
+        emailText: `Hi ${name},\n\nWe received your request to visit our showroom${appointmentDate ? ` on ${appointmentDate}${timePart}` : ""}${branch ? ` at ${branch}` : ""}.\n\nOur team will confirm your appointment and help you view and pay for your vehicle.\n\nTrack status in your account: ${accountUrl()}\n\nNabus Motors`,
       };
     }
     case "cart_order_confirmed": {
@@ -152,17 +152,17 @@ export function buildCustomerMessage(
       const totalPart = total ? ` Total: ${total}.` : "";
       const accountPart = ` Track your order: ${accountUrl()}`;
       return {
-        subject: `Your True Goshen order is confirmed${orderRef ? ` — ${orderRef}` : ""}`,
-        whatsapp: `True Goshen: Your cart order${refPart} is confirmed.${totalPart}${accountPart} Book a showroom visit from your account.`,
-        emailText: `Hi ${name},\n\nYour True Goshen cart order${refPart} is confirmed.${totalPart}\n\nView order history and book a showroom visit in your account:\n${accountUrl()}\n\nOur team will contact you shortly with next steps.\n\nTrue Goshen Company Limited`,
+        subject: `Your Nabus Motors order is confirmed${orderRef ? ` — ${orderRef}` : ""}`,
+        whatsapp: `Nabus Motors: Your cart order${refPart} is confirmed.${totalPart}${accountPart} Book a showroom visit from your account.`,
+        emailText: `Hi ${name},\n\nYour Nabus Motors cart order${refPart} is confirmed.${totalPart}\n\nView order history and book a showroom visit in your account:\n${accountUrl()}\n\nOur team will contact you shortly with next steps.\n\nNabus Motors and Trading`,
       };
     }
     case "order_submitted": {
       const itemCount = data.itemCount?.trim() || "1";
       return {
-        subject: "Your True Goshen order was received",
-        whatsapp: `True Goshen: We received your order (${itemCount} item(s)). Our team will confirm details shortly. Track: ${accountUrl()}`,
-        emailText: `Hi ${name},\n\nWe received your order with ${itemCount} item(s). Our team will confirm pricing, availability, and next steps shortly.\n\nTrack your order: ${accountUrl()}\n\nTrue Goshen Company Limited`,
+        subject: "Your Nabus Motors order was received",
+        whatsapp: `Nabus Motors: We received your order (${itemCount} item(s)). Our team will confirm details shortly. Track: ${accountUrl()}`,
+        emailText: `Hi ${name},\n\nWe received your order with ${itemCount} item(s). Our team will confirm pricing, availability, and next steps shortly.\n\nTrack your order: ${accountUrl()}\n\nNabus Motors and Trading`,
       };
     }
     case "preorder_status_update": {
@@ -171,8 +171,8 @@ export function buildCustomerMessage(
       const trackUrl = data.isCustomRequest === "true" ? vehicleRequestsAccountUrl() : accountUrl();
       return {
         subject: `${title} — status update`,
-        whatsapp: `True Goshen: ${title}: status is now ${status}. Track: ${trackUrl}`,
-        emailText: `Hi ${name},\n\n${title}: your status is now ${status}.\n\nTrack in your account: ${trackUrl}\n\nTrue Goshen`,
+        whatsapp: `Nabus Motors: ${title}: status is now ${status}. Track: ${trackUrl}`,
+        emailText: `Hi ${name},\n\n${title}: your status is now ${status}.\n\nTrack in your account: ${trackUrl}\n\nNabus Motors`,
       };
     }
     case "staff_message": {
@@ -180,8 +180,8 @@ export function buildCustomerMessage(
       const preview = data.messagePreview?.trim() || "You have a new message.";
       const company = CUSTOMER_FACING_COMPANY_NAME;
       return {
-        subject: `New message from True Goshen: ${subject}`,
-        whatsapp: `True Goshen: New reply about "${subject}": ${preview} View: ${accountUrl()}`,
+        subject: `New message from Nabus Motors: ${subject}`,
+        whatsapp: `Nabus Motors: New reply about "${subject}": ${preview} View: ${accountUrl()}`,
         emailText: `Hi ${name},\n\n${company} sent you a message about "${subject}":\n\n${preview}\n\nView and reply in your account: ${accountUrl()}\n\n${company}`,
       };
     }
@@ -189,17 +189,17 @@ export function buildCustomerMessage(
       const resetUrl = passwordResetUrl || forgotPasswordUrl();
       const refPart = reference ? ` Your reference: ${reference}.` : "";
       return {
-        subject: "Reset your True Goshen password",
-        whatsapp: `True Goshen: Reset your password here: ${resetUrl}.${refPart}`,
-        emailText: `Hi ${name},\n\nReset your True Goshen password using this secure link:\n${resetUrl}${reference ? `\n\nYour reference: ${reference}` : ""}\n\nThis link expires soon. If you did not request this, you can ignore this email.\n\nTrue Goshen Company Limited`,
+        subject: "Reset your Nabus Motors password",
+        whatsapp: `Nabus Motors: Reset your password here: ${resetUrl}.${refPart}`,
+        emailText: `Hi ${name},\n\nReset your Nabus Motors password using this secure link:\n${resetUrl}${reference ? `\n\nYour reference: ${reference}` : ""}\n\nThis link expires soon. If you did not request this, you can ignore this email.\n\nNabus Motors and Trading`,
       };
     }
     case "vehicle_available_locally": {
       const vehicleUrl = data.vehicleUrl?.trim() || "";
       return {
         subject: `${vehicle} is now available in Ghana`,
-        whatsapp: `True Goshen: The ${vehicle} you viewed is now available in Ghana — buy without shipping.${vehicleUrl ? ` View: ${vehicleUrl}` : ""}`,
-        emailText: `Hi ${name},\n\nGood news — the ${vehicle} you viewed is now available in Ghana and can be purchased without shipping.\n\nView the vehicle:${vehicleUrl ? `\n${vehicleUrl}` : ""}\n\nTrue Goshen Auto`,
+        whatsapp: `Nabus Motors: The ${vehicle} you viewed is now available in Ghana — buy without shipping.${vehicleUrl ? ` View: ${vehicleUrl}` : ""}`,
+        emailText: `Hi ${name},\n\nGood news — the ${vehicle} you viewed is now available in Ghana and can be purchased without shipping.\n\nView the vehicle:${vehicleUrl ? `\n${vehicleUrl}` : ""}\n\nNabus Motors`,
       };
     }
     case "price_drop": {
@@ -214,36 +214,36 @@ export function buildCustomerMessage(
             : "";
       return {
         subject: `Price drop: ${vehicle}`,
-        whatsapp: `True Goshen: Price drop on ${vehicle}.${pricePart}${vehicleUrl ? ` View: ${vehicleUrl}` : ""}`,
-        emailText: `Hi ${name},\n\nGood news — the price dropped on ${vehicle}.${pricePart}\n\nView the vehicle:${vehicleUrl ? `\n${vehicleUrl}` : ""}\n\nTrue Goshen Auto`,
+        whatsapp: `Nabus Motors: Price drop on ${vehicle}.${pricePart}${vehicleUrl ? ` View: ${vehicleUrl}` : ""}`,
+        emailText: `Hi ${name},\n\nGood news — the price dropped on ${vehicle}.${pricePart}\n\nView the vehicle:${vehicleUrl ? `\n${vehicleUrl}` : ""}\n\nNabus Motors`,
       };
     }
     case "mfa_enabled":
       return {
-        subject: "Authenticator enabled on your True Goshen account",
-        whatsapp: `True Goshen: Two-factor authentication was turned on for your account. If this wasn't you, reset your password and contact support. ${accountUrl()}`,
-        emailText: `Hi ${name},\n\nTwo-factor authentication (authenticator app) was turned on for your True Goshen account.\n\nIf you did not make this change, reset your password immediately and contact support.\n\nAccount security: ${accountUrl()}\n\nTrue Goshen Company Limited`,
+        subject: "Authenticator enabled on your Nabus Motors account",
+        whatsapp: `Nabus Motors: Two-factor authentication was turned on for your account. If this wasn't you, reset your password and contact support. ${accountUrl()}`,
+        emailText: `Hi ${name},\n\nTwo-factor authentication (authenticator app) was turned on for your Nabus Motors account.\n\nIf you did not make this change, reset your password immediately and contact support.\n\nAccount security: ${accountUrl()}\n\nNabus Motors and Trading`,
       };
     case "mfa_disabled":
       return {
-        subject: "Authenticator removed from your True Goshen account",
-        whatsapp: `True Goshen: Two-factor authentication was turned off for your account. If this wasn't you, reset your password and contact support. ${accountUrl()}`,
-        emailText: `Hi ${name},\n\nTwo-factor authentication was turned off for your True Goshen account.\n\nIf you did not make this change, reset your password immediately and contact support.\n\nAccount security: ${accountUrl()}\n\nTrue Goshen Company Limited`,
+        subject: "Authenticator removed from your Nabus Motors account",
+        whatsapp: `Nabus Motors: Two-factor authentication was turned off for your account. If this wasn't you, reset your password and contact support. ${accountUrl()}`,
+        emailText: `Hi ${name},\n\nTwo-factor authentication was turned off for your Nabus Motors account.\n\nIf you did not make this change, reset your password immediately and contact support.\n\nAccount security: ${accountUrl()}\n\nNabus Motors and Trading`,
       };
     case "password_changed":
       return {
-        subject: "Your True Goshen password was changed",
-        whatsapp: `True Goshen: Your password was changed. If this wasn't you, reset it now: ${forgotPasswordUrl()}`,
-        emailText: `Hi ${name},\n\nYour True Goshen password was changed successfully.\n\nIf you did not make this change, reset your password immediately:\n${forgotPasswordUrl()}\n\nThen review active sessions in your account: ${accountUrl()}\n\nTrue Goshen Company Limited`,
+        subject: "Your Nabus Motors password was changed",
+        whatsapp: `Nabus Motors: Your password was changed. If this wasn't you, reset it now: ${forgotPasswordUrl()}`,
+        emailText: `Hi ${name},\n\nYour Nabus Motors password was changed successfully.\n\nIf you did not make this change, reset your password immediately:\n${forgotPasswordUrl()}\n\nThen review active sessions in your account: ${accountUrl()}\n\nNabus Motors and Trading`,
       };
     case "login_new_device": {
       const when = data.when?.trim() || "just now";
       const device = data.device?.trim() || "a new device";
       const ip = data.ip?.trim() || "";
       return {
-        subject: "New device signed in to True Goshen",
-        whatsapp: `True Goshen: New sign-in from ${device} (${when}). If this wasn't you, change your password: ${forgotPasswordUrl()}`,
-        emailText: `Hi ${name},\n\nA new device signed in to your True Goshen account.\n\nWhen: ${when}\nDevice: ${device}${ip ? `\nIP: ${ip}` : ""}\n\nIf this was not you, change your password and review sessions:\n${forgotPasswordUrl()}\n${accountUrl()}\n\nTrue Goshen Company Limited`,
+        subject: "New device signed in to Nabus Motors",
+        whatsapp: `Nabus Motors: New sign-in from ${device} (${when}). If this wasn't you, change your password: ${forgotPasswordUrl()}`,
+        emailText: `Hi ${name},\n\nA new device signed in to your Nabus Motors account.\n\nWhen: ${when}\nDevice: ${device}${ip ? `\nIP: ${ip}` : ""}\n\nIf this was not you, change your password and review sessions:\n${forgotPasswordUrl()}\n${accountUrl()}\n\nNabus Motors and Trading`,
       };
     }
     case "login_alert": {
@@ -251,9 +251,9 @@ export function buildCustomerMessage(
       const device = data.device?.trim() || "";
       const ip = data.ip?.trim() || "";
       return {
-        subject: "New sign-in to your True Goshen account",
-        whatsapp: `True Goshen: Someone signed in to your account at ${when}${device ? ` from ${device}` : ""}. If this wasn't you, reset your password: ${forgotPasswordUrl()}`,
-        emailText: `Hi ${name},\n\nSomeone signed in to your True Goshen account.\n\nWhen: ${when}${device ? `\nDevice: ${device}` : ""}${ip ? `\nIP: ${ip}` : ""}\n\nIf this was not you, change your password and review sessions:\n${forgotPasswordUrl()}\n${accountUrl()}\n\nTrue Goshen Company Limited`,
+        subject: "New sign-in to your Nabus Motors account",
+        whatsapp: `Nabus Motors: Someone signed in to your account at ${when}${device ? ` from ${device}` : ""}. If this wasn't you, reset your password: ${forgotPasswordUrl()}`,
+        emailText: `Hi ${name},\n\nSomeone signed in to your Nabus Motors account.\n\nWhen: ${when}${device ? `\nDevice: ${device}` : ""}${ip ? `\nIP: ${ip}` : ""}\n\nIf this was not you, change your password and review sessions:\n${forgotPasswordUrl()}\n${accountUrl()}\n\nNabus Motors and Trading`,
       };
     }
     case "login_attempt_failed": {
@@ -261,47 +261,47 @@ export function buildCustomerMessage(
       const device = data.device?.trim() || "an unknown device";
       const ip = data.ip?.trim() || "";
       return {
-        subject: "Failed sign-in attempt on your True Goshen account",
-        whatsapp: `True Goshen: A failed sign-in was attempted on your account from ${device} (${when}). If this wasn't you, reset your password: ${forgotPasswordUrl()}`,
-        emailText: `Hi ${name},\n\nSomeone tried to sign in to your True Goshen account but did not enter the correct password.\n\nWhen: ${when}\nDevice: ${device}${ip ? `\nIP: ${ip}` : ""}\n\nIf this was not you, change your password immediately:\n${forgotPasswordUrl()}\n${accountUrl()}\n\nTrue Goshen Company Limited`,
+        subject: "Failed sign-in attempt on your Nabus Motors account",
+        whatsapp: `Nabus Motors: A failed sign-in was attempted on your account from ${device} (${when}). If this wasn't you, reset your password: ${forgotPasswordUrl()}`,
+        emailText: `Hi ${name},\n\nSomeone tried to sign in to your Nabus Motors account but did not enter the correct password.\n\nWhen: ${when}\nDevice: ${device}${ip ? `\nIP: ${ip}` : ""}\n\nIf this was not you, change your password immediately:\n${forgotPasswordUrl()}\n${accountUrl()}\n\nNabus Motors and Trading`,
       };
     }
     case "account_lockout":
       return {
-        subject: "True Goshen account temporarily locked",
-        whatsapp: `True Goshen: Your account was temporarily locked after too many failed sign-in attempts. Try again later, or reset your password: ${forgotPasswordUrl()}`,
-        emailText: `Hi ${name},\n\nYour True Goshen account was temporarily locked after too many failed sign-in attempts.\n\nIf this was you, wait a short time and try again, or reset your password:\n${forgotPasswordUrl()}\n\nIf this was not you, reset your password and contact support.\n\nTrue Goshen Company Limited`,
+        subject: "Nabus Motors account temporarily locked",
+        whatsapp: `Nabus Motors: Your account was temporarily locked after too many failed sign-in attempts. Try again later, or reset your password: ${forgotPasswordUrl()}`,
+        emailText: `Hi ${name},\n\nYour Nabus Motors account was temporarily locked after too many failed sign-in attempts.\n\nIf this was you, wait a short time and try again, or reset your password:\n${forgotPasswordUrl()}\n\nIf this was not you, reset your password and contact support.\n\nNabus Motors and Trading`,
       };
     case "account_deletion_scheduled": {
       const retentionDays = data.retentionDays?.trim() || "30";
       const scheduledDate = data.scheduledDeletionDate?.trim() || "the end of your retention period";
       const restoreUrl = data.restoreUrl?.trim() || accountUrl();
       return {
-        subject: "Your True Goshen account deletion is scheduled",
-        whatsapp: `True Goshen: We received your account deletion request. Personal data was removed immediately. Business records are retained until ${scheduledDate} (${retentionDays} days). You cannot sign in during this period. To cancel: ${restoreUrl}`,
-        emailText: `Hi ${name},\n\nWe received your request to delete your True Goshen account.\n\nWhat happens now:\n- Your login has been deactivated immediately\n- Personal data (saved vehicles, cart, messages, preferences) has been removed\n- Business records (orders, invoices, shipments, appointments) are retained for legal and operational purposes\n- Permanent anonymization is scheduled for ${scheduledDate} (${retentionDays}-day retention)\n\nDuring the retention period you may contact support or visit ${restoreUrl} to cancel deletion.\n\nAfter ${scheduledDate}, remaining records will be anonymized and cannot be recovered.\n\nTrue Goshen Company Limited`,
+        subject: "Your Nabus Motors account deletion is scheduled",
+        whatsapp: `Nabus Motors: We received your account deletion request. Personal data was removed immediately. Business records are retained until ${scheduledDate} (${retentionDays} days). You cannot sign in during this period. To cancel: ${restoreUrl}`,
+        emailText: `Hi ${name},\n\nWe received your request to delete your Nabus Motors account.\n\nWhat happens now:\n- Your login has been deactivated immediately\n- Personal data (saved vehicles, cart, messages, preferences) has been removed\n- Business records (orders, invoices, shipments, appointments) are retained for legal and operational purposes\n- Permanent anonymization is scheduled for ${scheduledDate} (${retentionDays}-day retention)\n\nDuring the retention period you may contact support or visit ${restoreUrl} to cancel deletion.\n\nAfter ${scheduledDate}, remaining records will be anonymized and cannot be recovered.\n\nNabus Motors and Trading`,
       };
     }
     case "account_deletion_cancelled": {
       return {
-        subject: "Your True Goshen account deletion was cancelled",
-        whatsapp: `True Goshen: Your account deletion request was cancelled. You can sign in again at ${accountUrl()}. Update your profile if needed.`,
-        emailText: `Hi ${name},\n\nYour account deletion request has been cancelled. You can sign in again at ${accountUrl()}.\n\nPersonal settings removed during the request will need to be reconfigured.\n\nTrue Goshen Company Limited`,
+        subject: "Your Nabus Motors account deletion was cancelled",
+        whatsapp: `Nabus Motors: Your account deletion request was cancelled. You can sign in again at ${accountUrl()}. Update your profile if needed.`,
+        emailText: `Hi ${name},\n\nYour account deletion request has been cancelled. You can sign in again at ${accountUrl()}.\n\nPersonal settings removed during the request will need to be reconfigured.\n\nNabus Motors and Trading`,
       };
     }
     case "account_deletion_completed": {
       const scheduledDate = data.scheduledDeletionDate?.trim() || "";
       return {
-        subject: "Your True Goshen account has been permanently anonymized",
-        whatsapp: `True Goshen: Your account retention period${scheduledDate ? ` ending ${scheduledDate}` : ""} has passed. Personal data has been permanently anonymized. Business records are retained in anonymized form.`,
-        emailText: `Hi,\n\nYour True Goshen account retention period has ended. Personal identifiers have been permanently anonymized. Required business records are retained in anonymized form for legal and operational purposes.\n\nThis action cannot be undone.\n\nTrue Goshen Company Limited`,
+        subject: "Your Nabus Motors account has been permanently anonymized",
+        whatsapp: `Nabus Motors: Your account retention period${scheduledDate ? ` ending ${scheduledDate}` : ""} has passed. Personal data has been permanently anonymized. Business records are retained in anonymized form.`,
+        emailText: `Hi,\n\nYour Nabus Motors account retention period has ended. Personal identifiers have been permanently anonymized. Required business records are retained in anonymized form for legal and operational purposes.\n\nThis action cannot be undone.\n\nNabus Motors and Trading`,
       };
     }
     default:
       return {
-        subject: "True Goshen update",
-        whatsapp: "True Goshen: Thank you for choosing True Goshen.",
-        emailText: `Hi ${name},\n\nThank you for choosing True Goshen.\n`,
+        subject: "Nabus Motors update",
+        whatsapp: "Nabus Motors: Thank you for choosing Nabus Motors.",
+        emailText: `Hi ${name},\n\nThank you for choosing Nabus Motors.\n`,
       };
   }
 }

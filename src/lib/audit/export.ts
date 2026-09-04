@@ -93,7 +93,7 @@ export function auditLogToPrintableHtml(rows: AuditLogRow[]): string {
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>True Goshen Audit Log</title>
+  <title>Nabus Motors Audit Log</title>
   <style>
     body { font-family: Georgia, "Times New Roman", serif; color: #1a1a1a; font-size: 11px; }
     h1 { font-size: 18px; margin: 0 0 4px; }
@@ -105,7 +105,7 @@ export function auditLogToPrintableHtml(rows: AuditLogRow[]): string {
   </style>
 </head>
 <body>
-  <h1>True Goshen — Audit Log</h1>
+  <h1>Nabus Motors — Audit Log</h1>
   <p>Exported ${escape(new Date().toISOString())} · ${rows.length} row(s)</p>
   <table>
     <thead>

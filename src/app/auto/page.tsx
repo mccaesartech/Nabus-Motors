@@ -7,7 +7,7 @@ import { CompanyDivisions } from "@/components/home/company-divisions";
 import { CustomVehicleRequestCta } from "@/components/vehicle/custom-vehicle-request-cta";
 import { FeaturedVehicles } from "@/components/home/featured-vehicles";
 import { FeaturedVehiclesSkeleton } from "@/components/home/featured-vehicles-skeleton";
-import { WhyBuyFromTrueGoshen } from "@/components/home/why-buy-from-true-goshen";
+import { WhyBuyFromNabus } from "@/components/home/why-buy-from-nabus";
 import { WhyChooseUs } from "@/components/home/why-choose-us";
 import { VehicleCategories } from "@/components/home/vehicle-categories";
 import { Testimonials } from "@/components/home/testimonials";
@@ -32,9 +32,9 @@ const RecommendedVehiclesSection = dynamic(
 );
 
 export const metadata = {
-  title: "True Goshen Auto",
+  title: "Nabus Motors",
   description:
-    "Browse verified vehicles with transparent pricing, flexible financing, and trusted customer support. True Goshen Auto — Drive With Confidence.",
+    "Browse verified vehicles with transparent pricing, flexible financing, and trusted customer support. Nabus Motors — Drive With Confidence.",
 };
 
 export const revalidate = 60;
@@ -61,7 +61,7 @@ export default async function AutoHomePage() {
         <FeaturedVehicles />
       </Suspense>
       <RecommendedVehiclesSection />
-      <WhyBuyFromTrueGoshen />
+      <WhyBuyFromNabus />
       <WhyChooseUs content={content.whyChooseUs} />
       <VehicleCategories content={content.browseByCategory} />
       <DeferredSection fallback={<div className="min-h-[16rem] border-t border-border bg-background" aria-hidden />}>

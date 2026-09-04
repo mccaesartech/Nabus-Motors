@@ -377,7 +377,7 @@ export async function getOwnerBootstrapAuth(): Promise<PlatformAuthContext | nul
   return {
     type: "owner",
     name: "Owner",
-    email: process.env.OWNER_EMAIL ?? "owner@truegoshenauto.com",
+    email: process.env.OWNER_EMAIL ?? "owner@nabusmotors.com",
     role: "owner",
   };
 }

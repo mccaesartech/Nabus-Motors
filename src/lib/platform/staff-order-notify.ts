@@ -1,4 +1,4 @@
-﻿import "server-only";
+import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { notifyAdminOutbound } from "@/lib/notifications/admin-notify";
@@ -22,7 +22,7 @@ type InAppRecipient = {
 };
 
 export type StaffOrderNotifyInput = {
-  /** admin_notifications.type â€” e.g. preorder, vehicle_order, order, freight_quote */
+  /** admin_notifications.type — e.g. preorder, vehicle_order, order, freight_quote */
   notificationType: string;
   title: string;
   message: string;
@@ -132,7 +132,7 @@ async function activeStaffWithPermission(
 }
 
 function buildStaffSmsBody(title: string, message: string, link: string): string {
-  return `True Goshen: ${title}. ${message} Attend now: ${link}`;
+  return `Nabus Motors: ${title}. ${message} Attend now: ${link}`;
 }
 
 async function logStaffOutbound(row: {
@@ -266,8 +266,8 @@ export async function notifyStaffNewOrder(
   if (!claimed) return;
 
   const settings = await getSiteSettings();
-  const bodyText = `${input.message}\n\nCustomer: ${input.customerName} Â· ${input.customerEmail}${
-    input.customerPhone?.trim() ? ` Â· ${input.customerPhone.trim()}` : ""
+  const bodyText = `${input.message}\n\nCustomer: ${input.customerName} · ${input.customerEmail}${
+    input.customerPhone?.trim() ? ` · ${input.customerPhone.trim()}` : ""
   }`;
 
   try {
@@ -310,7 +310,7 @@ export async function notifyStaffNewOrder(
   }
 }
 
-/** Fire-and-forget wrapper â€” never blocks customer order submission. */
+/** Fire-and-forget wrapper — never blocks customer order submission. */
 export function scheduleStaffNewOrder(
   supabase: SupabaseClient,
   input: StaffOrderNotifyInput

@@ -12,7 +12,7 @@ export type TrustBadgeKey = (typeof TRUST_BADGE_KEYS)[number];
 export type VehicleTrustBadges = Record<TrustBadgeKey, boolean>;
 
 export const TRUST_BADGE_LABELS: Record<TrustBadgeKey, string> = {
-  verified_by_true_goshen: "Verified by True Goshen",
+  verified_by_true_goshen: "Verified by Nabus Motors",
   professionally_inspected: "Professionally Inspected",
   documentation_verified: "Documentation Verified",
   mileage_verified: "Mileage Verified",

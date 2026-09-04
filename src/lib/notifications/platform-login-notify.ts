@@ -274,7 +274,7 @@ export async function notifyPlatformFailedLoginAlert(params: {
     .eq("email", email)
     .maybeSingle();
 
-  const ownerEmail = (process.env.OWNER_EMAIL ?? "owner@truegoshenauto.com")
+  const ownerEmail = (process.env.OWNER_EMAIL ?? "owner@nabusmotors.com")
     .trim()
     .toLowerCase();
   const isOwnerAttempt = email === ownerEmail;

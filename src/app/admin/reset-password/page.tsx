@@ -103,7 +103,7 @@ function AdminResetPasswordForm() {
         <p className="mt-2 text-center text-sm text-[var(--platform-text-secondary)]">
           {emailHint
             ? `Choose a new password for ${emailHint}.`
-            : "Choose a new password for your True Goshen platform account."}
+            : "Choose a new password for your Nabus Motors platform account."}
         </p>
 
         {success ? (

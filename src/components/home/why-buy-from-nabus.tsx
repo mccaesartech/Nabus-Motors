@@ -16,7 +16,7 @@ const TRUST_POINTS = [
     icon: BadgeCheck,
     title: "Every listing is reviewed",
     description:
-      "Vehicles are added by True Goshen — not open public listings. Each unit is vetted before it reaches our inventory.",
+      "Vehicles are added by Nabus Motors — not open public listings. Each unit is vetted before it reaches our inventory.",
   },
   {
     icon: ClipboardCheck,
@@ -52,7 +52,7 @@ const TRUST_POINTS = [
     icon: Package,
     title: "Genuine spare parts",
     description:
-      "Source verified parts through True Goshen Auto after your purchase — one partner for the full lifecycle.",
+      "Source verified parts through Nabus Motors after your purchase — one partner for the full lifecycle.",
   },
   {
     icon: Headphones,
@@ -69,11 +69,11 @@ const COMPACT_TRUST_POINT_IDS = new Set([
   "Genuine spare parts",
 ]);
 
-type WhyBuyFromTrueGoshenProps = {
+type WhyBuyFromNabusProps = {
   variant?: "full" | "compact";
 };
 
-export function WhyBuyFromTrueGoshen({ variant = "full" }: WhyBuyFromTrueGoshenProps) {
+export function WhyBuyFromNabus({ variant = "full" }: WhyBuyFromNabusProps) {
   const points =
     variant === "compact"
       ? TRUST_POINTS.filter((point) => COMPACT_TRUST_POINT_IDS.has(point.title))
@@ -86,7 +86,7 @@ export function WhyBuyFromTrueGoshen({ variant = "full" }: WhyBuyFromTrueGoshenP
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="max-w-md">
               <h2 className="text-xl font-semibold text-foreground sm:text-2xl">
-                Why Buy From True Goshen
+                Why Buy From Nabus Motors
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                 A professional automotive partner — verified inventory, import expertise, and
@@ -124,7 +124,7 @@ export function WhyBuyFromTrueGoshen({ variant = "full" }: WhyBuyFromTrueGoshenP
     <section className="border-y border-border bg-section-warm py-20 sm:py-24">
       <Container>
         <SectionHeader
-          title="Why Buy From True Goshen"
+          title="Why Buy From Nabus Motors"
           description="A professional automotive partner — not a classifieds site. We guide you from browsing through import, clearing, delivery, and beyond."
           align="center"
           className="mx-auto max-w-2xl"
@@ -153,3 +153,6 @@ export function WhyBuyFromTrueGoshen({ variant = "full" }: WhyBuyFromTrueGoshenP
     </section>
   );
 }
+
+/** @deprecated Use WhyBuyFromNabus */
+export const WhyBuyFromTrueGoshen = WhyBuyFromNabus;

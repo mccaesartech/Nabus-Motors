@@ -3,7 +3,7 @@ import { FreightTrackingClient } from "./freight-tracking-client";
 
 export const metadata = {
   title: "Shipment Tracking",
-  description: "Track your True Goshen freight shipment status and timeline.",
+  description: "Track your Nabus Motors shipment status and timeline.",
 };
 
 export default async function FreightTrackingPage() {

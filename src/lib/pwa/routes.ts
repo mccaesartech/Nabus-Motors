@@ -4,7 +4,7 @@ import { platformPathPrefix } from "@/lib/platform/paths";
 
 const adminRoot = `/${ADMIN_PATH}`;
 
-/** True Goshen Admin login and platform workspace (under /admin/*). */
+/** Nabus Motors Admin login and platform workspace (under /admin/*). */
 export function isAdminAppPath(pathname: string): boolean {
   return pathname === adminRoot || pathname.startsWith(`${adminRoot}/`);
 }

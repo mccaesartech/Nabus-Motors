@@ -79,7 +79,7 @@ export function SessionPreferenceModal({
         <DialogHeader>
           <DialogTitle>How should we keep you signed in?</DialogTitle>
           <DialogDescription>
-            Choose how True Goshen remembers your account on this device. You can
+            Choose how Nabus Motors remembers your account on this device. You can
             change this anytime from the sign-in page.
           </DialogDescription>
         </DialogHeader>

@@ -359,7 +359,7 @@ export async function generateVehicleSuggestions(
         ? "Treat the listing like a blank or unreliable form. Prefer filling empty fields and correcting weak/wrong labels (especially color) from any evidence in the owner request. Do not merely echo existing labels. Suggest make/model/year/color/trim/engine_size when the request or context supports them. Prefer complete structured fieldUpdates over vague notes."
         : "";
 
-  const systemPrompt = `You are a senior automotive inventory copywriter and listing analyst for True Goshen Auto, a premium vehicle dealership in Ghana and West Africa.
+  const systemPrompt = `You are a senior automotive inventory copywriter and listing analyst for Nabus Motors, a premium vehicle dealership in Ghana and West Africa.
 Given the current vehicle listing data and the owner's request, return ONLY valid JSON (no markdown fences) with this shape:
 {
   "description": "improved listing description or omit if unchanged",

@@ -9,14 +9,14 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 function extractRetryBody(detail: string | null): string {
-  if (!detail) return "True Goshen: You have an update. Reply for help.";
+  if (!detail) return "Nabus Motors: You have an update. Reply for help.";
   try {
     const parsed = JSON.parse(detail) as { waMeText?: string; reason?: string };
     if (parsed.waMeText?.trim()) return parsed.waMeText.trim();
   } catch {
     // plain detail
   }
-  return "True Goshen: You have an update. Reply for help.";
+  return "Nabus Motors: You have an update. Reply for help.";
 }
 
 async function runRetries(): Promise<{

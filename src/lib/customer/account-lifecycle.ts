@@ -504,7 +504,7 @@ export async function processExpiredAccountDeletions(): Promise<number> {
     const email = row.email?.trim().toLowerCase() || "";
     const phone = row.phone?.trim() || null;
     // Skip already-anonymized placeholders (should not appear in pending_deletion).
-    if (email && !email.endsWith("@deleted.truegoshen.local")) {
+    if (email && !email.endsWith("@deleted.nabus.local")) {
       const scheduledDate = row.retention_expires_at
         ? new Date(row.retention_expires_at).toLocaleDateString(undefined, {
             year: "numeric",

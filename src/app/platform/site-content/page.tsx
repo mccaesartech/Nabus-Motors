@@ -484,7 +484,7 @@ export default function SiteContentPage() {
               <TextInput
                 value={content.global.whatsappNumber}
                 onChange={(v) => updateSection("global", (p) => ({ ...p, whatsappNumber: v }))}
-                placeholder="233244876784"
+                placeholder="233279940200"
               />
             </Field>
             <div className="sm:col-span-2 grid gap-4 sm:grid-cols-2">

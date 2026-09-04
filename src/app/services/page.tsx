@@ -10,7 +10,7 @@ export const revalidate = 60;
 export const metadata = {
   title: "Services",
   description:
-    "Explore True Goshen Company Limited services — vehicles, freight forwarding, spare parts, and shipping consultation.",
+    "Explore Nabus Motors and Trading services — vehicles, freight forwarding, spare parts, and shipping consultation.",
 };
 
 export default async function ServicesPage() {

@@ -254,7 +254,7 @@ export default function SettingsPage() {
                 className="platform-input w-full"
                 value={settings.whatsapp_number}
                 onChange={(e) => update("whatsapp_number", e.target.value)}
-                placeholder="233244876784"
+                placeholder="233279940200"
               />
             </Field>
             <Field label="Primary email" className="sm:col-span-2">

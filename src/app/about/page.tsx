@@ -16,7 +16,7 @@ import { SiteVideoEmbed } from "@/components/shared/site-video";
 export const metadata = {
   title: "About Us",
   description:
-    "Learn about True Goshen Auto — our mission, quality standards, and commitment to customer trust.",
+    "Learn about Nabus Motors — our mission, quality standards, and commitment to customer trust.",
 };
 
 export default async function AboutPage() {
@@ -55,7 +55,7 @@ export default async function AboutPage() {
             <div className="overflow-hidden rounded-lg border border-border bg-black shadow-lg">
               <SiteVideoEmbed
                 url={about.promoVideoEmbedUrl.trim() || about.promoVideoUrl.trim()}
-                title={about.promoVideoTitle.trim() || "About True Goshen Auto"}
+                title={about.promoVideoTitle.trim() || "About Nabus Motors"}
                 display={{
                   videoAspect: about.videoAspect,
                   videoSize: about.videoSize,
@@ -76,7 +76,7 @@ export default async function AboutPage() {
         <Container>
           <div className="grid items-center gap-10 lg:grid-cols-2">
             <div className="relative aspect-[4/3] overflow-hidden">
-              <SafeVehicleImage src={missionImage} alt="True Goshen Auto showroom" />
+              <SafeVehicleImage src={missionImage} alt="Nabus Motors showroom" />
             </div>
             <div>
               <SectionHeader

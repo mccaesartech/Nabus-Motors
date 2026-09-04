@@ -15,7 +15,7 @@ describe("normalizeEmail", () => {
 
 describe("isValidEmailFormat", () => {
   it("accepts common addresses", () => {
-    expect(isValidEmailFormat("buyer@truegoshen.com")).toBe(true);
+    expect(isValidEmailFormat("buyer@nabusmotors.com")).toBe(true);
     expect(isValidEmailFormat("first.last+tag@gmail.com")).toBe(true);
   });
 

@@ -96,7 +96,7 @@ export async function generateCustomerNoteDraft(context: CustomerNoteContext): P
   const instruction = intentInstruction(context.intent, context.customPrompt);
   const outputKind = fieldTypeLabel(context.fieldType);
 
-  const systemPrompt = `You are a logistics coordinator for True Goshen Auto, a premium vehicle import and freight business in Ghana and West Africa.
+  const systemPrompt = `You are a logistics coordinator for Nabus Motors, a premium vehicle import and freight business in Ghana and West Africa.
 Write ${outputKind} text that will be shown directly to the customer on their tracking page or in a reply email.
 
 Rules:

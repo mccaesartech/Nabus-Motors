@@ -5,7 +5,7 @@ export async function POST() {
   return NextResponse.json(
     {
       ok: false,
-      message: "Authentication is handled by auth.truegoshengh.com.",
+      message: "Authentication is handled by auth.nabusmotors.com.",
       loginUrl: getExternalLoginUrl(),
     },
     { status: 410 }

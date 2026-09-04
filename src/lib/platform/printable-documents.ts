@@ -260,7 +260,7 @@ export function buildAdminOrderDocumentHtml(order: AdminOrderDetail): string {
 
 function shippingHandlingLabel(value?: string | null): string {
   if (value === "customer_arranged") return "Customer arranges shipping";
-  if (value === "true_goshen") return "True Goshen handles freight & clearing";
+  if (value === "true_goshen") return "Nabus Motors handles freight & clearing";
   if (value === "consultation") return "Consultation requested";
   return "—";
 }

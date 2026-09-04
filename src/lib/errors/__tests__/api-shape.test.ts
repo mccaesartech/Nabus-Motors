@@ -107,7 +107,7 @@ describe("standard API failure shape", () => {
       throw new Error('relation "widgets" does not exist');
     });
 
-    const response = await handler(new Request("https://truegoshen.vercel.app/api/test"));
+    const response = await handler(new Request("https://nabus-motors.vercel.app/api/test"));
     expect(response.status).toBe(500);
 
     const body = await response.json();
