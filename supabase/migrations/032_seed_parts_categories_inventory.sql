@@ -130,7 +130,7 @@ INSERT INTO parts (
     'universal-leather-seat-cover-set',
     'TG-INT-SC-001',
     '5-piece PU leather seat cover set, black. New.',
-    95, 'True Goshen',
+    95, 'Nabus Motors',
     ARRAY['Toyota', 'Honda', 'Nissan'], ARRAY['Corolla', 'Civic', 'Sentra'],
     15, 'draft', false
   ),
@@ -150,7 +150,7 @@ INSERT INTO parts (
     'all-weather-rubber-floor-mat-set',
     'TG-ACC-FM-003',
     '4-piece heavy-duty rubber floor mats, universal fit. New.',
-    42, 'True Goshen',
+    42, 'Nabus Motors',
     ARRAY['Toyota', 'Honda', 'Nissan'], ARRAY['Corolla', 'Civic', 'Sentra'],
     30, 'draft', false
   ),

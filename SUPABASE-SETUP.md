@@ -1,44 +1,14 @@
-# Supabase Setup — True Goshen Auto
+# Supabase Setup — Nabus Motors
 
-**Account:** mccaesartechtraining@gmail.com (`mcaesartechtraining`)  
-**Live site:** https://www.truegoshengh.com  
-**Auto Division:** https://www.truegoshengh.com/auto (or dedicated auto hosts if configured)  
-**Admin dashboard:** https://www.truegoshengh.com/admin/platform/dashboard
-
-Until Namecheap DNS/DNSSEC is fixed, temporary access: https://truegoshen.vercel.app — see `LAUNCH_DOMAIN_CUTOVER.md`.
+**Project name:** `nabus-motors` (or your chosen name)  
+**Live site (when deployed):** https://www.nabusmotors.com  
+**Admin dashboard:** `/admin/platform/dashboard`
 
 ---
 
-## Step 1 — Create Supabase project
+## Step 1 — Create Supabase project ✅
 
-1. Go to [supabase.com/dashboard](https://supabase.com/dashboard) and sign in with **mccaesartechtraining@gmail.com**
-2. Click **New project**
-   - **Name:** `true-goshen-auto`
-   - **Database password:** choose a strong password and save it
-   - **Region:** `West EU (London)` or closest to Ghana
-3. Wait ~2 minutes for provisioning
-
----
-
-## Step 2 — Run database setup (SQL)
-
-1. In Supabase, open **SQL Editor** → **New query**
-2. Copy the entire contents of **`supabase/setup.sql`** from this repo → paste → **Run**
-3. Open a **second query**, copy **`supabase/seed-vehicles.sql`** → paste → **Run**
-
-You should see **75 vehicles** in **Table Editor → vehicles**.
-
-To regenerate the seed after inventory changes:
-
-```powershell
-npx tsx scripts/generate-supabase-seed.ts
-```
-
----
-
-## Step 3 — Copy API keys
-
-Go to **Project Settings → API** and copy:
+You already created the project. Keep these handy from **Project Settings → API**:
 
 | Key | Env variable |
 |-----|----------------|
@@ -46,126 +16,127 @@ Go to **Project Settings → API** and copy:
 | anon public | `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
 | service_role (secret) | `SUPABASE_SERVICE_ROLE_KEY` |
 
-> **Never** expose `service_role` in the browser. It is server-only (admin dashboard).
+> Never expose `service_role` in the browser — server/admin only.
 
 ---
 
-## Step 4 — Add env vars to Vercel
+## Step 2 — Run database setup (SQL)
 
-1. Go to [vercel.com](https://vercel.com) → project **truegoshenauto** → **Settings → Environment Variables**
-2. Add these for **Production**:
+### Option A — One file (recommended for fresh project)
 
-| Variable | Example |
-|----------|---------|
-| `NEXT_PUBLIC_SUPABASE_URL` | `https://xxxxx.supabase.co` |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `eyJhbG...` |
-| `SUPABASE_SERVICE_ROLE_KEY` | `eyJhbG...` (service role) |
-| `NEXT_PUBLIC_SITE_URL` | `https://www.truegoshengh.com` |
-| `NEXT_PUBLIC_AUTO_SITE_URL` | `https://truegoshenauto.com` (optional) |
-| `AUTO_DIVISION_HOSTS` | `truegoshenauto.com,truegoshenauto.vercel.app` |
-| `NEXT_PUBLIC_WHATSAPP_NUMBER` | `233244876784` |
-| `ADMIN_PASSWORD` | your strong admin password |
-| `ADMIN_SECRET` | random secret string |
-| `RESEND_API_KEY` | API key from [resend.com](https://resend.com) |
-| `RESEND_FROM_EMAIL` | `noreply@truegoshengh.com` — must use the verified True Goshen domain |
+1. Open **`supabase/nabus-full-setup.sql`** in Cursor
+2. Select all → Copy
+3. Supabase Dashboard → **SQL Editor** → **New query** → Paste → **Run**
+4. Wait for success (may take 1–2 minutes)
 
-3. **Redeploy** (Deployments → ⋯ → Redeploy)
+### Option B — Manual two-step (legacy)
+
+1. Run **`supabase/setup.sql`**
+2. Run every file in **`supabase/migrations/`** in numeric order (001 → 103)
 
 ---
 
-## Step 4c — Email delivery (password reset & notifications)
+## Step 3 — Seed vehicle inventory
 
-**Option A — Resend (branded customer emails)**
+1. Open **`supabase/seed-vehicles.sql`**
+2. Copy entire file → Supabase **SQL Editor** → **New query** → **Run**
+3. Confirm in **Table Editor → vehicles** — you should see **75 rows**
 
-1. Add and verify your domain at [resend.com/domains](https://resend.com/domains)
-2. Set `RESEND_API_KEY` to the API key beginning with `re_`.
-3. Set `RESEND_FROM_EMAIL=noreply@truegoshengh.com`.
-
-**Option B — Supabase Auth SMTP (primary for password reset)**
-
-Password reset tries **Supabase `resetPasswordForEmail` first** (uses your project SMTP), then Resend as a branded fallback with the action link.
-
-1. **Project Settings → Authentication → SMTP Settings** — enable custom SMTP (SendGrid, Resend SMTP, etc.) or use Supabase default (rate-limited)
-2. **Authentication → Email Templates → Reset Password** — ensure the template is enabled
-3. Do not configure Supabase Authentication. Supabase is used as the database only.
-
----
-
-## Step 4b — Dedicated authentication service
-
-Authentication is configured outside Supabase:
-
-### Google sign-in (customer `/login` + `/register`)
-
-1. Set the Google OAuth redirect URI to
-   `https://auth.truegoshengh.com/api/auth/callback/google`.
-2. Configure the provider in the service at `https://auth.truegoshengh.com`.
-3. Full checklist: **`docs/GOOGLE_AUTH.md`**.
-
-Signup email checks (format, disposable domains, MX): **`docs/EMAIL_VALIDATION.md`**.
-
-Platform team invitations are independent of customer authentication. The
-application creates a token in `platform_user_invites`, sends
-`{NEXT_PUBLIC_SITE_URL}/admin/platform/invite/{token}`, validates it through the admin
-invite API, and establishes the platform session cookie after acceptance.
-
----
-
-## Step 5 — Local development
+To regenerate the seed after inventory changes:
 
 ```powershell
-cd "C:\Users\PC1\OneDrive\Desktop\True Goshen\true-goshen-auto"
+npm run db:seed
+```
+
+Then re-run `seed-vehicles.sql` in the SQL Editor.
+
+---
+
+## Step 4 — Local environment (`.env.local`)
+
+```powershell
+cd "C:\Users\PC1\OneDrive\Desktop\Nabus\truegoshenauto"
 copy .env.example .env.local
 ```
 
-Edit `.env.local` with your Supabase keys and admin password, then:
+Edit `.env.local` and paste your Supabase keys:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbG...
+SUPABASE_SERVICE_ROLE_KEY=eyJhbG...
+
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+NEXT_PUBLIC_WHATSAPP_NUMBER=233279940200
+
+ADMIN_PASSWORD=your-strong-admin-password
+ADMIN_SECRET=your-random-secret-string
+```
+
+Start locally:
 
 ```powershell
 npm run dev
 ```
 
-- Public site: http://localhost:3000
-- Admin login: http://localhost:3000/admin
+- Site: http://localhost:3000  
+- Admin: http://localhost:3000/admin  
 
 ---
 
-## Admin dashboard features
+## Step 5 — Vercel environment variables
 
-After Supabase is connected, log in at `/admin` with your `ADMIN_PASSWORD`:
+In your Vercel project → **Settings → Environment Variables**, add for **Production** and **Preview**:
 
-| Tab | What you can do |
-|-----|-----------------|
-| **Overview** | Vehicle counts, new leads, pending finance/appraisal stats |
-| **Vehicles** | Change status (available/sold/reserved), toggle featured, view listing |
-| **Inquiries** | Contact, vehicle, finance, appraisal, newsletter — update lead status |
+| Variable | Value |
+|----------|-------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase Project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | service_role key |
+| `NEXT_PUBLIC_SITE_URL` | `https://www.nabusmotors.com` (or your Vercel URL until domain is ready) |
+| `NEXT_PUBLIC_WHATSAPP_NUMBER` | `233279940200` |
+| `ADMIN_PASSWORD` | Strong admin password |
+| `ADMIN_SECRET` | Random secret string |
+
+Redeploy after saving env vars.
 
 ---
 
-## Database tables
+## Step 6 — Verify connection
 
-| Table | Purpose |
-|-------|---------|
-| `vehicles` | 75-car inventory (Chinese + international) |
-| `contact_inquiries` | Contact form submissions |
-| `vehicle_inquiries` | Purchase / test drive / rental requests |
-| `finance_applications` | Financing pre-qualification |
-| `appraisal_requests` | Sell / trade-in requests |
-| `newsletter_subscribers` | Email newsletter signups |
-| `profiles` | User profiles (future auth) |
-| `saved_vehicles` | User garage (future auth) |
+After `.env.local` is filled in:
+
+```powershell
+npm run dev
+```
+
+- Open **Inventory** — vehicles should load from Supabase (not demo fallback)
+- Visit `/api/health/ready` — should return `200` when Supabase is connected
 
 ---
 
 ## Troubleshooting
 
-**Site loads but inventory is demo data**  
-→ Supabase URL/anon key missing on Vercel. Redeploy after adding them.
+**Inventory shows demo data locally**  
+→ Supabase URL/anon key missing or wrong in `.env.local`. Restart `npm run dev`.
 
 **Admin shows “Supabase not connected”**  
-→ Add `SUPABASE_SERVICE_ROLE_KEY` on Vercel and redeploy.
+→ Add `SUPABASE_SERVICE_ROLE_KEY` and restart.
 
-**SQL errors on setup.sql**  
-→ Safe to re-run; uses `IF NOT EXISTS` and `DROP POLICY IF EXISTS`.
+**SQL errors on nabus-full-setup.sql**  
+→ Use a **fresh** Supabase project. If re-running, some “already exists” notices are OK; real errors usually mean the project was partially set up — create a new project or drop tables first.
 
 **Need to refresh vehicle seed**  
-→ Run `npx tsx scripts/generate-supabase-seed.ts`, then re-run `seed-vehicles.sql` in SQL Editor.
+→ `npm run db:seed` then re-run `seed-vehicles.sql`.
+
+---
+
+## Regenerate bundled migration file
+
+After editing files in `supabase/migrations/`:
+
+```powershell
+node scripts/bundle-supabase-migrations.mjs
+```
+
+This updates `supabase/nabus-full-setup.sql`.

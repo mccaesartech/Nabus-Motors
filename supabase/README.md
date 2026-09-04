@@ -4,12 +4,12 @@
 
 | Step | File to open in Cursor | First line should look like |
 |------|------------------------|----------------------------|
-| **1** | `supabase/setup.sql` | `-- True Goshen Auto — full database setup` |
+| **1** | `supabase/nabus-full-setup.sql` | `-- Nabus Motors — full database setup` |
 | **2** | `supabase/seed-vehicles.sql` | `-- Auto-generated: 75 vehicles` |
 
 ## How to run
 
-1. In Cursor, open **`supabase/setup.sql`**
+1. In Cursor, open **`supabase/nabus-full-setup.sql`**
 2. Select all (`Ctrl+A`) → Copy (`Ctrl+C`)
 3. Supabase Dashboard → **SQL Editor** → **New query**
 4. Paste → click **Run**

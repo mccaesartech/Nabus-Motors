@@ -1,4 +1,4 @@
--- True Goshen Company Limited v2.0 expansion — foundational schema
+-- Nabus Motors and Trading — foundational schema
 -- Safe to run multiple times (idempotent where possible)
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS company_content (
 INSERT INTO company_content (key, content) VALUES
   (
     'clearing_fee_notice',
-    '{"title":"Clearing & customs notice","body":"Clearing fees, duties, and port charges vary by shipment type, vehicle value, and Ghana Customs assessment. True Goshen will provide a detailed breakdown before you commit. Contact our freight team for a personalised quote — prices are not fixed on this notice."}'::jsonb
+    '{"title":"Clearing & customs notice","body":"Clearing fees, duties, and port charges vary by shipment type, vehicle value, and Ghana Customs assessment. Nabus Motors will provide a detailed breakdown before you commit. Contact our freight team for a personalised quote — prices are not fixed on this notice."}'::jsonb
   )
 ON CONFLICT (key) DO NOTHING;
 
@@ -27,7 +27,7 @@ CREATE POLICY "company_content_deny_all" ON company_content
 INSERT INTO site_settings (key, value) VALUES
   (
     'clearing_fee_notice',
-    'Clearing fees, duties, and port charges vary by shipment type, vehicle value, and Ghana Customs assessment. True Goshen will provide a detailed breakdown before you commit. Contact our freight team for a personalised quote — prices are not fixed on this notice.'
+    'Clearing fees, duties, and port charges vary by shipment type, vehicle value, and Ghana Customs assessment. Nabus Motors will provide a detailed breakdown before you commit. Contact our freight team for a personalised quote — prices are not fixed on this notice.'
   )
 ON CONFLICT (key) DO NOTHING;
 

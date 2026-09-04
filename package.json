@@ -7,6 +7,7 @@
     "build": "next build",
     "images": "npx tsx scripts/export-slugs.ts && node scripts/download-car-images.mjs --force",
     "db:seed": "npx tsx scripts/generate-supabase-seed.ts",
+    "db:bundle": "node scripts/bundle-supabase-migrations.mjs",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit --incremental false",

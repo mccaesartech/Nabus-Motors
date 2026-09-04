@@ -21,12 +21,12 @@ CREATE TABLE IF NOT EXISTS site_settings (
 );
 
 INSERT INTO site_settings (key, value) VALUES
-  ('company_name', 'True Goshen Auto'),
-  ('phone', '+233 24 487 6784'),
-  ('email', 'info@truegoshenauto.com'),
-  ('address', 'Ring Road East, Accra, Greater Accra, Ghana'),
-  ('whatsapp_number', '233244876784'),
-  ('notification_email', 'info@truegoshenauto.com')
+  ('company_name', 'Nabus Motors'),
+  ('phone', '+233 27 994 0200'),
+  ('email', 'info@nabusmotors.com'),
+  ('address', 'Accra Metropolitan District, Greater Accra, Ghana'),
+  ('whatsapp_number', '233279940200'),
+  ('notification_email', 'info@nabusmotors.com')
 ON CONFLICT (key) DO NOTHING;
 
 -- ─── Platform users (team roster; separate from Supabase auth) ────────────────

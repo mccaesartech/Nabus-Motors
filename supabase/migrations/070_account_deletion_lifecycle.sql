@@ -104,7 +104,7 @@ RETURNS TEXT
 LANGUAGE sql
 IMMUTABLE
 AS $$
-  SELECT anonymized_customer_ref(p_user_id) || '@deleted.truegoshen.local';
+  SELECT anonymized_customer_ref(p_user_id) || '@deleted.nabus.local';
 $$;
 
 CREATE OR REPLACE FUNCTION public.log_account_lifecycle_event(
