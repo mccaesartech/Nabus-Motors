@@ -14,9 +14,9 @@ const CORPORATE_LOGO_ASPECT = FULL_LOGO_WIDTH / CORPORATE_CROP_HEIGHT;
 export type LogoBrand = "corporate" | "auto" | "freight";
 
 const DEFAULT_ALT: Record<LogoBrand, string> = {
-  corporate: "True Goshen Company Limited",
-  auto: "True Goshen Auto",
-  freight: "True Goshen Freight",
+  corporate: "Nabus Motors and Trading",
+  auto: "Nabus Motors",
+  freight: "Nabus Motors",
 };
 
 function usesCorporateCrop(brand: LogoBrand) {

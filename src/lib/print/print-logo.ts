@@ -26,7 +26,7 @@ export function printLogoFallbackMarkup(): string {
   return `
     <div class="brand-logo-fallback" hidden>
       <span class="brand-logo-fallback-mark">TG</span>
-      <span class="brand-logo-fallback-text">TRUE GOSHEN</span>
+      <span class="brand-logo-fallback-text">NABUS MOTORS</span>
       <span class="brand-logo-fallback-sub">AUTO</span>
     </div>
   `;

@@ -6,13 +6,13 @@
  * Emergency only: set PUBLIC_SITE_URL_EMERGENCY_FALLBACK=https://truegoshen.vercel.app
  * while custom DNS is broken. Do not leave that set for launch.
  */
-export const PRODUCTION_PUBLIC_SITE_URL = "https://www.truegoshengh.com";
-const PRODUCTION_AUTO_SITE_URL = "https://www.truegoshengh.com";
+export const PRODUCTION_PUBLIC_SITE_URL = "https://www.nabusmotors.com";
+const PRODUCTION_AUTO_SITE_URL = "https://www.nabusmotors.com";
 const DEV_LOCALHOST_URL = "http://localhost:3000";
 /** Known legacy / temporary Vercel hostnames — normalize to the canonical custom domain. */
 const NON_CANONICAL_PUBLIC_HOSTS = new Set([
-  "truegoshen.vercel.app",
-  "truegoshenauto.vercel.app",
+  "nabus-motors.vercel.app",
+  "nabusmotors.vercel.app",
 ]);
 
 function isNonCanonicalPublicHost(hostname: string): boolean {

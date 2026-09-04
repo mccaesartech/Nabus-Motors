@@ -1,16 +1,16 @@
-export const COMPANY_NAME = "True Goshen Company Limited";
-export const SITE_NAME = "True Goshen Auto";
-export const SITE_PHONE_LOCAL = "024 487 6784";
-export const SITE_PHONE_INTL = "+233244876784";
-export const SITE_PHONE_DISPLAY = "+233 24 487 6784";
-export const WHATSAPP_NUMBER = "233244876784";
-export const SITE_EMAIL = "info@truegoshenauto.com";
-export const SITE_ADDRESS_LINE1 = "Ring Road East, Accra";
+export const COMPANY_NAME = "Nabus Motors and Trading";
+export const SITE_NAME = "Nabus Motors";
+export const SITE_PHONE_LOCAL = "027 994 0200";
+export const SITE_PHONE_INTL = "+233279940200";
+export const SITE_PHONE_DISPLAY = "+233 27 994 0200";
+export const WHATSAPP_NUMBER = "233279940200";
+export const SITE_EMAIL = "info@nabusmotors.com";
+export const SITE_ADDRESS_LINE1 = "Accra Metropolitan District";
 export const SITE_ADDRESS_LINE2 = "Greater Accra, Ghana";
 export const SITE_ADDRESS_FULL =
-  "Ring Road East, Accra, Greater Accra, Ghana";
+  "Accra Metropolitan District, Greater Accra, Ghana";
 export const GOOGLE_MAPS_URL =
-  "https://www.google.com/maps/search/?api=1&query=Ring+Road+East,+Accra,+Greater+Accra,+Ghana";
+  "https://www.google.com/maps/search/?api=1&query=Nabus+Motors+Accra+Ghana";
 
 /** Self-hosted stock hero background when CMS video mode is on but no upload/embed is set. */
 export const DEFAULT_HERO_BACKGROUND_VIDEO_URL = "/videos/hero-background.mp4";

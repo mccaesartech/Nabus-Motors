@@ -1,24 +1,24 @@
 /** Brand colors from globals.css — used in manifests and PWA chrome. */
-export const PWA_THEME_COLOR = "#4c1d95";
-export const ADMIN_PWA_THEME_COLOR = "#2e1065";
-export const PWA_BACKGROUND_COLOR = "#faf5ff";
+export const PWA_THEME_COLOR = "#2a1f18";
+export const ADMIN_PWA_THEME_COLOR = "#1a1410";
+export const PWA_BACKGROUND_COLOR = "#faf6f0";
 
 export const CUSTOMER_PWA = {
-  id: "true-goshen-customer",
-  name: "True Goshen",
-  shortName: "True Goshen",
+  id: "nabus-motors-customer",
+  name: "Nabus Motors",
+  shortName: "Nabus",
   description:
-    "True Goshen Company Limited — vehicle imports, freight forwarding, customs clearing, and genuine spare parts.",
+    "Nabus Motors and Trading — drive your dream car with verified vehicles, flexible financing, and trusted service in Accra, Ghana.",
   startUrl: "/",
   scope: "/",
   manifestPath: "/manifest.webmanifest",
 } as const;
 
 export const ADMIN_PWA = {
-  id: "true-goshen-admin",
-  name: "True Goshen Admin",
-  shortName: "TG Admin",
-  description: "True Goshen platform admin — secure dashboard for inventory, freight, and operations.",
+  id: "nabus-motors-admin",
+  name: "Nabus Motors Admin",
+  shortName: "Nabus Admin",
+  description: "Nabus Motors platform admin — secure dashboard for inventory and operations.",
   startUrl: "/admin",
   scope: "/admin",
   manifestPath: "/admin/manifest.webmanifest",

@@ -1,5 +1,5 @@
 {
-  "name": "true-goshen-auto",
+  "name": "nabus-motors",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -16,7 +16,7 @@
     "audit:prod": "npm audit --omit=dev --audit-level=high",
     "check:migrations": "node scripts/check-migrations.mjs",
     "load:smoke": "node scripts/load-smoke.mjs",
-    "logo": "node scripts/process-logo.mjs",
+    "logo": "node scripts/process-nabus-logo.mjs",
     "letterhead": "node scripts/export-letterhead.mjs",
     "pwa:icons": "node scripts/generate-pwa-icons.mjs",
     "countries:generate": "npx tsx scripts/generate-countries-data.ts",

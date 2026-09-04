@@ -89,24 +89,24 @@
 }
 
 :root {
-  /* Light purple modern — purple chrome with division accents */
-  --brand-primary: #4c1d95;
+  /* Nabus Motors — warm earth tones from brand monogram */
+  --brand-primary: #2a1f18;
   --brand-black: var(--brand-primary);
-  --brand-charcoal: #5b21b6;
-  --brand-charcoal-light: #6d28d9;
-  --brand-charcoal-dark: #2e1065;
-  --brand-indigo: #5b21b6;
-  --brand-indigo-light: #7c3aed;
-  --brand-indigo-dark: #4c1d95;
-  --brand-lavender: #f5f3ff;
-  --brand-lavender-light: #faf5ff;
-  --brand-lavender-dark: #ede9fe;
-  --brand-auto-accent: #8b5cf6;
-  --brand-auto-accent-light: #a78bfa;
-  --brand-auto-accent-dark: #7c3aed;
-  --brand-freight-accent: #0e7490;
-  --brand-freight-accent-light: #22d3ee;
-  --brand-freight-accent-dark: #0c4a6e;
+  --brand-charcoal: #3d2e24;
+  --brand-charcoal-light: #524033;
+  --brand-charcoal-dark: #1a1410;
+  --brand-indigo: #3d2e24;
+  --brand-indigo-light: #524033;
+  --brand-indigo-dark: #1a1410;
+  --brand-lavender: #f7f0e6;
+  --brand-lavender-light: #faf6f0;
+  --brand-lavender-dark: #ede5d4;
+  --brand-auto-accent: #c8541f;
+  --brand-auto-accent-light: #e06a32;
+  --brand-auto-accent-dark: #a84418;
+  --brand-freight-accent: #5c6b3c;
+  --brand-freight-accent-light: #7a8f52;
+  --brand-freight-accent-dark: #434f2c;
   --brand-purple: var(--brand-auto-accent);
   --brand-purple-light: var(--brand-auto-accent-light);
   --brand-purple-dark: var(--brand-auto-accent-dark);
@@ -114,55 +114,54 @@
   --brand-accent-light: var(--brand-auto-accent-light);
   --brand-accent-dark: var(--brand-auto-accent-dark);
   --brand-emphasis: var(--brand-primary);
-  --brand-emphasis-muted: #6d28d9;
-  --brand-surface: #f5f3ff;
-  --brand-muted: #7c6b9e;
-  --brand-muted-light: #a78bfa;
-  --brand-muted-dark: #5b21b6;
-  --text-secondary: #7c6b9e;
-  --text-on-dark-secondary: rgba(255, 255, 255, 0.8);
+  --brand-emphasis-muted: #524033;
+  --brand-surface: #f7f0e6;
+  --brand-muted: #9a8570;
+  --brand-muted-light: #b8a48c;
+  --brand-muted-dark: #6b5a48;
+  --text-secondary: #7a6554;
+  --text-on-dark-secondary: rgba(255, 255, 255, 0.85);
 
-  --background: #faf5ff;
-  --foreground: #4c1d95;
+  --background: #faf6f0;
+  --foreground: #2a1f18;
   --card: #ffffff;
-  --card-foreground: #4c1d95;
+  --card-foreground: #2a1f18;
   --popover: #ffffff;
-  --popover-foreground: #4c1d95;
+  --popover-foreground: #2a1f18;
   --primary: var(--brand-auto-accent);
   --primary-foreground: #ffffff;
-  --secondary: #f5f3ff;
-  --secondary-foreground: #4c1d95;
-  --muted: #f5f3ff;
-  /* Darkened from #7c6b9e (4.39:1 on #faf5ff) to meet WCAG AA 4.5:1 for body text */
-  --muted-foreground: #655484;
-  --accent: #ede9fe;
-  --accent-foreground: #4c1d95;
+  --secondary: #f7f0e6;
+  --secondary-foreground: #2a1f18;
+  --muted: #f7f0e6;
+  --muted-foreground: #6b5a48;
+  --accent: #ede5d4;
+  --accent-foreground: #2a1f18;
   --destructive: #dc2626;
-  --border: #e9d5ff;
-  --input: #e9d5ff;
+  --border: #e8ddd0;
+  --input: #e8ddd0;
   --ring: var(--brand-auto-accent);
   --chart-1: var(--brand-auto-accent);
   --chart-2: var(--brand-primary);
-  --chart-3: #7c6b9e;
-  --chart-4: #c4b5fd;
-  --chart-5: #e9d5ff;
+  --chart-3: #9a8570;
+  --chart-4: #ede5d4;
+  --chart-5: #f7f0e6;
   --radius: 0.375rem;
   --sidebar: var(--brand-primary);
-  --sidebar-foreground: #f5f3ff;
-  --sidebar-primary: #f5f3ff;
+  --sidebar-foreground: #f7f0e6;
+  --sidebar-primary: #f7f0e6;
   --sidebar-primary-foreground: var(--brand-primary);
-  --sidebar-accent: #5b21b6;
-  --sidebar-accent-foreground: #f5f3ff;
-  --sidebar-border: #6d28d9;
+  --sidebar-accent: #3d2e24;
+  --sidebar-accent-foreground: #f7f0e6;
+  --sidebar-border: #524033;
   --sidebar-ring: var(--brand-auto-accent);
 
-  --section-warm: #f5f3ff;
-  --icon-box-bg: #f5f3ff;
-  --icon-box-border: #e9d5ff;
+  --section-warm: #f7f0e6;
+  --icon-box-bg: #f7f0e6;
+  --icon-box-border: #e8ddd0;
   --icon-box-fg: var(--brand-primary);
 
-  --shadow-luxury: 0 1px 2px rgba(76, 29, 149, 0.06);
-  --shadow-luxury-lg: 0 4px 12px rgba(76, 29, 149, 0.08);
+  --shadow-luxury: 0 1px 2px rgba(42, 31, 24, 0.06);
+  --shadow-luxury-lg: 0 4px 12px rgba(42, 31, 24, 0.08);
 
   --header-height: 3.75rem;
   --header-subnav-height: 2.75rem;
@@ -170,8 +169,8 @@
   --header-logo-spacing: 1.5rem;
   --header-nav-gap: 1rem;
   --header-util-gap: 1.25rem;
-  --brand-cta-gold: #c9a227;
-  --brand-cta-gold-hover: #b08f22;
+  --brand-cta-gold: #c8541f;
+  --brand-cta-gold-hover: #a84418;
   --compare-bar-height: 0px;
 }
 
@@ -307,8 +306,8 @@
     min-width: 2.75rem;
     padding: 0.375rem 0.875rem 0.375rem 0.5rem;
     border-radius: 0.5rem;
-    border: 1px solid rgba(139, 92, 246, 0.28);
-    background: rgba(139, 92, 246, 0.08);
+    border: 1px solid rgba(200, 84, 31, 0.28);
+    background: rgba(200, 84, 31, 0.08);
     font-size: 0.875rem;
     font-weight: 600;
     line-height: 1.25;
@@ -326,8 +325,8 @@
   }
 
   .site-back-nav:hover {
-    background: rgba(139, 92, 246, 0.14);
-    border-color: rgba(124, 58, 237, 0.45);
+    background: rgba(200, 84, 31, 0.14);
+    border-color: rgba(168, 68, 24, 0.45);
     color: var(--brand-indigo-dark);
   }
 
@@ -335,12 +334,12 @@
   .site-back-nav.back-nav-pending {
     transform: scale(0.97);
     opacity: 0.85;
-    background: rgba(139, 92, 246, 0.18);
+    background: rgba(200, 84, 31, 0.18);
   }
 
   .site-back-nav:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.22);
+    box-shadow: 0 0 0 3px rgba(200, 84, 31, 0.22);
   }
 
   .site-back-nav .back-nav-icon {
@@ -351,7 +350,7 @@
     width: 1.75rem;
     height: 1.75rem;
     border-radius: 9999px;
-    background: rgba(212, 175, 55, 0.22);
+    background: rgba(200, 84, 31, 0.22);
     color: var(--brand-purple-dark);
   }
 
@@ -377,11 +376,11 @@
 
 @keyframes local-availability-pulse {
   0% {
-    box-shadow: inset 0 0 0 0 rgba(139, 92, 246, 0.22);
+    box-shadow: inset 0 0 0 0 rgba(200, 84, 31, 0.22);
     opacity: 1;
   }
   70% {
-    box-shadow: inset 0 0 0 6px rgba(139, 92, 246, 0);
+    box-shadow: inset 0 0 0 6px rgba(200, 84, 31, 0);
     opacity: 0.35;
   }
   100% {

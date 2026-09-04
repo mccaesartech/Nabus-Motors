@@ -311,10 +311,10 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     whatsappNumber: WHATSAPP_NUMBER,
   },
   homepage: {
-    eyebrow: "TRUE GOSHEN AUTO",
-    title: "Drive With Confidence",
+    eyebrow: "NABUS MOTORS",
+    title: "Drive Your Dream Car",
     subtitle:
-      "Curated premium vehicles, transparent pricing, and flexible pre-order options — from inquiry to delivery.",
+      "Award-winning automobile dealer in Accra — verified vehicles, flexible Autochek financing, and professional service from inquiry to delivery.",
     heroBackgroundMode: "video",
     backgroundImage: "",
     backgroundVideoUrl: "",
@@ -333,9 +333,9 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     ctaTertiaryHref: "/auto/sell",
   },
   whyChooseUs: {
-    title: "Why Choose True Goshen",
+    title: "Why Choose Nabus Motors",
     description:
-      "We built our process around transparency and accountability — the qualities that matter when purchasing a vehicle.",
+      "Award-winning dealer recognised for customer service, verified vehicles, and flexible financing — the qualities that matter when purchasing a car.",
     cards: [
       {
         icon: "BadgeCheck",
@@ -533,10 +533,10 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     ],
   },
   about: {
-    eyebrow: "About True Goshen Auto",
+    eyebrow: "About Nabus Motors",
     heroTitle: "Built on Trust, Driven by Quality",
     heroSubtitle:
-      "True Goshen Auto was founded with a simple belief: buying a vehicle should feel safe, transparent, and professional. We combine rigorous inspection standards with honest communication to earn your confidence.",
+      "Nabus Motors was founded with a simple belief: buying a vehicle should feel safe, transparent, and professional. We combine rigorous inspection standards with honest communication to earn your confidence.",
     promoVideoTitle: "",
     promoVideoUrl: "",
     promoVideoEmbedUrl: "",
@@ -593,7 +593,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
   },
   footer: {
     tagline:
-      "Your Safe Place for Quality Vehicles. Verified inventory, transparent pricing, and professional service you can trust.",
+      "Drive Your Dream Car. Verified inventory, flexible financing, and award-winning service you can trust.",
     addressLine1: SITE_ADDRESS_LINE1,
     addressLine2: SITE_ADDRESS_LINE2,
     phone: SITE_PHONE_DISPLAY,

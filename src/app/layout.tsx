@@ -44,8 +44,8 @@ export const metadata: Metadata = {
   metadataBase: new URL(getPublicSiteUrl()),
   applicationName: CUSTOMER_PWA.name,
   title: {
-    default: "True Goshen Company Limited | Vehicles, Freight & Parts",
-    template: "%s | True Goshen",
+    default: "Nabus Motors | Drive Your Dream Car",
+    template: "%s | Nabus Motors",
   },
   description: CUSTOMER_PWA.description,
   manifest: CUSTOMER_PWA.manifestPath,
@@ -71,8 +71,8 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: "website",
-    siteName: "True Goshen Company Limited",
-    images: [{ url: "/logo.png", width: 1024, height: 374, alt: "True Goshen Company Limited" }],
+    siteName: "Nabus Motors and Trading",
+    images: [{ url: "/logo.png", width: 1024, height: 374, alt: "Nabus Motors and Trading" }],
   },
   other: {
     "mobile-web-app-capable": "yes",

@@ -1,15 +1,15 @@
 /**
- * True Goshen platform design tokens — semantic colors for status UI only.
- * Primary brand remains purple; do not replace accent with semantic colors.
+ * Nabus Motors platform design tokens — semantic colors for status UI only.
+ * Primary brand remains terracotta brown; do not replace accent with semantic colors.
  */
 export const platformTokens = {
   primary: {
-    purple: "#8b5cf6",
-    purpleHover: "#7c3aed",
-    purpleDeep: "#4c1d95",
-    lavender: "#c4b5fd",
-    lavenderLight: "#f5f3ff",
-    lavenderBg: "#faf5ff",
+    purple: "#c8541f",
+    purpleHover: "#a84418",
+    purpleDeep: "#2a1f18",
+    lavender: "#ede5d4",
+    lavenderLight: "#f7f0e6",
+    lavenderBg: "#faf6f0",
   },
   accent: {
     gold: "#d97706",
@@ -28,10 +28,10 @@ export const platformTokens = {
   },
   surface: {
     card: "#ffffff",
-    background: "#faf5ff",
-    backgroundSecondary: "#f5f3ff",
-    border: "#e9d5ff",
-    hoverTint: "rgba(139, 92, 246, 0.06)",
+    background: "#faf6f0",
+    backgroundSecondary: "#f7f0e6",
+    border: "#e8ddd0",
+    hoverTint: "rgba(200, 84, 31, 0.06)",
   },
 } as const;
 
@@ -71,10 +71,10 @@ export const semanticToneClasses: Record<
 export const activityIconColors: Record<string, { bg: string; text: string }> = {
   vehicle: { bg: "rgba(59, 130, 246, 0.12)", text: "#2563eb" },
   shipment: { bg: "rgba(245, 158, 11, 0.12)", text: "#d97706" },
-  customer: { bg: "rgba(139, 92, 246, 0.12)", text: "#7c3aed" },
+  customer: { bg: "rgba(200, 84, 31, 0.12)", text: "#a84418" },
   payment: { bg: "rgba(16, 185, 129, 0.12)", text: "#059669" },
   message: { bg: "rgba(59, 130, 246, 0.12)", text: "#2563eb" },
   approval: { bg: "rgba(245, 158, 11, 0.12)", text: "#d97706" },
   support: { bg: "rgba(107, 114, 128, 0.12)", text: "#6b7280" },
-  appointment: { bg: "rgba(139, 92, 246, 0.12)", text: "#8b5cf6" },
+  appointment: { bg: "rgba(200, 84, 31, 0.12)", text: "#c8541f" },
 };

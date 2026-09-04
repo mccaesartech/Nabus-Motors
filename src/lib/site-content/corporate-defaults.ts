@@ -105,32 +105,32 @@ export type SparePartsLandingSiteContent = PageHeroSiteContentSimple & {
 };
 
 export const DEFAULT_CORPORATE_HOMEPAGE: CorporateHomepageSiteContent = {
-  heroEyebrow: "True Goshen Company Limited",
-  heroTitle: "Your Trusted Partner for Vehicles, Freight & Parts",
+  heroEyebrow: "Nabus Motors and Trading",
+  heroTitle: "Drive Your Dream Car",
   heroSubtitle:
-    "One company, multiple specialised divisions — delivering quality vehicles, seamless international logistics, and genuine spare parts to Ghana and beyond.",
+    "Ghana's award-winning automobile dealer — verified vehicles, flexible financing through Autochek, and trusted service from inquiry to delivery.",
   heroVideoUrl: CORPORATE_HERO_VIDEO_URL,
   heroPosterUrl: CORPORATE_HERO_POSTER_URL,
-  ctaPrimaryLabel: "Explore Our Services",
+  ctaPrimaryLabel: "Browse Vehicles",
   ctaPrimaryHref: ROUTES.corporate.services,
   ctaSecondaryLabel: "Contact Us",
   ctaSecondaryHref: ROUTES.corporate.contact,
-  aboutTitle: "About the Company",
+  aboutTitle: "About Nabus Motors",
   aboutDescription:
-    "True Goshen Company Limited is a Ghana-based enterprise specialising in automotive sales, international freight forwarding, and genuine spare parts — built on transparency, accountability, and customer trust.",
+    "Nabus Motors and Trading is a leading automobile dealership in Accra, Ghana — recognised as Best Automobile Dealer of the Year. We offer verified vehicles, flexible auto financing, vehicle service, and a one-stop shop for everything automotive.",
   aboutSpecialties: [
-    "Vehicle import & pre-order from China, Japan, USA, UK, and UAE",
-    "Freight forwarding, RoRo, and containerised shipping to Ghana",
-    "Ghana Customs clearing and inland delivery coordination",
-    "Genuine OEM and aftermarket spare parts supply",
+    "Verified new and pre-owned vehicle sales",
+    "Flexible auto financing via Autochek Autoloan",
+    "Vehicle import and pre-order services",
+    "Professional vehicle service and maintenance",
     "Transparent pricing and dedicated customer support",
   ],
   contactCtaTitle: "Get in Touch",
   contactCtaDescription:
-    "Reach our team for vehicle inquiries, freight quotes, spare parts, or shipping consultation.",
+    "Reach our team for vehicle inquiries, financing options, service appointments, or trade-in valuations.",
   contactCtaPrimaryLabel: "Contact Us",
   contactCtaPrimaryHref: ROUTES.corporate.contact,
-  contactCtaSecondaryLabel: "Visit Auto Division",
+  contactCtaSecondaryLabel: "Browse Inventory",
   contactCtaSecondaryHref: ROUTES.auto.home,
 };
 
@@ -188,9 +188,9 @@ export const DEFAULT_CORPORATE_FAQ: CorporateFaqSiteContent = {
   items: [
     {
       id: "divisions",
-      question: "What divisions does True Goshen operate?",
+      question: "What services does Nabus Motors offer?",
       answer:
-        "We operate four divisions: Auto (vehicle sales and pre-orders), Freight Forwarding & Clearing, Genuine Spare Parts, and Shipping Consultation for import logistics.",
+        "We offer verified vehicle sales, flexible auto financing through Autochek, vehicle import and pre-order, professional vehicle service, and trade-in valuations — a one-stop shop for everything automotive.",
     },
     {
       id: "preorder",
@@ -223,14 +223,14 @@ export const DEFAULT_CORPORATE_SERVICES_PAGE: DivisionLandingSiteContent = {
   heroEyebrow: "Our Divisions",
   heroTitle: "Services",
   heroSubtitle:
-    "True Goshen Company Limited operates specialised divisions under one trusted brand — each focused on delivering transparency, quality, and reliable customer support.",
+    "Nabus Motors operates specialised services under one trusted brand — each focused on delivering transparency, quality vehicles, and reliable customer support.",
   cards: [
     {
       id: "auto",
       icon: "Car",
-      title: "Auto Division — Buy & Pre-Order Vehicles",
+      title: "Vehicle Sales — Buy & Pre-Order",
       description:
-        "Browse verified inventory, pre-order imports, flexible financing, and nationwide delivery through True Goshen Auto.",
+        "Browse verified inventory, pre-order imports, flexible Autochek financing, and nationwide delivery through Nabus Motors.",
       cta: "Enter Auto Division",
       href: ROUTES.auto.home,
       image: "/images/services/buy-vehicle.jpg",
