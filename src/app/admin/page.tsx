@@ -18,6 +18,7 @@ import {
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [ownerLogin, setOwnerLogin] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [passkeyLoading, setPasskeyLoading] = useState(false);
@@ -38,7 +39,7 @@ export default function AdminLoginPage() {
       headers: { "Content-Type": "application/json" },
       credentials: "same-origin",
       body: JSON.stringify({
-        email: email.trim().toLowerCase(),
+        email: ownerLogin ? "" : email.trim().toLowerCase(),
         password,
       }),
     });
@@ -111,7 +112,7 @@ export default function AdminLoginPage() {
           Admin Portal
         </h1>
         <p className="mt-2 text-center text-sm text-[var(--platform-text-secondary)]">
-          Team members: enter your email and password. Owner: leave email blank and use the master password.
+          Team members: enter your email and password. Owner: use master password only (no email).
           New invites must be activated from the invitation link, not this form.
         </p>
         <form
@@ -121,19 +122,41 @@ export default function AdminLoginPage() {
           data-1p-ignore
           data-lpignore="true"
         >
-          <div className="space-y-1.5">
-            <Label htmlFor="admin-portal-email">Email (team members)</Label>
+          <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-[var(--platform-border)] bg-[var(--platform-bg)] px-3 py-2.5 text-sm text-[var(--platform-text-secondary)]">
             <input
-              id="admin-portal-email"
-              name="admin-portal-email"
-              type="email"
-              autoComplete="username"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="platform-input w-full"
-              placeholder="you@company.com (team members)"
+              type="checkbox"
+              checked={ownerLogin}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setOwnerLogin(checked);
+                if (checked) setEmail("");
+                setError("");
+              }}
+              className="mt-0.5"
             />
-          </div>
+            <span>
+              <span className="font-medium text-[var(--platform-text)]">Owner sign-in</span>
+              <span className="mt-0.5 block text-xs">
+                Uses the server master password only. Clears email so autofill cannot route you to team login.
+              </span>
+            </span>
+          </label>
+          {!ownerLogin ? (
+            <div className="space-y-1.5">
+              <Label htmlFor="admin-portal-email">Email (team members)</Label>
+              <input
+                id="admin-portal-email"
+                name="admin-portal-email"
+                type="text"
+                inputMode="email"
+                autoComplete="off"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="platform-input w-full"
+                placeholder="you@company.com"
+              />
+            </div>
+          ) : null}
           <div className="space-y-1.5">
             <Label htmlFor="admin-portal-password">Password</Label>
             <PasswordInput
