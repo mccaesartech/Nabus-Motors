@@ -58,6 +58,8 @@ const nextConfig: NextConfig = {
       { source: "/garage", destination: "/auto/garage", permanent: true },
       { source: "/appointments", destination: "/account?section=visit", permanent: false },
       { source: "/auto/pre-order", destination: "/auto/inventory?status=pre_order", permanent: false },
+      // Nabus Motors — editorial showroom is the public homepage
+      { source: "/", destination: "/auto", permanent: true },
     ];
   },
   experimental: {

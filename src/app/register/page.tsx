@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Logo } from "@/components/shared/logo";
+import { NabusAuthSplitShell } from "@/components/nabus/nabus-auth-split-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -166,22 +166,10 @@ function RegisterForm() {
   }
 
   return (
-    <div className="grid min-h-[calc(100dvh-var(--shell-top-offset))] lg:grid-cols-2">
-      <div className="relative hidden overflow-hidden bg-[var(--nabus-nav-dark)] lg:block">
-        <div className="absolute inset-0 bg-gradient-to-br from-[var(--nabus-nav-dark)] via-[#2a1018] to-[var(--nabus-primary)]/60" />
-        <div className="relative flex h-full flex-col justify-end p-12">
-          <p className="text-sm font-semibold text-white/80">Nabus Motors</p>
-          <h2 className="mt-2 text-2xl font-bold text-white">
-            Track imports, orders, and messages — all in one place.
-          </h2>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-center px-4 py-12 sm:px-8">
-        <div className="w-full max-w-md">
-          <div className="mb-8 flex justify-center lg:justify-start">
-            <Logo variant="purple" brand="auto" height={48} srcOverride="/logo.png" />
-          </div>
+    <NabusAuthSplitShell
+      panelTitle="Track imports, orders, and messages — all in one place."
+      panelBody="Create your account to manage pre-orders, purchases, and showroom visits from one dashboard."
+    >
           <h1 className="text-2xl font-bold text-[var(--nabus-charcoal)]">Create Account</h1>
           <p className="mt-2 text-sm text-[var(--nabus-text-secondary)]">
             Create your account to track pre-orders, purchases, and message our team.
@@ -292,9 +280,7 @@ function RegisterForm() {
               Sign in
             </Link>
           </p>
-        </div>
-      </div>
-    </div>
+    </NabusAuthSplitShell>
   );
 }
 

@@ -42,7 +42,7 @@ const CATEGORIES = [
     id: "premium",
     title: "Premium",
     desc: "Flagship models, fully verified.",
-    href: `${ROUTES.auto.inventory}?trust=verified_by_true_goshen`,
+    href: `${ROUTES.auto.inventory}?trust=documentation_verified`,
     image: "https://images.unsplash.com/photo-1555215695-3004980ad54e?w=800&q=80",
   },
 ] as const;

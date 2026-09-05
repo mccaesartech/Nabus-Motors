@@ -81,7 +81,7 @@ export function SiteChrome({
         {children}
         <InstallCustomerAppBanner />
       </main>
-      <NabusFooter content={content} brand={useAutoChrome ? "auto" : "corporate"} />
+      <NabusFooter content={content} brand="auto" />
       <WhatsAppFloat whatsappNumber={operational.whatsapp_number || content.global.whatsappNumber} />
       <PwaInstallToastHost />
       {useAutoChrome ? <CompareFloatingBar /> : null}

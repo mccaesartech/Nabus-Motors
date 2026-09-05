@@ -26,7 +26,7 @@ export default function AccountSettingsPage() {
             </p>
             <Link
               href="/account/settings/privacy"
-              className="inline-flex min-h-10 items-center text-sm font-medium text-brand-purple hover:underline"
+              className="inline-flex min-h-10 items-center text-sm font-medium text-[var(--nabus-primary)] hover:underline"
             >
               Go to Privacy &amp; Security →
             </Link>

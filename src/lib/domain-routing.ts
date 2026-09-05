@@ -111,9 +111,6 @@ export function resolveAutoDivisionRedirect(req: NextRequest): NextResponse | nu
   const hostname = req.headers.get("host") ?? "";
   if (!isAutoDivisionHost(hostname)) return null;
 
-  // *.vercel.app auto hosts are already redirected to www above.
-  if (hostname.toLowerCase().split(":")[0].endsWith(".vercel.app")) return null;
-
   const { pathname, search } = req.nextUrl;
   if (shouldPassthrough(pathname) || pathname.includes(".")) return null;
 

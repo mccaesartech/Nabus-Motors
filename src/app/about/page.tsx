@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { ROUTES } from "@/lib/routes";
-import { Container } from "@/components/shared/container";
-import { SectionHeader } from "@/components/shared/section-header";
 import { SafeVehicleImage } from "@/components/shared/safe-vehicle-image";
 import { Button } from "@/components/ui/button";
+import { NabusEditorialPageHero } from "@/components/nabus/nabus-editorial-page-hero";
+import { NabusSectionLabel } from "@/components/nabus/nabus-section-label";
 import {
   getSiteContent,
   resolveAboutMissionImage,
@@ -31,28 +31,20 @@ export default async function AboutPage() {
   });
 
   return (
-    <>
-      <section className="relative bg-brand-primary py-20 sm:py-24">
-        <Container>
-          <p className="text-xs font-medium uppercase tracking-[0.2em] text-white/70">
-            {about.eyebrow}
-          </p>
-          <h1 className="mt-4 max-w-xl text-3xl font-semibold text-white sm:text-4xl">
-            {about.heroTitle}
-          </h1>
-          <p className="mt-4 max-w-2xl text-base leading-relaxed text-on-dark-secondary">
-            {about.heroSubtitle}
-          </p>
-        </Container>
-      </section>
+    <div className="bg-[var(--nabus-ivory)]">
+      <NabusEditorialPageHero
+        label={about.eyebrow}
+        title={about.heroTitle}
+        description={about.heroSubtitle}
+      />
 
-      {promoVideo && (
-        <section className="border-b border-border bg-muted py-14 sm:py-16">
-          <Container>
-            {about.promoVideoTitle.trim() && (
-              <h2 className="mb-6 text-center text-2xl font-semibold">{about.promoVideoTitle}</h2>
-            )}
-            <div className="overflow-hidden rounded-lg border border-border bg-black shadow-lg">
+      {promoVideo ? (
+        <section className="border-b border-[var(--nabus-border)] py-14 sm:py-16">
+          <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-10 xl:px-12">
+            {about.promoVideoTitle.trim() ? (
+              <NabusSectionLabel className="mb-6">{about.promoVideoTitle}</NabusSectionLabel>
+            ) : null}
+            <div className="overflow-hidden border border-[var(--nabus-border)] bg-[var(--nabus-graphite)]">
               <SiteVideoEmbed
                 url={about.promoVideoEmbedUrl.trim() || about.promoVideoUrl.trim()}
                 title={about.promoVideoTitle.trim() || "About Nabus Motors"}
@@ -68,47 +60,59 @@ export default async function AboutPage() {
                 }}
               />
             </div>
-          </Container>
+          </div>
         </section>
-      )}
+      ) : null}
 
       <section className="py-14 sm:py-16">
-        <Container>
-          <div className="grid items-center gap-10 lg:grid-cols-2">
-            <div className="relative aspect-[4/3] overflow-hidden">
+        <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-10 xl:px-12">
+          <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
+            <div className="relative aspect-[4/3] overflow-hidden border border-[var(--nabus-border)]">
               <SafeVehicleImage src={missionImage} alt="Nabus Motors showroom" />
             </div>
             <div>
-              <SectionHeader
-                title={about.missionTitle}
-                description={about.missionDescription}
-                className="mb-0"
-              />
-              <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+              <NabusSectionLabel>Our Mission</NabusSectionLabel>
+              <h2 className="mt-4 text-2xl font-semibold tracking-tight text-[var(--nabus-graphite)] sm:text-3xl">
+                {about.missionTitle}
+              </h2>
+              <p className="mt-4 text-sm leading-relaxed text-[var(--nabus-muted)]">
+                {about.missionDescription}
+              </p>
+              <p className="mt-4 text-sm leading-relaxed text-[var(--nabus-muted)]">
                 {about.missionBody}
               </p>
-              <Button className="mt-6" render={<Link href={ROUTES.auto.inventory} />}>
-                View Our Inventory
+              <Button
+                className="mt-6 rounded-lg bg-[var(--nabus-wine)] hover:bg-[var(--nabus-crimson)]"
+                render={<Link href={ROUTES.auto.inventory} />}
+              >
+                Browse The Showroom
               </Button>
             </div>
           </div>
-        </Container>
+        </div>
       </section>
 
-      <section className="border-y border-border bg-muted py-14 sm:py-16">
-        <Container>
-          <SectionHeader title={about.valuesTitle} align="center" className="mx-auto" />
-          <div className="grid gap-8 sm:grid-cols-2">
+      <section className="border-y border-[var(--nabus-border)] bg-[var(--nabus-paper)] py-14 sm:py-16">
+        <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-10 xl:px-12">
+          <div className="mx-auto max-w-2xl text-center">
+            <NabusSectionLabel>{about.valuesTitle}</NabusSectionLabel>
+          </div>
+          <div className="mt-10 grid gap-px bg-[var(--nabus-border)] sm:grid-cols-2">
             {about.values.map((value) => {
               const Icon = resolveSiteContentIcon(value.icon);
               return (
-                <div key={value.title} className="flex gap-4">
-                  <div className="flex size-11 shrink-0 items-center justify-center rounded-md border border-border bg-muted">
-                    <Icon className="size-5 text-foreground" strokeWidth={1.5} />
+                <div
+                  key={value.title}
+                  className="flex gap-4 bg-[var(--nabus-paper)] p-6 sm:p-8"
+                >
+                  <div className="flex size-11 shrink-0 items-center justify-center border border-[var(--nabus-border)] bg-[var(--nabus-ivory)]">
+                    <Icon className="size-5 text-[var(--nabus-wine)]" strokeWidth={1.5} />
                   </div>
                   <div>
-                    <h3 className="text-[15px] font-semibold">{value.title}</h3>
-                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    <h3 className="text-[15px] font-semibold text-[var(--nabus-graphite)]">
+                      {value.title}
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed text-[var(--nabus-muted)]">
                       {value.description}
                     </p>
                   </div>
@@ -116,30 +120,32 @@ export default async function AboutPage() {
               );
             })}
           </div>
-        </Container>
+        </div>
       </section>
 
       <section className="py-14 sm:py-16">
-        <Container>
-          <div className="grid items-center gap-10 lg:grid-cols-2">
+        <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-10 xl:px-12">
+          <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
             <div className="order-2 lg:order-1">
-              <SectionHeader
-                title={about.qualityTitle}
-                description={about.qualityDescription}
-                className="mb-0"
-              />
-              <ul className="mt-4 space-y-3 text-sm text-muted-foreground">
+              <NabusSectionLabel>Quality</NabusSectionLabel>
+              <h2 className="mt-4 text-2xl font-semibold tracking-tight text-[var(--nabus-graphite)] sm:text-3xl">
+                {about.qualityTitle}
+              </h2>
+              <p className="mt-4 text-sm leading-relaxed text-[var(--nabus-muted)]">
+                {about.qualityDescription}
+              </p>
+              <ul className="mt-6 space-y-3 border-l-2 border-[var(--nabus-gold)] pl-4 text-sm text-[var(--nabus-muted)]">
                 {about.qualityBullets.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
               </ul>
             </div>
-            <div className="relative order-1 aspect-[4/3] overflow-hidden lg:order-2">
+            <div className="relative order-1 aspect-[4/3] overflow-hidden border border-[var(--nabus-border)] lg:order-2">
               <SafeVehicleImage src={qualityImage} alt="Vehicle inspection process" />
             </div>
           </div>
-        </Container>
+        </div>
       </section>
-    </>
+    </div>
   );
 }

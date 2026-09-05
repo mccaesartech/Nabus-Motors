@@ -1,4 +1,6 @@
 export { NabusStatusChip as NabusStatus } from "./nabus-status-chip";
+export { NabusEditorialPageHero } from "./nabus-editorial-page-hero";
+export { NabusAuthSplitShell } from "./nabus-auth-split-shell";
 export { NabusStatusChip } from "./nabus-status-chip";
 export { NabusCarTile, NabusVehicleCard } from "./nabus-car-tile";
 export { NabusArc } from "./nabus-arc";

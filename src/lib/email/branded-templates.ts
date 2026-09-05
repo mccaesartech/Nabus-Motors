@@ -1,6 +1,6 @@
 import "server-only";
 
-const BRAND_BG = "#2A1F18";
+const BRAND_BG = "#292725";
 const BRAND_ACCENT = "#C8541F";
 const BRAND_TEXT = "#F7F0E6";
 

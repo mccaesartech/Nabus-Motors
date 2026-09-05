@@ -558,11 +558,11 @@ function AccountContent() {
                 {profile?.phone ? ` · ${profile.phone}` : null}
               </p>
               {profile?.registration_id && (
-                <div className="mt-4 inline-flex flex-col gap-1 rounded-lg border border-brand-purple/20 bg-brand-purple/5 px-4 py-3">
+                <div className="mt-4 inline-flex flex-col gap-1 rounded-lg border border-[var(--nabus-wine)]/20 bg-[var(--nabus-red-soft)] px-4 py-3">
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Your registration ID
                   </p>
-                  <p className="font-mono text-lg font-semibold text-brand-purple">
+                  <p className="font-mono text-lg font-semibold text-[var(--nabus-primary)]">
                     {profile.registration_id}
                   </p>
                   <p className="text-xs text-muted-foreground">
@@ -572,7 +572,7 @@ function AccountContent() {
               )}
               <Link
                 href="/account/settings"
-                className="mt-3 inline-flex min-h-10 items-center text-sm font-medium text-brand-purple hover:underline"
+                className="mt-3 inline-flex min-h-10 items-center text-sm font-medium text-[var(--nabus-primary)] hover:underline"
               >
                 Edit profile details →
               </Link>
@@ -670,7 +670,7 @@ function AccountContent() {
                           : ""}
                       </p>
                     </div>
-                    <span className="rounded-full bg-brand-purple/10 px-3 py-1 text-xs font-medium text-brand-purple">
+                    <span className="rounded-full bg-[var(--nabus-red-soft)] px-3 py-1 text-xs font-medium text-[var(--nabus-primary)]">
                       {shipmentStatusLabel(shipment.status)}
                     </span>
                   </div>
@@ -686,7 +686,7 @@ function AccountContent() {
                   )}
                   <button
                     type="button"
-                    className="mt-3 text-sm font-medium text-brand-purple hover:underline"
+                    className="mt-3 text-sm font-medium text-[var(--nabus-primary)] hover:underline"
                     onClick={() =>
                       setExpandedShipmentId((id) => (id === shipment.id ? null : shipment.id))
                     }
@@ -799,7 +799,7 @@ function AccountContent() {
                         {item.vehicle_slug && (
                           <Link
                             href={ROUTES.auto.inventoryDetail(item.vehicle_slug)}
-                            className="mt-1 inline-block text-xs font-medium text-brand-purple hover:underline"
+                            className="mt-1 inline-block text-xs font-medium text-[var(--nabus-primary)] hover:underline"
                           >
                             View vehicle
                           </Link>
@@ -825,16 +825,16 @@ function AccountContent() {
                       </div>
                     </div>
                     {shipment ? (
-                      <div className="rounded-lg border border-brand-purple/20 bg-brand-purple/5 p-4">
+                      <div className="rounded-lg border border-[var(--nabus-wine)]/20 bg-[var(--nabus-red-soft)] p-4">
                         <VisualShipmentTimeline
                           status={shipment.status}
                           trackingId={shipment.tracking_number}
                           expectedArrival={shipment.estimated_arrival}
                           size="mini"
-                          className="mb-3 border-brand-purple/20 bg-white/50"
+                          className="mb-3 border-[var(--nabus-wine)]/20 bg-white/50"
                         />
                         <div className="flex flex-wrap items-center gap-2 text-sm">
-                          <Ship className="size-4 text-brand-purple" />
+                          <Ship className="size-4 text-[var(--nabus-primary)]" />
                           <span className="font-mono font-medium">{shipment.tracking_number}</span>
                           <span className="text-muted-foreground">·</span>
                           <span>{shipmentStatusLabel(shipment.status)}</span>
@@ -875,7 +875,7 @@ function AccountContent() {
           ) : otherInquiries.length === 0 ? (
             <p className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
               No other inquiries yet.{" "}
-              <Link href="/contact" className="font-medium text-brand-purple hover:underline">
+              <Link href="/contact" className="font-medium text-[var(--nabus-primary)] hover:underline">
                 Contact us
               </Link>
               .
@@ -945,15 +945,15 @@ function AccountContent() {
                           "w-full px-3 py-3 text-left text-sm transition-colors hover:bg-muted/50",
                           selectedConversationId === conv.id &&
                             !showNewConversation &&
-                            "bg-brand-purple/5",
+                            "bg-[var(--nabus-red-soft)]",
                           highlightConversationId === conv.id &&
-                            "ring-2 ring-brand-purple ring-inset"
+                            "ring-2 ring-[var(--nabus-wine)] ring-inset"
                         )}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <p className="line-clamp-1 font-medium">{conv.subject}</p>
                           {conv.unreadCount > 0 && (
-                            <span className="shrink-0 rounded-full bg-brand-purple px-1.5 py-0.5 text-[10px] font-bold text-white">
+                            <span className="shrink-0 rounded-full bg-[var(--nabus-wine)] px-1.5 py-0.5 text-[10px] font-bold text-white">
                               {conv.unreadCount}
                             </span>
                           )}
@@ -1071,7 +1071,7 @@ function AccountContent() {
                           className={cn(
                             "max-w-[85%] rounded-lg px-3 py-2 text-sm",
                             msg.isMine
-                              ? "ml-auto bg-brand-purple/10"
+                              ? "ml-auto bg-[var(--nabus-red-soft)]"
                               : "mr-auto bg-muted/60"
                           )}
                         >
