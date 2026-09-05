@@ -508,7 +508,7 @@ export default function InventoryPage() {
   return (
     <div className="min-w-0 max-w-full space-y-6">
       <PageHeader
-        title="Vehicle inventory"
+        title="Vehicles"
         description={
           canEdit
             ? isManager

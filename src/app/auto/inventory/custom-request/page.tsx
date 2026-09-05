@@ -1,5 +1,5 @@
-import { Container } from "@/components/shared/container";
-import { CustomVehicleRequestForm } from "@/components/vehicle/custom-vehicle-request-form";
+import { getSiteContent } from "@/lib/site-content";
+import { ImportWizard } from "@/components/auto/import-wizard";
 
 export const metadata = {
   title: "Request a Vehicle",
@@ -7,12 +7,16 @@ export const metadata = {
     "Can't find your car in our inventory? Tell us what you want and our team will follow up.",
 };
 
-export default function CustomVehicleRequestPage() {
+export default async function CustomVehicleRequestPage() {
+  const content = await getSiteContent();
   return (
-    <div className="py-10 sm:py-14">
-      <Container className="max-w-2xl">
-        <CustomVehicleRequestForm />
-      </Container>
-    </div>
+    <ImportWizard
+      hero={{
+        title: "Request a Vehicle",
+        subtitle:
+          content.inventoryPage?.subtitle ??
+          "Tell us what you need — we will source, import, and deliver to Ghana.",
+      }}
+    />
   );
 }

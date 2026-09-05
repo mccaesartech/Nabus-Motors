@@ -338,12 +338,12 @@ export function PlatformSidebar({
               onClick={onMobileClose}
               title="Nabus Motors Admin"
             >
-              <Logo variant="purple" icon height={32} href={false} priority quality={100} className="size-full max-h-8 max-w-8" />
+              <Logo variant="white" icon height={32} href={false} priority quality={100} className="size-full max-h-8 max-w-8" />
             </Link>
           ) : (
             <>
               <Link href="/platform/dashboard" className="flex min-w-0 flex-1 justify-center" onClick={onMobileClose}>
-                <Logo variant="purple" height={62} href={false} priority quality={100} className="max-w-full" />
+                <Logo variant="white" height={62} href={false} priority quality={100} className="max-w-full" />
               </Link>
               <button
                 type="button"

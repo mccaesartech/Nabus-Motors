@@ -1,17 +1,16 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
-import { StatusBadge } from "@/components/platform/status-badge";
 import { WelcomeHeader } from "@/components/platform/dashboard/welcome-header";
-import { KpiCards } from "@/components/platform/dashboard/kpi-cards";
 import { QuickActions } from "@/components/platform/dashboard/quick-actions";
-import { AttentionCenter } from "@/components/platform/dashboard/attention-center";
+import { NabusKpiRow } from "@/components/platform/dashboard/nabus-kpi-row";
+import { SalesOverviewPanel } from "@/components/platform/dashboard/sales-overview-panel";
 import { EnhancedDataTable } from "@/components/platform/enhanced-data-table";
-import { DeferredSection } from "@/components/shared/deferred-section";
+import { StatusBadge } from "@/components/platform/status-badge";
 import { adminLoginPath } from "@/lib/admin/paths";
 import { isAdminAuthError } from "@/lib/admin/client";
 import { platformPath } from "@/lib/platform/paths";
@@ -21,29 +20,12 @@ import type {
   PlatformStats,
   UnifiedLead,
 } from "@/lib/platform/types";
-import { leadTypeLabel } from "@/lib/platform/types";
-import { PaymentStatusBadge } from "@/components/platform/status-badge";
 import { usePlatformCurrency } from "@/context/platform-currency-context";
 import { usePlatformSession } from "@/components/platform/platform-shell";
 import { canViewFinance } from "@/lib/platform/permissions";
 import { useAdminNotifications } from "@/context/admin-notifications-context";
 import { PlatformDateTime } from "@/components/platform/platform-datetime";
 import { useAfterIdle } from "@/hooks/use-after-idle";
-
-const BusinessInsights = dynamic(
-  () =>
-    import("@/components/platform/dashboard/business-insights").then((m) => m.BusinessInsights),
-  {
-    loading: () => (
-      <div
-        className="h-64 animate-pulse rounded-xl bg-[var(--platform-bg-secondary)]"
-        role="status"
-        aria-label="Loading insights"
-      />
-    ),
-    ssr: false,
-  }
-);
 
 const ActivityTimeline = dynamic(
   () =>
@@ -62,30 +44,6 @@ const ActivityTimeline = dynamic(
 const ConfirmDialog = dynamic(
   () => import("@/components/platform/confirm-dialog").then((m) => m.ConfirmDialog),
   { ssr: false }
-);
-
-type DashboardExtras = {
-  pendingShipments: number;
-  delayedShipments: number;
-  appointmentsToday: number;
-  freightQuotes: number;
-  failedPayments: number;
-};
-
-const EMPTY_EXTRAS: DashboardExtras = {
-  pendingShipments: 0,
-  delayedShipments: 0,
-  appointmentsToday: 0,
-  freightQuotes: 0,
-  failedPayments: 0,
-};
-
-const SectionSkeleton = ({ className = "h-64" }: { className?: string }) => (
-  <div
-    className={`animate-pulse rounded-xl bg-[var(--platform-bg-secondary)] ${className}`}
-    role="status"
-    aria-label="Loading section"
-  />
 );
 
 export default function PlatformDashboardPage() {
@@ -108,13 +66,11 @@ export default function PlatformDashboardPage() {
       created_at: string;
     }>
   >([]);
-  const [extras, setExtras] = useState<DashboardExtras>(EMPTY_EXTRAS);
   const [configured, setConfigured] = useState(true);
   const [statsLoading, setStatsLoading] = useState(true);
   const [tablesLoading, setTablesLoading] = useState(true);
   const [insightsLoading, setInsightsLoading] = useState(true);
   const [coreDataError, setCoreDataError] = useState("");
-  const [insightsError, setInsightsError] = useState("");
   const [deleteVehicleTarget, setDeleteVehicleTarget] = useState<DashboardRecentTransaction | null>(
     null
   );
@@ -154,10 +110,6 @@ export default function PlatformDashboardPage() {
         setConfigured((prev) => prev && Boolean(recentJson.configured));
         setRecentTransactions(recentJson.recentTransactions ?? []);
         setRecentLeads(recentJson.recentLeads ?? []);
-        setExtras((prev) => ({
-          ...prev,
-          failedPayments: recentJson.failedPayments ?? prev.failedPayments,
-        }));
       }
 
       if (!statsRes?.ok || !recentRes?.ok) {
@@ -175,24 +127,11 @@ export default function PlatformDashboardPage() {
     }
   }, [router]);
 
-  const loadExtras = useCallback(async () => {
-    try {
-      const res = await fetch("/api/admin/dashboard/extras", { cache: "no-store" });
-      if (res.ok) {
-        const extrasJson = await res.json();
-        setExtras(extrasJson.extras ?? EMPTY_EXTRAS);
-      }
-    } catch {
-      // Core dashboard summaries remain useful if optional extras are unavailable.
-    }
-  }, []);
-
   const insightsLoadedRef = useRef(false);
 
   const loadInsights = useCallback(async () => {
     if (insightsLoadedRef.current) return;
     insightsLoadedRef.current = true;
-    setInsightsError("");
 
     try {
       const [chartResult, activityResult] = await Promise.allSettled([
@@ -222,16 +161,8 @@ export default function PlatformDashboardPage() {
         const activityJson = await activityRes.json();
         setActivityLog(activityJson.activity ?? []);
       }
-
-      if (!chartRes?.ok || (permissions?.activity && !activityRes?.ok)) {
-        setInsightsError(
-          "Detailed chart data could not fully refresh. Core availability and lead summaries are still shown."
-        );
-      }
     } catch {
-      setInsightsError(
-        "Detailed chart data could not refresh. Core availability and lead summaries are still shown."
-      );
+      // Core dashboard summaries remain useful if chart data is unavailable.
     } finally {
       setInsightsLoading(false);
     }
@@ -245,12 +176,6 @@ export default function PlatformDashboardPage() {
     if (session && idleReady) void loadInsights();
   }, [idleReady, loadInsights, session]);
 
-  useEffect(() => {
-    if (session && idleReady) void loadExtras();
-  }, [idleReady, loadExtras, session]);
-
-  const formatCurrency = (n: number) => formatPrice(n);
-
   async function dismissTransaction(vehicleId: string) {
     const res = await fetch("/api/admin/dashboard/transactions", {
       method: "POST",
@@ -259,25 +184,12 @@ export default function PlatformDashboardPage() {
     });
     const json = await res.json();
     if (res.ok) {
-      setDeleteToast("Removed from recent transactions. The vehicle stays in your fleet inventory.");
+      setDeleteToast("Removed from recent orders. The vehicle stays in inventory.");
       setRecentTransactions((prev) => prev.filter((v) => v.id !== vehicleId));
     } else {
-      setDeleteToast(json.message ?? "Could not remove from recent transactions.");
+      setDeleteToast(json.message ?? "Could not remove from recent orders.");
     }
   }
-
-  const businessSummary = useMemo(() => {
-    if (!stats) return undefined;
-    const parts: string[] = [];
-    if (stats.totalLeads > 0) parts.push(`${stats.totalLeads} open lead${stats.totalLeads !== 1 ? "s" : ""}`);
-    if (extras.appointmentsToday > 0)
-      parts.push(`${extras.appointmentsToday} appointment${extras.appointmentsToday !== 1 ? "s" : ""} today`);
-    if (stats.availableVehicles > 0)
-      parts.push(`${stats.availableVehicles} vehicle${stats.availableVehicles !== 1 ? "s" : ""} available`);
-    return parts.length
-      ? `${parts.join(" · ")}. Review priorities below.`
-      : undefined;
-  }, [stats, extras.appointmentsToday]);
 
   if (!permissions) {
     return (
@@ -288,17 +200,12 @@ export default function PlatformDashboardPage() {
   }
 
   return (
-    <div className="min-w-0 max-w-full space-y-4 sm:space-y-5">
-      <WelcomeHeader
-        userName={userName}
-        role={role}
-        permissions={permissions}
-        businessSummary={businessSummary}
-      />
+    <div className="min-w-0 max-w-full space-y-5 sm:space-y-6">
+      <WelcomeHeader userName={userName} role={role} />
 
       {!configured && (
         <div
-          className="rounded-lg border border-[var(--platform-warning)]/30 bg-[rgba(245,158,11,0.08)] px-4 py-3 text-sm text-[var(--platform-warning)]"
+          className="rounded-lg border border-[var(--platform-warning)]/30 bg-[rgba(224,167,35,0.08)] px-4 py-3 text-sm text-[var(--platform-warning)]"
           role="alert"
         >
           Database not connected. Configure Supabase env vars and redeploy.
@@ -307,7 +214,7 @@ export default function PlatformDashboardPage() {
 
       {deleteToast && (
         <div
-          className="rounded-lg border border-[var(--platform-success)]/30 bg-[rgba(16,185,129,0.08)] px-4 py-3 text-sm text-[var(--platform-success)]"
+          className="rounded-lg border border-[var(--platform-success)]/30 bg-[rgba(22,163,74,0.08)] px-4 py-3 text-sm text-[var(--platform-success)]"
           role="status"
         >
           {deleteToast}
@@ -316,177 +223,52 @@ export default function PlatformDashboardPage() {
 
       {coreDataError ? (
         <div
-          className="rounded-lg border border-[var(--platform-warning)]/30 bg-[rgba(245,158,11,0.08)] px-4 py-3 text-sm text-[var(--platform-text)]"
+          className="rounded-lg border border-[var(--platform-warning)]/30 bg-[rgba(224,167,35,0.08)] px-4 py-3 text-sm text-[var(--platform-text)]"
           role="status"
         >
           {coreDataError}
         </div>
       ) : null}
 
-      <KpiCards
-        stats={stats ?? ({} as PlatformStats)}
-        role={role}
-        permissions={permissions}
-        extras={extras}
-        loading={statsLoading || !stats}
-      />
-
       <QuickActions permissions={permissions} role={role} />
 
-      <AttentionCenter
-        stats={stats}
-        notifications={notifications}
-        permissions={permissions}
-        role={role}
-        extras={extras}
-      />
+      <NabusKpiRow stats={stats} role={role} loading={statsLoading || !stats} />
 
-      {insightsError ? (
-        <p className="text-xs leading-5 text-[var(--platform-text-secondary)]" role="status">
-          {insightsError}
-        </p>
-      ) : null}
-
-      <InsightsSection
-        stats={stats}
-        permissions={permissions}
-        role={role}
-        chartVehicles={chartVehicles}
-        extras={extras}
-        notifications={notifications}
-        recentLeads={recentLeads}
-        activityLog={activityLog}
-        tablesLoading={tablesLoading}
-        insightsLoading={insightsLoading}
-      />
-
-      <DeferredSection
-        fallback={
-          <div className="grid min-w-0 gap-4 xl:grid-cols-2 2xl:gap-5">
-            <SectionSkeleton className="h-72" />
-            <SectionSkeleton className="h-72" />
-          </div>
-        }
-      >
-        <DashboardTablesSection
-          recentTransactions={recentTransactions}
-          recentLeads={recentLeads}
-          tablesLoading={tablesLoading}
-          canDeleteTransactions={canDeleteTransactions}
-          showFinance={financeVisible}
-          formatCurrency={formatCurrency}
-          onDeleteTarget={setDeleteVehicleTarget}
+      <div className="grid min-w-0 max-w-full auto-rows-min gap-4 xl:grid-cols-2 2xl:gap-5">
+        <SalesOverviewPanel
+          vehicles={chartVehicles}
+          loading={insightsLoading && chartVehicles.length === 0}
         />
-      </DeferredSection>
-
-      <ConfirmDialog
-        open={Boolean(deleteVehicleTarget)}
-        onOpenChange={(open) => !open && setDeleteVehicleTarget(null)}
-        title="Remove from recent transactions?"
-        description={
-          deleteVehicleTarget
-            ? `${deleteVehicleTarget.year} ${deleteVehicleTarget.make} ${deleteVehicleTarget.model} will be hidden from this dashboard list only. The vehicle remains in inventory and fleet counts — it is not moved to Trash.`
-            : ""
-        }
-        confirmLabel="Remove from list"
-        destructive
-        onConfirm={async () => {
-          if (deleteVehicleTarget) await dismissTransaction(deleteVehicleTarget.id);
-        }}
-      />
-    </div>
-  );
-}
-
-type InsightsSectionProps = {
-  stats: PlatformStats | null;
-  permissions: NonNullable<ReturnType<typeof usePlatformSession>>["permissions"];
-  role: NonNullable<ReturnType<typeof usePlatformSession>>["role"];
-  chartVehicles: DbVehicle[];
-  extras: DashboardExtras;
-  notifications: ReturnType<typeof useAdminNotifications>["notifications"];
-  recentLeads: UnifiedLead[];
-  activityLog: Array<{
-    id: string;
-    action: string;
-    actor_name: string | null;
-    resource: string | null;
-    created_at: string;
-  }>;
-  tablesLoading: boolean;
-  insightsLoading: boolean;
-};
-
-function InsightsSection({
-  stats,
-  permissions,
-  role,
-  chartVehicles,
-  extras,
-  notifications,
-  recentLeads,
-  activityLog,
-  tablesLoading,
-  insightsLoading,
-}: InsightsSectionProps) {
-  return (
-    <div className="grid min-w-0 max-w-full auto-rows-min gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.25fr)] 2xl:gap-5">
-      <div className="min-w-0 max-w-full overflow-x-clip">
-        <ActivityTimeline
-          notifications={notifications}
-          recentLeads={recentLeads}
-          activityLog={activityLog}
-          loading={tablesLoading || insightsLoading}
-        />
-      </div>
-
-      <div className="min-w-0 max-w-full overflow-x-clip">
-        {stats ? (
-          <BusinessInsights
-            stats={stats}
-            permissions={permissions}
-            role={role}
-            vehicles={chartVehicles}
-            vehiclesLoading={insightsLoading}
-            extras={extras}
+        <section
+          aria-label="Recent activity"
+          className="platform-card min-w-0 max-w-full overflow-x-clip rounded-xl p-4 sm:p-5"
+        >
+          <h2 className="text-sm font-semibold text-[var(--platform-text)]">Recent Activity</h2>
+          <p className="mt-0.5 mb-4 text-xs text-[var(--platform-text-secondary)]">
+            Latest leads, notifications, and team actions
+          </p>
+          <ActivityTimeline
+            notifications={notifications}
+            recentLeads={recentLeads}
+            activityLog={activityLog}
+            loading={tablesLoading || insightsLoading}
           />
-        ) : (
-          <SectionSkeleton className="h-80" />
-        )}
+        </section>
       </div>
-    </div>
-  );
-}
 
-type DashboardTablesSectionProps = {
-  recentTransactions: DashboardRecentTransaction[];
-  recentLeads: UnifiedLead[];
-  tablesLoading: boolean;
-  canDeleteTransactions: boolean;
-  showFinance: boolean;
-  formatCurrency: (n: number) => string;
-  onDeleteTarget: (v: DashboardRecentTransaction) => void;
-};
-
-function DashboardTablesSection({
-  recentTransactions,
-  recentLeads,
-  tablesLoading,
-  canDeleteTransactions,
-  showFinance,
-  formatCurrency,
-  onDeleteTarget,
-}: DashboardTablesSectionProps) {
-  return (
-    <div className="grid min-w-0 max-w-full gap-4 xl:grid-cols-2 2xl:gap-5">
-      <section aria-label="Recent transactions" className="min-w-0 max-w-full space-y-3 overflow-x-clip">
+      <section aria-label="Recent orders" className="min-w-0 max-w-full space-y-3 overflow-x-clip">
         <div className="flex min-w-0 items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-[var(--platform-text)]">Recent transactions</h2>
+          <div>
+            <h2 className="text-sm font-semibold text-[var(--platform-text)]">Recent Orders</h2>
+            <p className="text-xs text-[var(--platform-text-secondary)]">
+              Reserved, sold, and confirmed pre-order vehicles
+            </p>
+          </div>
           <Link
-            href={platformPath("inventory")}
+            href={platformPath("leads?tab=order")}
             className="shrink-0 text-xs font-medium text-[var(--platform-accent)] hover:underline"
           >
-            View inventory
+            View all orders
           </Link>
         </div>
         <EnhancedDataTable
@@ -502,7 +284,7 @@ function DashboardTablesSection({
                 </span>
               ),
             },
-            ...(showFinance
+            ...(financeVisible
               ? [
                   {
                     id: "price",
@@ -510,7 +292,7 @@ function DashboardTablesSection({
                     sortable: true,
                     sortValue: (v: DashboardRecentTransaction) => v.price,
                     accessor: (v: DashboardRecentTransaction) => (
-                      <span className="tabular-nums">{formatCurrency(v.price)}</span>
+                      <span className="tabular-nums">{formatPrice(v.price)}</span>
                     ),
                   },
                 ]
@@ -526,7 +308,10 @@ function DashboardTablesSection({
               sortable: true,
               sortValue: (v) => v.created_at ?? "",
               accessor: (v) => (
-                <PlatformDateTime value={v.created_at} className="text-xs text-[var(--platform-text-secondary)]" />
+                <PlatformDateTime
+                  value={v.created_at}
+                  className="text-xs text-[var(--platform-text-secondary)]"
+                />
               ),
             },
             ...(canDeleteTransactions
@@ -538,12 +323,12 @@ function DashboardTablesSection({
                     accessor: (v: DashboardRecentTransaction) => (
                       <button
                         type="button"
-                        className="platform-btn-ghost text-[var(--platform-danger)]"
-                        title="Remove from recent transactions"
-                        aria-label="Remove from recent transactions"
+                        className="platform-btn-ghost text-[var(--platform-error)]"
+                        title="Remove from recent orders"
+                        aria-label="Remove from recent orders"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onDeleteTarget(v);
+                          setDeleteVehicleTarget(v);
                         }}
                       >
                         <Trash2 className="size-4" aria-hidden />
@@ -557,91 +342,31 @@ function DashboardTablesSection({
           rowKey={(v) => v.id}
           emptyMessage={
             tablesLoading
-              ? "Loading recent transactions…"
+              ? "Loading recent orders…"
               : "No reserved, sold, or confirmed pre-order vehicles yet."
           }
           loading={tablesLoading}
-          pageSize={6}
+          pageSize={8}
           hideSearch
           minWidth="36rem"
         />
       </section>
 
-      <section aria-label="Lead tracking" className="min-w-0 max-w-full space-y-3 overflow-x-clip">
-        <div className="flex min-w-0 items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-[var(--platform-text)]">Lead tracking</h2>
-          <Link
-            href={platformPath("leads")}
-            className="shrink-0 text-xs font-medium text-[var(--platform-accent)] hover:underline"
-          >
-            Manage leads
-          </Link>
-        </div>
-        <EnhancedDataTable
-          columns={[
-            {
-              id: "contact",
-              header: "Contact",
-              sortable: true,
-              sortValue: (lead) => lead.name,
-              accessor: (lead) => <LeadContactCell lead={lead} />,
-            },
-            {
-              id: "type",
-              header: "Type",
-              accessor: (lead) => leadTypeLabel(lead.type),
-            },
-            {
-              id: "status",
-              header: "Status",
-              accessor: (lead) => (
-                <div className="flex flex-wrap items-center gap-2">
-                  <StatusBadge status={lead.status} />
-                  {lead.paymentStatus && <PaymentStatusBadge status={lead.paymentStatus} />}
-                </div>
-              ),
-            },
-            {
-              id: "submitted",
-              header: "Submitted",
-              sortable: true,
-              sortValue: (lead) => lead.createdAt,
-              accessor: (lead) => (
-                <PlatformDateTime value={lead.createdAt} className="text-xs text-[var(--platform-text-secondary)]" />
-              ),
-            },
-          ]}
-          data={recentLeads}
-          rowKey={(lead) => `${lead.type}-${lead.id}`}
-          emptyMessage={tablesLoading ? "Loading leads…" : "No leads captured yet."}
-          loading={tablesLoading}
-          pageSize={6}
-          hideSearch
-          minWidth="36rem"
-        />
-      </section>
+      <ConfirmDialog
+        open={Boolean(deleteVehicleTarget)}
+        onOpenChange={(open) => !open && setDeleteVehicleTarget(null)}
+        title="Remove from recent orders?"
+        description={
+          deleteVehicleTarget
+            ? `${deleteVehicleTarget.year} ${deleteVehicleTarget.make} ${deleteVehicleTarget.model} will be hidden from this list only. The vehicle remains in inventory.`
+            : ""
+        }
+        confirmLabel="Remove from list"
+        destructive
+        onConfirm={async () => {
+          if (deleteVehicleTarget) await dismissTransaction(deleteVehicleTarget.id);
+        }}
+      />
     </div>
   );
 }
-
-const LeadContactCell = memo(function LeadContactCell({ lead }: { lead: UnifiedLead }) {
-  return (
-    <div>
-      {lead.detailLink ? (
-        <Link href={lead.detailLink} className="font-medium text-[var(--platform-accent)] hover:underline">
-          {lead.name}
-        </Link>
-      ) : (
-        <Link
-          href={`${platformPath("leads")}?tab=${lead.type}`}
-          className="font-medium text-[var(--platform-accent)] hover:underline"
-        >
-          {lead.name}
-        </Link>
-      )}
-      <p className="text-xs text-[var(--platform-text-secondary)]">
-        {lead.vehicleTitle ?? lead.summary.slice(0, 48)}
-      </p>
-    </div>
-  );
-});

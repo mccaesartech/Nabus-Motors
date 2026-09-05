@@ -107,16 +107,17 @@ export function SortBar({ total }: SortBarProps) {
           maxLength={MAX_PUBLIC_SEARCH_LENGTH}
           placeholder="Search make, model, year, color…"
           aria-label="Search inventory"
-          className="h-9 pl-8"
+          className="h-11 rounded-lg border-[var(--nabus-input-border)] pl-9 focus-visible:border-[var(--nabus-primary)]"
         />
       </form>
       <Suspense fallback={null}>
         <ActiveFilterChips />
       </Suspense>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-muted-foreground">
-          {total} vehicle{total !== 1 ? "s" : ""} found
-          {isPending && " · Updating..."}
+        <p className="text-sm text-[var(--nabus-text-secondary)]">
+          <span className="font-semibold tabular-nums text-[var(--nabus-charcoal)]">{total}</span>{" "}
+          vehicle{total !== 1 ? "s" : ""} found
+          {isPending && " · Updating…"}
         </p>
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <InventoryMobileFilters />

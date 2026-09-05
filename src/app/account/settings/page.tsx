@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Container } from "@/components/shared/container";
 import { AccountSettingsShell } from "@/components/account/account-settings-nav";
 import { ProfileSettingsSection } from "@/components/account/profile-settings-section";
 import { useRequireCustomerAuth } from "@/hooks/use-require-customer-auth";
@@ -10,16 +9,11 @@ export default function AccountSettingsPage() {
   const { user, loading } = useRequireCustomerAuth();
 
   if (loading || !user) {
-    return (
-      <Container className="py-16 sm:py-20">
-        <p className="text-sm text-muted-foreground">Loading settings…</p>
-      </Container>
-    );
+    return <p className="text-sm text-[var(--nabus-text-secondary)]">Loading settings…</p>;
   }
 
   return (
-    <Container className="py-12 sm:py-16">
-      <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-3xl">
         <AccountSettingsShell
           title="Account settings"
           description="View and update your profile, then manage privacy and security."
@@ -38,7 +32,6 @@ export default function AccountSettingsPage() {
             </Link>
           </div>
         </AccountSettingsShell>
-      </div>
-    </Container>
+    </div>
   );
 }

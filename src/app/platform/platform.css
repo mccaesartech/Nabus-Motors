@@ -17,6 +17,20 @@
   --platform-error: #b7192e;
   --platform-card-shadow-hover: 0 4px 16px rgba(24, 24, 24, 0.06);
 
+  /* Nabus component tokens — inherit in admin workspace */
+  --nabus-primary: #b7192e;
+  --nabus-primary-hover: #8d1223;
+  --nabus-yellow: #e0a723;
+  --nabus-yellow-light: #f4c542;
+  --nabus-red-soft: #fcecef;
+  --nabus-yellow-soft: #fff7e0;
+  --nabus-background: #f7f7f7;
+  --nabus-surface: #ffffff;
+  --nabus-charcoal: #181818;
+  --nabus-text-secondary: #696969;
+  --nabus-border: #e5e5e5;
+  --nabus-input-border: #dcdcdc;
+
   background-color: var(--platform-bg);
   color: var(--platform-text);
   min-height: 100vh;
@@ -101,7 +115,7 @@
   height: 2.25rem;
   width: 100%;
   border-radius: 0.375rem;
-  border: 1px solid #c4b5fd;
+  border: 1px solid var(--platform-border);
   background-color: var(--platform-card);
   padding-top: 0;
   padding-bottom: 0;
@@ -116,7 +130,7 @@
 /* Beat shadcn Input utilities (border-input / bg-transparent) on platform forms */
 .platform-theme input.platform-input,
 .platform-theme [data-slot="input"].platform-input {
-  border-color: #c4b5fd;
+  border-color: var(--platform-border);
   background-color: var(--platform-card);
 }
 
@@ -136,12 +150,12 @@
 }
 
 .platform-input:focus {
-  border-color: rgba(200, 84, 31, 0.5);
-  box-shadow: 0 0 0 3px rgba(200, 84, 31, 0.12);
+  border-color: rgba(183, 25, 46, 0.45);
+  box-shadow: 0 0 0 3px rgba(183, 25, 46, 0.1);
 }
 
 .platform-input::placeholder {
-  color: rgba(124, 107, 158, 0.7);
+  color: rgba(105, 105, 105, 0.65);
 }
 
 .platform-select {
@@ -358,13 +372,13 @@
 }
 
 .platform-filter-chip:hover {
-  border-color: #c4b5fd;
+  border-color: rgba(183, 25, 46, 0.35);
   color: var(--platform-text);
 }
 
 .platform-filter-chip[data-active="true"] {
-  border-color: rgba(200, 84, 31, 0.45);
-  background-color: rgba(200, 84, 31, 0.1);
+  border-color: rgba(183, 25, 46, 0.45);
+  background-color: rgba(183, 25, 46, 0.08);
   color: var(--platform-text);
 }
 
@@ -427,13 +441,13 @@
 @media (hover: hover) {
   a.platform-dashboard-card:hover,
   button.platform-dashboard-card:hover:not(:disabled) {
-    border-color: #c4b5fd;
+    border-color: rgba(183, 25, 46, 0.25);
     box-shadow: var(--platform-card-shadow-hover);
     transform: translateY(-1px);
   }
 
   button.platform-stat-card:hover:not(:disabled) {
-    border-color: #c4b5fd;
+    border-color: rgba(183, 25, 46, 0.25);
     box-shadow: var(--platform-card-shadow-hover);
   }
 }

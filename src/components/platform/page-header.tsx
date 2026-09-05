@@ -36,7 +36,7 @@ export function PageHeader({
             {breadcrumb}
           </p>
         )}
-        <h1 className="text-xl font-semibold tracking-tight text-[var(--platform-text)] sm:text-2xl">
+        <h1 className="text-xl font-bold tracking-tight text-[var(--platform-text)] sm:text-2xl">
           {title}
         </h1>
         {description && (

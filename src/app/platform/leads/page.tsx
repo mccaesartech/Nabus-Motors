@@ -9,7 +9,8 @@ import {
   ConfirmDialog,
   DELETE_CONFIRM_PHRASE,
 } from "@/components/platform/confirm-dialog";
-import { PaymentStatusBadge, StatusBadge } from "@/components/platform/status-badge";
+import { PaymentStatusBadge } from "@/components/platform/status-badge";
+import { LeadStageChip } from "@/components/nabus/lead-stage-chip";
 import { SafeVehicleImage } from "@/components/shared/safe-vehicle-image";
 import { usePlatformSession } from "@/components/platform/platform-shell";
 import { adminLoginPath } from "@/lib/admin/paths";
@@ -525,7 +526,7 @@ export default function LeadsPage() {
                       className={cn(
                         "border-t border-[var(--platform-border)] align-top",
                         isClickable &&
-                          "cursor-pointer select-none hover:bg-[rgba(139,92,246,0.04)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--platform-accent)]"
+                          "cursor-pointer select-none hover:bg-[rgba(183,25,46,0.04)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--platform-accent)]"
                       )}
                       onClick={() => {
                         if (isClickable && lead.detailLink) router.push(lead.detailLink);
@@ -638,6 +639,7 @@ export default function LeadsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
+                          <LeadStageChip status={lead.status} />
                           <select
                             value={lead.status}
                             disabled={!canMutate}

@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Container } from "@/components/shared/container";
 import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -167,16 +166,26 @@ function RegisterForm() {
   }
 
   return (
-    <Container className="py-16 sm:py-20">
-      <div className="mx-auto max-w-md">
-        <div className="mb-8 flex justify-center">
-          <Logo variant="purple" brand="corporate" height={52} />
+    <div className="grid min-h-[calc(100dvh-var(--shell-top-offset))] lg:grid-cols-2">
+      <div className="relative hidden overflow-hidden bg-[var(--nabus-nav-dark)] lg:block">
+        <div className="absolute inset-0 bg-gradient-to-br from-[var(--nabus-nav-dark)] via-[#2a1018] to-[var(--nabus-primary)]/60" />
+        <div className="relative flex h-full flex-col justify-end p-12">
+          <p className="text-sm font-semibold text-white/80">Nabus Motors</p>
+          <h2 className="mt-2 text-2xl font-bold text-white">
+            Track imports, orders, and messages — all in one place.
+          </h2>
         </div>
-        <h1 className="text-2xl font-semibold">Create Account</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Create your account to track pre-orders, purchases, and message our
-          team.
-        </p>
+      </div>
+
+      <div className="flex items-center justify-center px-4 py-12 sm:px-8">
+        <div className="w-full max-w-md">
+          <div className="mb-8 flex justify-center lg:justify-start">
+            <Logo variant="purple" brand="auto" height={48} srcOverride="/logo.png" />
+          </div>
+          <h1 className="text-2xl font-bold text-[var(--nabus-charcoal)]">Create Account</h1>
+          <p className="mt-2 text-sm text-[var(--nabus-text-secondary)]">
+            Create your account to track pre-orders, purchases, and message our team.
+          </p>
         <div className="mt-8 space-y-5">
           <GoogleSignInButton
             redirectPath={redirectTo}
@@ -261,31 +270,37 @@ function RegisterForm() {
             />
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <Button type="submit" className="w-full" size="lg" disabled={loading}>
+          <Button
+            type="submit"
+            className="h-11 w-full rounded-lg bg-[var(--nabus-primary)] hover:bg-[var(--nabus-primary-hover)]"
+            size="lg"
+            disabled={loading}
+          >
             {loading ? "Creating account…" : "Create Account"}
           </Button>
         </form>
-        <p className="mt-6 text-center text-sm text-muted-foreground">
-          Already have an account?{" "}
-          <Link
-            href={
-              redirectTo === "/account?welcome=1"
-                ? "/login"
-                : `/login?redirect=${encodeURIComponent(redirectTo)}`
-            }
-            className="font-medium text-brand-purple hover:text-foreground"
-          >
-            Sign in
-          </Link>
-        </p>
+          <p className="mt-6 text-center text-sm text-[var(--nabus-text-secondary)] lg:text-left">
+            Already have an account?{" "}
+            <Link
+              href={
+                redirectTo === "/account?welcome=1"
+                  ? "/login"
+                  : `/login?redirect=${encodeURIComponent(redirectTo)}`
+              }
+              className="font-semibold text-[var(--nabus-primary)] hover:underline"
+            >
+              Sign in
+            </Link>
+          </p>
+        </div>
       </div>
-    </Container>
+    </div>
   );
 }
 
 export default function RegisterPage() {
   return (
-    <Suspense fallback={<Container className="py-16 sm:py-20">{null}</Container>}>
+    <Suspense fallback={<div className="min-h-[50vh]" />}>
       <RegisterForm />
     </Suspense>
   );

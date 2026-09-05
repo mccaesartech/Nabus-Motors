@@ -404,7 +404,7 @@ export function SalesTrendChart({
           <LineChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 4 }}>
             <XAxis
               dataKey="label"
-              tick={{ fill: "#a78bfa", fontSize: 9 }}
+              tick={{ fill: "#696969", fontSize: 9 }}
               axisLine={false}
               tickLine={false}
               interval="preserveStartEnd"
@@ -415,7 +415,7 @@ export function SalesTrendChart({
             />
             <YAxis
               allowDecimals={false}
-              tick={{ fill: "#a78bfa", fontSize: 10 }}
+              tick={{ fill: "#696969", fontSize: 10 }}
               axisLine={false}
               tickLine={false}
               width={28}
@@ -427,9 +427,9 @@ export function SalesTrendChart({
             <Line
               type="monotone"
               dataKey="value"
-              stroke={platformTokens.primary.purple}
+              stroke="#b7192e"
               strokeWidth={2}
-              dot={{ r: 3, fill: platformTokens.primary.purple }}
+              dot={{ r: 3, fill: "#b7192e" }}
               activeDot={{ r: 5 }}
               {...CHART_ANIMATION}
             />
@@ -464,7 +464,7 @@ export function RevenueTrendChart({
           <BarChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 4 }}>
             <XAxis
               dataKey="label"
-              tick={{ fill: "#a78bfa", fontSize: 9 }}
+              tick={{ fill: "#696969", fontSize: 9 }}
               axisLine={false}
               tickLine={false}
               interval="preserveStartEnd"
@@ -474,7 +474,7 @@ export function RevenueTrendChart({
               minTickGap={8}
             />
             <YAxis
-              tick={{ fill: "#a78bfa", fontSize: 10 }}
+              tick={{ fill: "#696969", fontSize: 10 }}
               axisLine={false}
               tickLine={false}
               width={36}
@@ -492,7 +492,7 @@ export function RevenueTrendChart({
             />
             <Bar
               dataKey="value"
-              fill={platformTokens.semantic.success}
+              fill="#b7192e"
               radius={[4, 4, 0, 0]}
               {...CHART_ANIMATION}
             />

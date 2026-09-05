@@ -1,10 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, Suspense } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { MessageSquare, MessageSquarePlus, Package, Send, Ship, ShoppingCart, CalendarCheck, Car, Truck, Search, Settings } from "lucide-react";
-import { Container } from "@/components/shared/container";
+import { MessageSquare, MessageSquarePlus, Package, Send, Ship, ShoppingCart, CalendarCheck, Car, Truck, Settings } from "lucide-react";
 import { ShipmentTimeline } from "@/components/shared/shipment-timeline";
 import { ImportMilestoneTimeline } from "@/components/shared/import-milestone-timeline";
 import { VisualShipmentTimeline } from "@/components/shared/visual-shipment-timeline";
@@ -32,7 +31,7 @@ import { cn } from "@/lib/utils";
 import { shipmentStatusLabel } from "@/lib/platform/shipment";
 import { formatCargoDisplay } from "@/lib/freight/cargo-options";
 import type { CustomerCartSummary, PartsOrderSummary } from "@/lib/parts/cart-types";
-import { AccountDashboardTiles } from "@/components/account/account-dashboard-tiles";
+import { NabusDashboardCard } from "@/components/nabus/nabus-dashboard-card";
 import { AccountCartSection } from "@/components/account/account-cart-section";
 import { OrderHistorySection } from "@/components/account/order-history-section";
 import { RecentOrderBanner } from "@/components/account/recent-order-banner";
@@ -116,11 +115,7 @@ function inquiryTypeLabel(item: CustomerInquirySummary) {
 
 export default function AccountPage() {
   return (
-    <Suspense fallback={
-      <Container className="py-16 sm:py-20">
-        <p className="text-sm text-muted-foreground">Loading your account…</p>
-      </Container>
-    }>
+    <Suspense fallback={<p className="text-sm text-[var(--nabus-text-secondary)]">Loading your account…</p>}>
       <AccountContent />
     </Suspense>
   );
@@ -530,15 +525,12 @@ function AccountContent() {
 
   if (loading || !user) {
     return (
-      <Container className="py-16 sm:py-20">
-        <p className="text-sm text-muted-foreground">Loading your account…</p>
-      </Container>
+      <p className="text-sm text-[var(--nabus-text-secondary)]">Loading your account…</p>
     );
   }
 
   return (
-    <Container className="py-12 sm:py-16">
-      <div className="mx-auto max-w-4xl space-y-10">
+    <div className="mx-auto max-w-4xl space-y-10">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-start">
             <ProfileAvatarViewer
@@ -605,48 +597,32 @@ function AccountContent() {
 
         <AccountNotificationsSection />
 
-        <AccountDashboardTiles
-          tiles={[
-            {
-              id: "cart",
-              label: "My Cart",
-              icon: ShoppingCart,
-              href: "#my-cart",
-              badge: cartItemCount,
-              badgeLabel: "items in cart",
-            },
-            {
-              id: "orders",
-              label: "My Orders",
-              icon: Package,
-              href: "#my-orders",
-              badge: pendingOrderCount,
-              badgeLabel: "pending orders",
-            },
-            {
-              id: "visit",
-              label: "Book a Visit",
-              icon: CalendarCheck,
-              href: "#book-visit",
-            },
-            {
-              id: "vehicle-requests",
-              label: "Vehicle requests",
-              icon: Search,
-              href: "#vehicle-requests",
-              badge: customRequests.length,
-              badgeLabel: "vehicle requests",
-            },
-            {
-              id: "preorders",
-              label: "My Pre-orders",
-              icon: Car,
-              href: "#my-preorders",
-              badge: catalogPreorders.length,
-              badgeLabel: "pre-orders",
-            },
-          ]}
-        />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <NabusDashboardCard
+            title="Active Orders"
+            value={pendingOrderCount}
+            description="Pending parts orders"
+            icon={Package}
+          />
+          <NabusDashboardCard
+            title="Saved Vehicles"
+            value={cartSummary?.vehicle_count ?? 0}
+            description="In your cart"
+            icon={ShoppingCart}
+          />
+          <NabusDashboardCard
+            title="Upcoming Payment"
+            value={catalogPreorders.filter((p) => p.payment_status !== "completed").length}
+            description="Pre-orders awaiting deposit"
+            icon={Car}
+          />
+          <NabusDashboardCard
+            title="Service Booking"
+            value={appointments.filter((a) => a.status === "scheduled" || a.status === "confirmed").length}
+            description="Scheduled visits"
+            icon={CalendarCheck}
+          />
+        </div>
 
         {!dataLoading && partsOrders.length > 0 && <RecentOrderBanner orders={partsOrders} />}
 
@@ -1172,13 +1148,12 @@ function AccountContent() {
             </div>
           </div>
         </section>
-      </div>
       <LogoutConfirmDialog
         open={logoutConfirmOpen}
         onOpenChange={setLogoutConfirmOpen}
         onConfirm={handleSignOut}
         confirmLabel="Sign out"
       />
-    </Container>
+    </div>
   );
 }

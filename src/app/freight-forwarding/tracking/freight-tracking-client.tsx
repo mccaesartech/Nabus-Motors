@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useState } from "react";
 import { useHashScroll } from "@/hooks/use-hash-scroll";
 import { Container } from "@/components/shared/container";
-import { SectionHeader } from "@/components/shared/section-header";
+import { NabusPageHeader } from "@/components/nabus/nabus-page-header";
+import { NabusTimeline } from "@/components/nabus/nabus-timeline";
+import { buildShipmentTimelineSteps } from "@/lib/nabus/shipment-timeline";
 import { FreightServiceCards } from "@/components/freight/freight-service-cards";
 import { FreightAdviceTrigger } from "@/components/freight/freight-advice-message-panel";
 import { LoggedInContactBanner, useFreightFormProfile } from "@/components/freight/freight-form-account-fields";
@@ -144,7 +146,12 @@ export function FreightTrackingClient({ pageContent }: FreightTrackingClientProp
   return (
     <Container className="py-12 sm:py-16">
       <div className="mx-auto max-w-4xl">
-        <SectionHeader title={pageContent.title} description={pageContent.subtitle} />
+        <NabusPageHeader
+          title={pageContent.title}
+          description={pageContent.subtitle}
+          eyebrow="Tracking"
+          className="mb-10"
+        />
 
         {pageContent.cards.length > 0 && (
           <div className="mb-10">
@@ -165,7 +172,7 @@ export function FreightTrackingClient({ pageContent }: FreightTrackingClientProp
           <form
             id="track-form"
             onSubmit={handleTrack}
-            className="scroll-mt-[var(--header-height)] space-y-4 rounded-xl border border-border bg-card p-6 shadow-luxury"
+            className="scroll-mt-[var(--header-height)] space-y-4 rounded-xl border border-[var(--nabus-border)] bg-[var(--nabus-surface)] p-6"
           >
             <div className="flex flex-wrap gap-2">
               {(
@@ -337,31 +344,30 @@ export function FreightTrackingClient({ pageContent }: FreightTrackingClientProp
           )}
 
           {result && (
-            <div className="mt-8 space-y-6 rounded-xl border border-border bg-card p-6 shadow-luxury">
-              <VisualShipmentTimeline
-                status={result.status}
-                trackingId={result.tracking_number}
-                expectedArrival={result.estimated_arrival}
-              />
+            <div className="mt-8 space-y-6 rounded-xl border border-[var(--nabus-border)] bg-[var(--nabus-surface)] p-6">
+              <NabusTimeline steps={buildShipmentTimelineSteps(result.status)} />
 
-              <div className="flex flex-wrap items-start justify-between gap-4 border-t border-border pt-4">
+              <div className="flex flex-wrap items-start justify-between gap-4 border-t border-[var(--nabus-border)] pt-4">
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--nabus-text-secondary)]">
                     Tracking number
                   </p>
-                  <p className="mt-1 font-mono text-lg font-semibold">{result.tracking_number}</p>
+                  <p className="mt-1 font-mono text-lg font-semibold text-[var(--nabus-charcoal)]">
+                    {result.tracking_number}
+                  </p>
                 </div>
-                <span className="rounded-full bg-brand-purple/10 px-3 py-1 text-sm font-medium text-brand-purple">
+                <span className="inline-flex items-center rounded-full border border-[var(--nabus-primary)]/20 bg-[var(--nabus-red-soft)] px-3 py-1 text-xs font-semibold text-[var(--nabus-primary)]">
                   {shipmentStatusLabel(result.status)}
                 </span>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 {result.origin_country && (
-                  <div className="flex gap-2 text-sm text-muted-foreground">
+                  <div className="flex gap-2 text-sm text-[var(--nabus-text-secondary)]">
                     <MapPin className="mt-0.5 size-4 shrink-0" />
                     <span>
-                      <strong className="text-foreground">Origin:</strong> {result.origin_country}
+                      <strong className="text-[var(--nabus-charcoal)]">Departure:</strong>{" "}
+                      {result.origin_country}
                     </span>
                   </div>
                 )}
@@ -382,8 +388,8 @@ export function FreightTrackingClient({ pageContent }: FreightTrackingClientProp
                   </div>
                 )}
                 {result.estimated_arrival && (
-                  <div className="text-sm text-muted-foreground">
-                    <strong className="text-foreground">Est. arrival:</strong>{" "}
+                  <div className="text-sm text-[var(--nabus-text-secondary)]">
+                    <strong className="text-[var(--nabus-charcoal)]">ETA:</strong>{" "}
                     {new Date(result.estimated_arrival).toLocaleDateString()}
                   </div>
                 )}

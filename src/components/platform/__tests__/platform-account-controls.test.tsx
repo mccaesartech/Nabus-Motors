@@ -6,7 +6,6 @@ import {
 } from "@/components/platform/platform-logout-action";
 import { WelcomeHeader } from "@/components/platform/dashboard/welcome-header";
 import { PlatformSidebarFooter } from "@/components/platform/sidebar";
-import { buildSessionPermissions } from "@/lib/platform/permissions";
 
 describe("rendered platform account controls", () => {
   it.each(["owner", "super_admin", "manager", "staff"] as const)(
@@ -37,16 +36,13 @@ describe("rendered platform account controls", () => {
 
   it("mounts the account trigger in the dashboard header users actually see", () => {
     const html = renderToStaticMarkup(
-      <WelcomeHeader
-        userName="Assigned User"
-        role="manager"
-        permissions={buildSessionPermissions("manager")}
-      />
+      <WelcomeHeader userName="Assigned User" role="manager" />
     );
 
     expect(html).toContain('data-testid="platform-account-trigger-dashboard"');
     expect(html).toContain("Open account menu for Assigned User, Manager");
     expect(html).toContain('aria-haspopup="menu"');
+    expect(html).toContain("Nabus Motors today");
   });
 });
 
