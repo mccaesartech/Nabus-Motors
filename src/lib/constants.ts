@@ -26,18 +26,19 @@ export const DEFAULT_HERO_VIDEO_SOURCE =
 export const DEFAULT_HERO_BACKGROUND_EMBED_URL =
   "https://www.youtube.com/watch?v=pu-tvoWj1sE";
 
-/** Corporate homepage hero — logistics, vehicles, and freight montage. */
-export const CORPORATE_HERO_VIDEO_URL = "/videos/corporate-hero.mp4";
+/** Corporate homepage hero — luxury showroom walkthrough (Pexels, royalty-free). */
+export const CORPORATE_HERO_VIDEO_URL =
+  "https://videos.pexels.com/video-files/30225108/30225108-hd_1920_1080_30fps.mp4";
 
-/** Lower-bitrate mobile variant (generate with scripts/optimize-videos.ps1). */
-export const CORPORATE_HERO_VIDEO_MOBILE_URL = "/videos/corporate-hero-mobile.mp4";
+/** Same clip on mobile until a dedicated mobile encode is added. */
+export const CORPORATE_HERO_VIDEO_MOBILE_URL = CORPORATE_HERO_VIDEO_URL;
 
-/** Poster for corporate hero video (first frame of montage). */
-export const CORPORATE_HERO_POSTER_URL = "/images/corporate-hero-poster.jpg";
+/** Poster for corporate hero video — local still from Pexels 170811. */
+export const CORPORATE_HERO_POSTER_URL = "/images/nabus-hero-poster.jpg";
 
-/** Source attribution for corporate hero montage (Pexels, royalty-free). */
+/** Source attribution for corporate hero footage (Pexels, royalty-free). */
 export const CORPORATE_HERO_VIDEO_SOURCE =
-  "Pexels — logistics hub aerial (6585382), vehicles (2103099), port shipping (3045163)";
+  "Pexels — luxury cars in showroom (30225108), poster still (170811)";
 
 export function whatsappUrl(message?: string, number = WHATSAPP_NUMBER): string {
   const base = `https://wa.me/${number}`;

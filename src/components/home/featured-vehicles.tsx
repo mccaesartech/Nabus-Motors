@@ -3,7 +3,7 @@ import { ROUTES } from "@/lib/routes";
 import { ArrowRight } from "lucide-react";
 import { Container } from "@/components/shared/container";
 import { SectionHeader } from "@/components/shared/section-header";
-import { VehicleCard } from "@/components/shared/vehicle-card";
+import { NabusVehicleCard } from "@/components/nabus/nabus-vehicle-card";
 import { Button } from "@/components/ui/button";
 import { fetchFeaturedVehicles } from "@/lib/supabase/vehicles";
 
@@ -32,7 +32,7 @@ export async function FeaturedVehicles() {
 
         <div className="mt-8 grid w-full gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {featured.slice(0, 6).map((vehicle) => (
-            <VehicleCard key={vehicle.id} vehicle={vehicle} />
+            <NabusVehicleCard key={vehicle.id} vehicle={vehicle} />
           ))}
         </div>
 

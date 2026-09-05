@@ -105,10 +105,10 @@ export type SparePartsLandingSiteContent = PageHeroSiteContentSimple & {
 };
 
 export const DEFAULT_CORPORATE_HOMEPAGE: CorporateHomepageSiteContent = {
-  heroEyebrow: "Nabus Motors and Trading",
-  heroTitle: "Drive Your Dream Car",
+  heroEyebrow: "Accra, Ghana",
+  heroTitle: "Your next vehicle, verified and ready",
   heroSubtitle:
-    "Ghana's award-winning automobile dealer — verified vehicles, flexible financing through Autochek, and trusted service from inquiry to delivery.",
+    "Browse inspected inventory, pre-order imports from China and Japan, and finance with Autochek — all from one trusted dealership team.",
   heroVideoUrl: CORPORATE_HERO_VIDEO_URL,
   heroPosterUrl: CORPORATE_HERO_POSTER_URL,
   ctaPrimaryLabel: "Browse Vehicles",

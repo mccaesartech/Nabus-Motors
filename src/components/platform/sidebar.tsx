@@ -54,7 +54,7 @@ export function PlatformSidebarFooter({ collapsed }: { collapsed: boolean }) {
       aria-label="Account actions"
       data-testid="platform-sidebar-footer"
       className={cn(
-        "platform-sidebar-footer relative z-10 shrink-0 border-t border-[var(--platform-border)] bg-[var(--platform-bg-secondary)] p-2",
+        "platform-sidebar-footer relative z-10 shrink-0 border-t border-[#333] bg-[var(--platform-sidebar-bg)] p-2",
         !collapsed && "px-3 py-3"
       )}
     >
@@ -315,17 +315,17 @@ export function PlatformSidebar({
         aria-label="Platform navigation"
         inert={!isDesktop && !mobileOpen && !collapsed ? true : undefined}
         className={cn(
-          "flex h-dvh min-h-0 flex-col overflow-hidden border-r border-[var(--platform-border)] bg-[var(--platform-bg-secondary)] transition-[transform,width] duration-300 ease-out",
+          "flex h-dvh min-h-0 flex-col overflow-hidden border-r border-[#333] bg-[var(--platform-sidebar-bg)] text-white transition-[transform,width] duration-300 ease-out",
           "max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50 max-lg:shadow-xl max-lg:will-change-transform",
           "lg:relative lg:z-auto lg:h-full lg:shrink-0 lg:shadow-none",
-          collapsed ? "w-[4.5rem]" : "w-[min(100%-3rem,16rem)] max-lg:w-[min(calc(100dvw-3rem),16rem)] sm:w-64",
+          collapsed ? "w-[4.5rem]" : "w-[min(100%-3rem,15rem)] max-lg:w-[min(calc(100dvw-3rem),15rem)] sm:w-[230px]",
           showMobileDrawer || showMobileIconRail ? "max-lg:translate-x-0" : "max-lg:-translate-x-full"
         )}
         {...swipeHandlers}
       >
         <div
           className={cn(
-            "shrink-0 border-b border-[var(--platform-border)]",
+            "shrink-0 border-b border-[#333]",
             collapsed
               ? "flex items-center justify-center px-1.5 py-3"
               : "flex items-center justify-between gap-2 px-3 py-4 sm:px-4 sm:py-5"

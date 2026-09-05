@@ -7,8 +7,11 @@ export async function register() {
   // Sentry init is gated by DSN inside the config modules (no-op when unset).
   if (process.env.NEXT_RUNTIME === "nodejs") {
     await import("./sentry.server.config");
-    const { validateResendEnvironment } = await import("@/lib/email/resend");
-    validateResendEnvironment();
+    // Resend is optional until invite/notification email is configured.
+    if (process.env.RESEND_API_KEY?.trim()) {
+      const { validateResendEnvironment } = await import("@/lib/email/resend");
+      validateResendEnvironment();
+    }
   }
   if (process.env.NEXT_RUNTIME === "edge") {
     await import("./sentry.edge.config");

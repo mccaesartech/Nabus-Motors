@@ -1,8 +1,9 @@
 import { Suspense } from "react";
 import dynamic from "next/dynamic";
-import { MapPin } from "lucide-react";
 import { Container } from "@/components/shared/container";
-import { VehicleCard } from "@/components/shared/vehicle-card";
+import { NabusVehicleCard } from "@/components/nabus/nabus-vehicle-card";
+import { NabusPageHeader } from "@/components/nabus/nabus-page-header";
+import { NabusEmptyState } from "@/components/nabus/nabus-empty-state";
 import { CustomVehicleRequestCta } from "@/components/vehicle/custom-vehicle-request-cta";
 import {
   parseFiltersFromSearchParams,
@@ -13,13 +14,17 @@ import { queryFilteredVehicles } from "@/lib/supabase/vehicle-queries";
 import { getSiteContent } from "@/lib/site-content";
 import { resolveFulfillmentMode } from "@/lib/vehicles/fulfillment";
 import { hasActiveInventoryFilters } from "@/lib/vehicles/filter-config";
+import Link from "next/link";
+import { Car } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ROUTES } from "@/lib/routes";
 
 const InventoryFilters = dynamic(
   () =>
     import("@/components/inventory/inventory-filters").then((m) => ({
       default: m.InventoryFilters,
     })),
-  { loading: () => <div className="hidden w-64 shrink-0 lg:block" aria-hidden /> }
+  { loading: () => <div className="hidden w-72 shrink-0 lg:block" aria-hidden /> }
 );
 
 const SortBar = dynamic(
@@ -55,13 +60,13 @@ interface InventoryPageProps {
 }
 
 export const metadata = {
-  title: "Inventory",
+  title: "Shop Cars",
   description:
-    "Browse and search our verified vehicle inventory by make, model, year, and more.",
+    "Browse and search verified Nabus Motors inventory by make, model, year, and more.",
 };
 
 function FiltersFallback() {
-  return <div className="hidden w-64 shrink-0 lg:block" />;
+  return <div className="hidden w-72 shrink-0 lg:block" />;
 }
 
 export default async function InventoryPage({ searchParams }: InventoryPageProps) {
@@ -82,39 +87,27 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const currentPage = Math.min(Math.max(1, page), totalPages || 1);
 
+  const headerTitle = isLocallyAvailableView
+    ? "Available in Ghana"
+    : isPreorderView
+      ? pageCopy.preorderTitle
+      : pageCopy.title || "Find Your Next Car";
+
+  const headerDescription = isLocallyAvailableView
+    ? "In-stock Ghana inventory and newly arrived vehicles — ready for immediate delivery."
+    : isPreorderView
+      ? pageCopy.preorderSubtitle
+      : pageCopy.subtitle;
+
   return (
     <div className="py-10 sm:py-14">
       <Container>
-        {isLocallyAvailableView ? (
-          <div className="mb-8 overflow-hidden rounded-xl border border-brand-purple/30 bg-gradient-to-r from-brand-purple/10 via-brand-gold/8 to-brand-purple/5 p-6 sm:p-8">
-            <div className="flex items-start gap-4">
-              <div className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-brand-gold/45 bg-brand-gold/15">
-                <MapPin className="size-5 text-brand-purple" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wide text-brand-purple">
-                  Ghana inventory
-                </p>
-                <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-                  Available in Ghana
-                </h1>
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                  In-stock Ghana inventory and newly arrived vehicles — ready for
-                  immediate delivery with no international shipping.
-                </p>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="mb-8">
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              {isPreorderView ? pageCopy.preorderTitle : pageCopy.title}
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {isPreorderView ? pageCopy.preorderSubtitle : pageCopy.subtitle}
-            </p>
-          </div>
-        )}
+        <NabusPageHeader
+          eyebrow={isLocallyAvailableView ? "Ghana Inventory" : isPreorderView ? "Import" : "Shop Cars"}
+          title={headerTitle}
+          description={headerDescription}
+          variant={isLocallyAvailableView ? "accent" : "default"}
+        />
 
         {isPreorderView && (
           <CustomVehicleRequestCta variant="banner" className="mb-8" />
@@ -122,7 +115,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
 
         <div className="flex min-w-0 flex-col gap-8 lg:flex-row">
           <Suspense fallback={<FiltersFallback />}>
-            <InventoryFilters className="hidden w-64 shrink-0 lg:block" />
+            <InventoryFilters className="hidden w-72 shrink-0 lg:block" />
           </Suspense>
 
           <div className="min-w-0 flex-1">
@@ -133,19 +126,30 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
             </Suspense>
 
             {paginated.length > 0 ? (
-              <div className="grid w-full auto-rows-fr gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4">
+              <div className="mt-6 grid w-full auto-rows-fr gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {paginated.map((vehicle) => (
-                  <VehicleCard key={vehicle.id} vehicle={vehicle} className="h-full" />
+                  <NabusVehicleCard key={vehicle.id} vehicle={vehicle} className="h-full" />
                 ))}
               </div>
             ) : (
-              <div className="space-y-6 border border-dashed border-border py-16 text-center">
-                <p className="text-sm font-medium">No vehicles match your filters</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Try adjusting your search criteria.
-                </p>
-                <CustomVehicleRequestCta className="mx-auto max-w-sm" />
-              </div>
+              <NabusEmptyState
+                icon={Car}
+                title="No vehicles match your filters"
+                description="Try adjusting your search criteria or browse our full inventory."
+                className="mt-6"
+                action={
+                  <div className="flex flex-wrap justify-center gap-3">
+                    <Button
+                      variant="outline"
+                      className="rounded-full"
+                      render={<Link href={ROUTES.auto.inventory} />}
+                    >
+                      Clear Filters
+                    </Button>
+                    <CustomVehicleRequestCta className="max-w-sm" />
+                  </div>
+                }
+              />
             )}
 
             <Suspense fallback={null}>

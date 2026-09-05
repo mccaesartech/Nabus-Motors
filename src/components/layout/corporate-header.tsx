@@ -72,7 +72,7 @@ export function CorporateHeader({ content, showFreightNav = true }: CorporateHea
   return (
     <header
       className={cn(
-        "fixed top-0 inset-x-0 z-50 w-full border-b border-white/10 bg-brand-primary transition-shadow duration-300",
+        "fixed top-0 inset-x-0 z-50 w-full border-b border-white/10 bg-brand-primary transition-shadow duration-300 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-brand-auto-accent/80",
         scrolled && "shadow-luxury"
       )}
     >

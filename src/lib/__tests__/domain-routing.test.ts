@@ -4,9 +4,11 @@ import { resolveLegacyVercelHostRedirect } from "@/lib/domain-routing";
 
 const originalEmergency = process.env.PUBLIC_SITE_URL_EMERGENCY_FALLBACK;
 const originalSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+const originalCustomDomainLive = process.env.NEXT_PUBLIC_CUSTOM_DOMAIN_LIVE;
 
 beforeEach(() => {
   process.env.NEXT_PUBLIC_SITE_URL = "https://www.nabusmotors.com";
+  delete process.env.NEXT_PUBLIC_CUSTOM_DOMAIN_LIVE;
 });
 
 afterEach(() => {
@@ -20,6 +22,11 @@ afterEach(() => {
   } else {
     process.env.NEXT_PUBLIC_SITE_URL = originalSiteUrl;
   }
+  if (originalCustomDomainLive === undefined) {
+    delete process.env.NEXT_PUBLIC_CUSTOM_DOMAIN_LIVE;
+  } else {
+    process.env.NEXT_PUBLIC_CUSTOM_DOMAIN_LIVE = originalCustomDomainLive;
+  }
 });
 
 function request(host: string, path: string) {
@@ -29,6 +36,13 @@ function request(host: string, path: string) {
 }
 
 describe("resolveLegacyVercelHostRedirect", () => {
+  it("does not redirect between pre-launch vercel.app aliases", () => {
+    process.env.NEXT_PUBLIC_SITE_URL = "https://nabusmotors.vercel.app";
+    expect(
+      resolveLegacyVercelHostRedirect(request("nabus-motors.vercel.app", "/"))
+    ).toBeNull();
+  });
+
   it("does not redirect when already on the canonical Vercel host", () => {
     process.env.NEXT_PUBLIC_SITE_URL = "https://nabus-motors.vercel.app";
     expect(
@@ -38,6 +52,7 @@ describe("resolveLegacyVercelHostRedirect", () => {
 
   it("308-redirects alias and preview vercel.app hosts including API", () => {
     delete process.env.PUBLIC_SITE_URL_EMERGENCY_FALLBACK;
+    process.env.NEXT_PUBLIC_CUSTOM_DOMAIN_LIVE = "true";
 
     for (const host of [
       "nabus-motors.vercel.app",
@@ -57,6 +72,7 @@ describe("resolveLegacyVercelHostRedirect", () => {
 
   it("308-redirects service worker and account paths on vercel.app", () => {
     delete process.env.PUBLIC_SITE_URL_EMERGENCY_FALLBACK;
+    process.env.NEXT_PUBLIC_CUSTOM_DOMAIN_LIVE = "true";
     const sw = resolveLegacyVercelHostRedirect(
       request("nabus-motors.vercel.app", "/serwist/sw.js")
     );
@@ -81,6 +97,15 @@ describe("resolveLegacyVercelHostRedirect", () => {
     ).toBeNull();
   });
 
+  it("does not redirect vercel.app to custom domain before DNS cutover", () => {
+    delete process.env.PUBLIC_SITE_URL_EMERGENCY_FALLBACK;
+    expect(
+      resolveLegacyVercelHostRedirect(
+        request("nabus-motors.vercel.app", "/auto/inventory")
+      )
+    ).toBeNull();
+  });
+
   it("honors emergency vercel fallback host", () => {
     process.env.PUBLIC_SITE_URL_EMERGENCY_FALLBACK =
       "https://nabus-motors.vercel.app";
@@ -89,6 +114,7 @@ describe("resolveLegacyVercelHostRedirect", () => {
         request("nabus-motors.vercel.app", "/account")
       )
     ).toBeNull();
+    process.env.NEXT_PUBLIC_CUSTOM_DOMAIN_LIVE = "true";
     expect(
       resolveLegacyVercelHostRedirect(
         request("other-preview.vercel.app", "/account")

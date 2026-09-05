@@ -46,6 +46,7 @@ export const ROUTES = {
     sparePartDetail: (slug: string) => `${AUTO_DIVISION}/spare-parts/${slug}`,
     cart: `${AUTO_DIVISION}/cart`,
     cartComplete: `${AUTO_DIVISION}/cart/complete`,
+    rentals: `${AUTO_DIVISION}/rentals`,
   },
 } as const;
 

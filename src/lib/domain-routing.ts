@@ -1,10 +1,11 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { getPublicSiteUrl } from "@/lib/site-url";
+import { getPublicSiteUrl, isCustomDomainLive } from "@/lib/site-url";
 
 const DEFAULT_AUTO_DIVISION_HOSTS = [
   "auto.nabusmotors.com",
   "www.auto.nabusmotors.com",
+  "nabusmotors.vercel.app",
   "nabus-motors.vercel.app",
 ];
 
@@ -18,6 +19,15 @@ const AUTO_SHORT_PATH_SEGMENTS = new Set([
   "spare-parts",
   "parts",
 ]);
+
+const PRELAUNCH_VERCEL_HOSTS = new Set([
+  "nabusmotors.vercel.app",
+  "nabus-motors.vercel.app",
+]);
+
+function isSamePrelaunchVercelHost(a: string, b: string): boolean {
+  return PRELAUNCH_VERCEL_HOSTS.has(a) && PRELAUNCH_VERCEL_HOSTS.has(b);
+}
 
 const PASSTHROUGH_PREFIXES = ["/api", "/platform", "/admin", "/_next", "/auto"];
 
@@ -79,8 +89,15 @@ export function resolveLegacyVercelHostRedirect(
     return null;
   }
 
-  // Already on the canonical host (e.g. nabus-motors.vercel.app during pre-launch).
-  if (hostname === canonicalHost) return null;
+  // Already on the canonical host (e.g. nabusmotors.vercel.app during pre-launch).
+  if (hostname === canonicalHost || isSamePrelaunchVercelHost(hostname, canonicalHost)) {
+    return null;
+  }
+
+  // Pre-launch: custom domain may still be on GoDaddy — never redirect vercel.app there.
+  if (!canonicalHost.endsWith(".vercel.app") && !isCustomDomainLive()) {
+    return null;
+  }
 
   const dest = new URL(`${pathname}${search}`, canonical);
   return NextResponse.redirect(dest, 308);

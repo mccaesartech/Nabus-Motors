@@ -7,7 +7,10 @@ import {
   isVercelAppHostname,
   unregisterStaleServiceWorkers,
 } from "@/lib/cache-recovery";
-import { PRODUCTION_PUBLIC_SITE_URL } from "@/lib/site-url";
+import {
+  getClientPublicSiteUrl,
+  isCustomDomainLive,
+} from "@/lib/site-url";
 
 type PwaServiceWorkerRegistrarProps = {
   /** SW scope — customer uses `/`, admin uses `/admin` for separate install identity. */
@@ -18,8 +21,9 @@ type PwaServiceWorkerRegistrarProps = {
  * Registers the Serwist service worker without pulling @serwist/turbopack/react
  * or patching history during the critical rendering path.
  *
- * Never registers on *.vercel.app — those hosts must migrate to www and drop
- * any leftover workers that keep relative `/api/*` polls alive.
+ * Never registers on *.vercel.app — unregister leftover workers only.
+ * Do not redirect to the custom domain until NEXT_PUBLIC_CUSTOM_DOMAIN_LIVE is set
+ * (pre-launch DNS may still point at the old GoDaddy site).
  *
  * On SW *updates* (skipWaiting + clientsClaim), reload once per build so pages
  * do not keep running against a newly claimed worker. Shares BUILD_RELOAD_KEY
@@ -37,9 +41,26 @@ export function PwaServiceWorkerRegistrar({
       if (isVercelAppHostname()) {
         await unregisterStaleServiceWorkers();
         if (cancelled) return;
+
+        const canonical = getClientPublicSiteUrl();
+        let canonicalHost: string;
+        try {
+          canonicalHost = new URL(canonical).hostname.toLowerCase();
+        } catch {
+          return;
+        }
+
+        const currentHost = window.location.hostname.toLowerCase();
+        if (currentHost === canonicalHost) return;
+
+        // Pre-launch: custom domain may still be the old GoDaddy site.
+        if (!canonicalHost.endsWith(".vercel.app") && !isCustomDomainLive()) {
+          return;
+        }
+
         const dest = new URL(
           `${window.location.pathname}${window.location.search}${window.location.hash}`,
-          PRODUCTION_PUBLIC_SITE_URL
+          canonical
         );
         window.location.replace(dest.toString());
         return;

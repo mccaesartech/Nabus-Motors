@@ -216,8 +216,8 @@ export function ContinueYourJourney() {
   if (items.length === 0) return null;
 
   return (
-    <div className="mb-10 rounded-xl border border-brand-purple/15 bg-brand-purple/5 p-4 sm:mb-12 sm:p-5">
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-purple">
+    <div className="mb-10 rounded-sm border border-brand-auto-accent/20 bg-brand-surface p-4 sm:mb-12 sm:p-5">
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-auto-accent">
         Continue Your Journey
       </p>
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden">
@@ -228,10 +228,10 @@ export function ContinueYourJourney() {
               key={item.id}
               href={item.href}
               className={cn(
-                "inline-flex shrink-0 items-center gap-2 rounded-full border border-brand-purple/20 bg-background px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:border-brand-purple/40 hover:bg-brand-purple/10"
+                "inline-flex shrink-0 items-center gap-2 rounded-sm border border-border bg-background px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:border-brand-auto-accent/40 hover:bg-brand-auto-accent/5"
               )}
             >
-              <Icon className="size-4 text-brand-purple" strokeWidth={2} />
+              <Icon className="size-4 text-brand-auto-accent" strokeWidth={2} />
               {item.label}
               <ArrowRight className="size-3.5 text-muted-foreground" />
             </Link>

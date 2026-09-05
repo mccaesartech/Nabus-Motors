@@ -1,54 +1,38 @@
-import dynamic from "next/dynamic";
-import { CorporateAbout, CorporateContactCta, CorporateFaq, CorporateHero, CorporateServices, CorporateStats } from "@/components/corporate/corporate-sections";
-import { LocallyAvailableCarsBanner } from "@/components/vehicle/locally-available-cars-banner";
-import { Testimonials } from "@/components/home/testimonials";
-import { WhyChooseUs } from "@/components/home/why-choose-us";
-import { WhyBuyFromNabus } from "@/components/home/why-buy-from-nabus";
-import { DeferredSection } from "@/components/shared/deferred-section";
+import { NabusHero } from "@/components/home/nabus/nabus-hero";
+import { NabusQuickActionDock } from "@/components/home/nabus/nabus-quick-action-dock";
+import { NabusFeaturedCarousel } from "@/components/home/nabus/nabus-featured-carousel";
+import { NabusAdvantageBand } from "@/components/home/nabus/nabus-advantage-band";
+import { NabusImportJourney } from "@/components/home/nabus/nabus-import-journey";
+import { NabusFinancingSection } from "@/components/home/nabus/nabus-financing-section";
+import { NabusServicesAlternating } from "@/components/home/nabus/nabus-services-alternating";
+import { NabusFinalCta } from "@/components/home/nabus/nabus-final-cta";
 import { getSiteContent } from "@/lib/site-content";
-import { getLocallyAvailableVehicles } from "@/lib/supabase/vehicles";
-
-const StartYourJourney = dynamic(
-  () =>
-    import("@/components/home/start-your-journey").then((m) => ({
-      default: m.StartYourJourney,
-    })),
-  { loading: () => <div className="min-h-[14rem] border-b border-border bg-background" aria-hidden /> }
-);
+import { fetchFeaturedVehicles } from "@/lib/supabase/vehicles";
 
 export const revalidate = 120;
 
 export const metadata = {
   title: "Nabus Motors and Trading",
   description:
-    "Nabus Motors and Trading — vehicle imports, freight forwarding, customs clearing, and genuine spare parts for Ghana and beyond.",
+    "Nabus Motors and Trading — vehicle imports, sales, rentals, financing, and full automotive services in Ghana.",
 };
 
 export default async function CorporateHomePage() {
-  const [content, localVehicles] = await Promise.all([
+  const [content, featured] = await Promise.all([
     getSiteContent(),
-    getLocallyAvailableVehicles(),
+    fetchFeaturedVehicles(),
   ]);
 
   return (
     <>
-      <CorporateHero content={content.corporateHomepage} />
-      <StartYourJourney content={content.startYourJourney} />
-      <LocallyAvailableCarsBanner vehicles={localVehicles} />
-      <CorporateAbout content={content.corporateHomepage} />
-      <CorporateServices content={content.corporateServices} />
-      <WhyBuyFromNabus variant="compact" />
-      <WhyChooseUs content={content.whyChooseUs} />
-      <DeferredSection fallback={<div className="min-h-[12rem] border-b border-border bg-brand-primary" aria-hidden />}>
-        <CorporateStats content={content.corporateStats} />
-      </DeferredSection>
-      <DeferredSection fallback={<div className="min-h-[16rem] border-t border-border bg-background" aria-hidden />}>
-        <Testimonials content={content.corporateTestimonials} />
-      </DeferredSection>
-      <DeferredSection fallback={<div className="min-h-[16rem] border-b border-border bg-background" aria-hidden />}>
-        <CorporateFaq content={content.corporateFaq} />
-      </DeferredSection>
-      <CorporateContactCta content={content.corporateHomepage} />
+      <NabusHero content={content.homepage} />
+      <NabusQuickActionDock />
+      <NabusFeaturedCarousel vehicles={featured.slice(0, 4)} />
+      <NabusImportJourney />
+      <NabusAdvantageBand />
+      <NabusFinancingSection />
+      <NabusServicesAlternating />
+      <NabusFinalCta />
     </>
   );
 }

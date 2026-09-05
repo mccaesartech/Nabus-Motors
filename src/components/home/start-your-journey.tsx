@@ -17,13 +17,23 @@ import type {
 } from "@/lib/site-content/corporate-defaults";
 import { cn } from "@/lib/utils";
 
-function JourneyServiceCard({ card }: { card: DivisionLandingCard }) {
+function JourneyServiceCard({ card, featured = false }: { card: DivisionLandingCard; featured?: boolean }) {
   const Icon = resolveSiteContentIcon(card.icon);
   const imageSrc = normalizeMediaUrl(card.image) || card.image;
 
   return (
-    <article className="group flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card shadow-luxury transition-all duration-300 hover:-translate-y-0.5 hover:shadow-luxury-lg">
-      <div className="relative aspect-[16/10] overflow-hidden">
+    <article
+      className={cn(
+        "group flex h-full flex-col overflow-hidden rounded-sm border border-border/80 bg-card shadow-luxury transition-all duration-300 hover:-translate-y-0.5 hover:shadow-luxury-lg",
+        featured && "lg:flex-row"
+      )}
+    >
+      <div
+        className={cn(
+          "relative overflow-hidden",
+          featured ? "aspect-[16/10] lg:aspect-auto lg:min-h-[16rem] lg:w-[42%]" : "aspect-[16/10]"
+        )}
+      >
         <Image
           src={imageSrc}
           alt={card.imageAlt}
@@ -35,19 +45,19 @@ function JourneyServiceCard({ card }: { card: DivisionLandingCard }) {
           className="pointer-events-none absolute inset-0 bg-gradient-to-t from-brand-black/50 via-transparent to-transparent"
           aria-hidden
         />
-        <div className="absolute left-4 top-4 flex size-10 items-center justify-center rounded-lg border border-white/20 bg-brand-black/45 text-white backdrop-blur-sm">
-          <Icon className="size-5" strokeWidth={2} />
+        <div className="absolute left-4 top-4 flex size-9 items-center justify-center rounded-sm border border-white/25 bg-brand-primary/55 text-white backdrop-blur-sm">
+          <Icon className="size-4" strokeWidth={2} />
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col p-5 sm:p-6">
+      <div className={cn("flex flex-1 flex-col p-5 sm:p-6", featured && "lg:justify-center")}>
         <h3 className="text-lg font-semibold tracking-tight text-foreground">{card.title}</h3>
         <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">
           {card.description}
         </p>
         <Button
           size="sm"
-          className="mt-5 w-full justify-center gap-2 rounded-lg bg-brand-purple-dark font-semibold uppercase tracking-[0.08em] text-white hover:bg-brand-purple sm:w-auto"
+          className="mt-5 w-full justify-center gap-2 rounded-sm bg-brand-primary font-semibold tracking-wide text-white hover:bg-brand-charcoal sm:w-auto"
           render={<Link href={card.href} />}
         >
           {card.cta}
@@ -63,7 +73,7 @@ function AdvisorCard({ advisor }: { advisor: StartYourJourneyAdvisorContent }) {
   const imageSrc = normalizeMediaUrl(advisor.image) || advisor.image;
 
   return (
-    <article className="group flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card shadow-luxury transition-all duration-300 hover:-translate-y-0.5 hover:shadow-luxury-lg">
+    <article className="group flex h-full flex-col overflow-hidden rounded-sm border border-brand-auto-accent/25 bg-card shadow-luxury transition-all duration-300 hover:-translate-y-0.5 hover:shadow-luxury-lg">
       <div className="relative aspect-[16/10] overflow-hidden">
         <Image
           src={imageSrc}
@@ -76,8 +86,8 @@ function AdvisorCard({ advisor }: { advisor: StartYourJourneyAdvisorContent }) {
           className="pointer-events-none absolute inset-0 bg-gradient-to-t from-brand-black/50 via-transparent to-transparent"
           aria-hidden
         />
-        <div className="absolute left-4 top-4 flex size-10 items-center justify-center rounded-lg border border-white/20 bg-brand-black/45 text-white backdrop-blur-sm">
-          <Icon className="size-5" strokeWidth={2} />
+        <div className="absolute left-4 top-4 flex size-9 items-center justify-center rounded-sm border border-white/25 bg-brand-auto-accent/80 text-white backdrop-blur-sm">
+          <Icon className="size-4" strokeWidth={2} />
         </div>
       </div>
 
@@ -90,7 +100,7 @@ function AdvisorCard({ advisor }: { advisor: StartYourJourneyAdvisorContent }) {
           <Button
             size="sm"
             className={cn(
-              "justify-center gap-2 rounded-lg border-2 border-brand-cta-gold/90 bg-brand-cta-gold font-semibold uppercase tracking-[0.08em] text-brand-primary hover:bg-brand-cta-gold-hover"
+              "justify-center gap-2 rounded-sm bg-brand-auto-accent font-semibold tracking-wide text-white hover:bg-brand-auto-accent-dark"
             )}
             render={
               <a
@@ -106,7 +116,7 @@ function AdvisorCard({ advisor }: { advisor: StartYourJourneyAdvisorContent }) {
           <Button
             size="sm"
             variant="outline"
-            className="justify-center rounded-lg border-border font-semibold uppercase tracking-[0.08em]"
+            className="justify-center rounded-sm border-border font-semibold tracking-wide"
             render={<Link href={advisor.secondaryHref} />}
           >
             {advisor.secondaryLabel}
@@ -130,15 +140,25 @@ export function StartYourJourney({ content }: StartYourJourneyProps) {
         <SectionHeader
           title={content.title}
           description={content.description}
-          align="center"
-          className="mx-auto"
+          className="max-w-xl"
         />
 
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {content.cards.map((card) => (
-            <JourneyServiceCard key={card.id} card={card} />
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-12 lg:gap-6">
+          {content.cards.map((card, index) => (
+            <div
+              key={card.id}
+              className={cn(
+                index === 0 ? "sm:col-span-2 lg:col-span-7" : "lg:col-span-5",
+                index === 1 && "lg:col-span-5",
+                index >= 2 && "lg:col-span-4"
+              )}
+            >
+              <JourneyServiceCard card={card} featured={index === 0} />
+            </div>
           ))}
-          <AdvisorCard advisor={content.advisor} />
+          <div className="sm:col-span-2 lg:col-span-5">
+            <AdvisorCard advisor={content.advisor} />
+          </div>
         </div>
       </Container>
     </section>

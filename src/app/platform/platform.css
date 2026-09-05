@@ -1,18 +1,21 @@
-/* Nabus Motors platform admin — warm earth-tone design system */
+/* Nabus Motors platform admin — light workspace, dark sidebar */
 
 .platform-theme {
-  --platform-bg: #faf6f0;
-  --platform-bg-secondary: #f7f0e6;
+  --platform-bg: #f7f7f7;
+  --platform-bg-secondary: #ffffff;
   --platform-card: #ffffff;
-  --platform-accent: #c8541f;
-  --platform-accent-hover: #a84418;
-  --platform-text: #2a1f18;
-  --platform-text-secondary: #9a8570;
-  --platform-border: #e8ddd0;
+  --platform-accent: #b7192e;
+  --platform-accent-hover: #8d1223;
+  --platform-text: #181818;
+  --platform-text-secondary: #696969;
+  --platform-border: #e5e5e5;
+  --platform-sidebar-bg: #202020;
+  --platform-sidebar-text: rgba(255, 255, 255, 0.75);
+  --platform-sidebar-text-active: #ffffff;
   --platform-success: #16a34a;
-  --platform-warning: #d97706;
-  --platform-error: #dc2626;
-  --platform-card-shadow-hover: 0 4px 16px rgba(42, 31, 24, 0.08);
+  --platform-warning: #e0a723;
+  --platform-error: #b7192e;
+  --platform-card-shadow-hover: 0 4px 16px rgba(24, 24, 24, 0.06);
 
   background-color: var(--platform-bg);
   color: var(--platform-text);
@@ -22,7 +25,7 @@
 }
 
 .platform-theme ::selection {
-  background: rgba(200, 84, 31, 0.25);
+  background: rgba(183, 25, 46, 0.2);
 }
 
 .platform-bg {
@@ -58,23 +61,23 @@
   display: flex;
   align-items: center;
   gap: 0.625rem;
-  border-radius: 0.375rem;
+  border-radius: 0.5rem;
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--platform-text-secondary);
+  color: var(--platform-sidebar-text);
   transition: background-color 0.15s ease, color 0.15s ease;
   min-height: 2.5rem;
 }
 
 .platform-sidebar-link:hover {
-  background-color: rgba(42, 31, 24, 0.06);
-  color: var(--platform-text);
+  background-color: rgba(255, 255, 255, 0.08);
+  color: var(--platform-sidebar-text-active);
 }
 
 .platform-sidebar-link[data-active="true"] {
-  background-color: rgba(200, 84, 31, 0.14);
-  color: var(--platform-text);
+  background-color: rgba(183, 25, 46, 0.15);
+  color: var(--platform-sidebar-text-active);
   font-weight: 600;
   box-shadow: inset 3px 0 0 var(--platform-accent);
 }

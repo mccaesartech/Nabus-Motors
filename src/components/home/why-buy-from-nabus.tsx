@@ -153,6 +153,3 @@ export function WhyBuyFromNabus({ variant = "full" }: WhyBuyFromNabusProps) {
     </section>
   );
 }
-
-/** @deprecated Use WhyBuyFromNabus */
-export const WhyBuyFromTrueGoshen = WhyBuyFromNabus;

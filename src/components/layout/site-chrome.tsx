@@ -3,12 +3,9 @@
 import { Suspense, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
-import { Header, HeaderStatic } from "@/components/layout/header";
-import { CorporateHeader } from "@/components/layout/corporate-header";
-import { DivisionContextBar } from "@/components/layout/division-context-bar";
+import { NabusHeader, NabusHeaderStatic } from "@/components/layout/nabus-header";
+import { NabusFooter } from "@/components/layout/nabus-footer";
 import { CustomerBackBar } from "@/components/layout/customer-back-bar";
-import { FreightSubNav } from "@/components/layout/freight-sub-nav";
-import { Footer } from "@/components/layout/footer";
 import { MaintenanceBanner } from "@/components/layout/maintenance-banner";
 import { InstallCustomerAppBanner } from "@/components/pwa/install-customer-app-banner";
 import { PwaInstallToastHost } from "@/components/pwa/pwa-install-toast-host";
@@ -17,7 +14,7 @@ import { isAdminAppPath } from "@/lib/pwa/routes";
 import type { OperationalSettings, SiteSettings } from "@/lib/platform/site-settings";
 import { toOperationalSettings } from "@/lib/platform/site-settings";
 import { DEFAULT_SITE_SETTINGS } from "@/lib/platform/modules";
-import { isAutoDivisionPath, isFreightDivisionPath, ROUTES } from "@/lib/routes";
+import { isAutoDivisionPath, ROUTES } from "@/lib/routes";
 import type { SiteContent } from "@/lib/site-content/defaults";
 import { DEFAULT_SITE_CONTENT } from "@/lib/site-content/defaults";
 
@@ -50,19 +47,9 @@ export function SiteChrome({
 }: SiteChromeProps) {
   const pathname = usePathname() ?? "";
   const isAdmin = isAdminAppPath(pathname);
+  const useAutoChrome = isAutoDivisionPath(pathname);
 
-  const displayContent = useMemo(() => {
-    if (operational.featureShowSparePartsNav) return content;
-    return {
-      ...content,
-      header: {
-        ...content.header,
-        navLinks: content.header.navLinks.filter(
-          (link) => link.href !== ROUTES.auto.spareParts
-        ),
-      },
-    };
-  }, [content, operational.featureShowSparePartsNav]);
+  const showSpareParts = operational.featureShowSparePartsNav;
 
   if (isAdmin) {
     return (
@@ -73,43 +60,28 @@ export function SiteChrome({
     );
   }
 
-  const useAutoHeader = isAutoDivisionPath(pathname);
-  const useFreightSubNav = isFreightDivisionPath(pathname);
-
   return (
     <>
       <PlatformPublicHistoryBounce />
       {operational.maintenanceMode && pathname !== "/maintenance" ? (
         <MaintenanceBanner message={operational.maintenance_message} />
       ) : null}
-      {useAutoHeader ? (
-        <Suspense fallback={<HeaderStatic content={displayContent} />}>
-          <Header content={displayContent} />
-        </Suspense>
-      ) : (
-        <CorporateHeader
-          content={displayContent}
-          showFreightNav={operational.featureShowFreightNav}
-        />
-      )}
+      <Suspense fallback={<NabusHeaderStatic content={content} showSpareParts={showSpareParts} />}>
+        <NabusHeader content={content} showSpareParts={showSpareParts} />
+      </Suspense>
       <main
         id="main-content"
         tabIndex={-1}
-        className="min-w-0 flex-1 overflow-x-hidden pt-[var(--header-height)] pb-[var(--compare-bar-height,0px)] outline-none"
+        className="min-w-0 flex-1 overflow-x-hidden pt-[var(--shell-top-offset)] pb-[var(--compare-bar-height,0px)] outline-none"
       >
-        {useFreightSubNav ? <FreightSubNav /> : <DivisionContextBar />}
         <CustomerBackBar />
         {children}
         <InstallCustomerAppBanner />
       </main>
-      <Footer
-        content={displayContent}
-        showInventory={useAutoHeader}
-        brand={useAutoHeader ? "auto" : "corporate"}
-      />
+      <NabusFooter content={content} brand={useAutoChrome ? "auto" : "corporate"} />
       <WhatsAppFloat whatsappNumber={operational.whatsapp_number || content.global.whatsappNumber} />
       <PwaInstallToastHost />
-      {useAutoHeader ? <CompareFloatingBar /> : null}
+      {useAutoChrome ? <CompareFloatingBar /> : null}
     </>
   );
 }

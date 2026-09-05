@@ -1,4 +1,4 @@
-import { Inter } from "next/font/google";
+import { Manrope } from "next/font/google";
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { Suspense } from "react";
@@ -17,20 +17,24 @@ import { buildCacheRecoveryInlineScript } from "@/lib/cache-recovery-inline-scri
 import { CUSTOMER_PWA, PWA_BACKGROUND_COLOR, PWA_THEME_COLOR } from "@/lib/pwa/constants";
 import { getSiteSettings } from "@/lib/platform/site-settings-server";
 import { DEFAULT_SITE_CONTENT } from "@/lib/site-content/defaults";
-import { getPublicSiteUrl } from "@/lib/site-url";
+import { getPublicSiteUrl, isCustomDomainLive } from "@/lib/site-url";
 import "./globals.css";
 
-const CACHE_RECOVERY_INLINE_SCRIPT = buildCacheRecoveryInlineScript(getPublicSiteUrl());
+const CACHE_RECOVERY_INLINE_SCRIPT = buildCacheRecoveryInlineScript(
+  getPublicSiteUrl(),
+  isCustomDomainLive()
+);
 
 /**
  * Root layout reads `x-nonce` for CSP. That opts the tree into dynamic rendering
  * (required for per-request script nonces — see docs/CSP.md).
  */
 
-const inter = Inter({
+const manrope = Manrope({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-manrope",
   display: "swap",
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 export const viewport: Viewport = {
@@ -98,7 +102,7 @@ export default async function RootLayout({
   const settings = await getSiteSettings();
 
   return (
-    <html lang="en" className={`${inter.variable} light h-full`} suppressHydrationWarning>
+    <html lang="en" className={`${manrope.variable} light h-full`} suppressHydrationWarning>
       <head>
         <ResourceHints />
         <meta

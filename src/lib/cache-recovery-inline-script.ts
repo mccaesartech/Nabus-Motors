@@ -7,14 +7,24 @@ import { PRODUCTION_PUBLIC_SITE_URL } from "@/lib/site-url";
  * Must stay plain JS — no imports inside the IIFE string.
  */
 export function buildCacheRecoveryInlineScript(
-  canonicalOrigin: string = PRODUCTION_PUBLIC_SITE_URL
+  canonicalOrigin: string = PRODUCTION_PUBLIC_SITE_URL,
+  customDomainLive = false
 ): string {
   const canon = JSON.stringify(canonicalOrigin);
+  const customLive = customDomainLive ? "true" : "false";
   return `(function(){
-var CANON=${canon};
+var CANON=${canon},CUSTOM_LIVE=${customLive};
 try{
   var h=(location.hostname||"").toLowerCase();
   if(h.slice(-11)===".vercel.app"){
+    var c=new URL(CANON);
+    if(c.origin===location.origin)return;
+    var ch=c.hostname.toLowerCase();
+    if(ch.slice(-11)===".vercel.app"){
+      location.replace(CANON+location.pathname+location.search+location.hash);
+      return;
+    }
+    if(!CUSTOM_LIVE)return;
     try{
       if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations){
         navigator.serviceWorker.getRegistrations().then(function(regs){

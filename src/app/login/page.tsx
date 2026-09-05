@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Container } from "@/components/shared/container";
 import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +22,7 @@ import {
 } from "@/lib/customer/session-preference";
 import { supabase } from "@/lib/supabase/client";
 import { resolveCustomerApiUrl } from "@/lib/site-url";
+import { ROUTES } from "@/lib/routes";
 
 async function reportFailedLoginAttempt(email: string) {
   try {
@@ -32,7 +32,7 @@ async function reportFailedLoginAttempt(email: string) {
       body: JSON.stringify({ email: email.trim().toLowerCase(), method: "password" }),
     });
   } catch {
-    // non-blocking — sign-in UX must not depend on alert delivery
+    // non-blocking
   }
 }
 
@@ -126,128 +126,138 @@ function LoginForm() {
     }
 
     window.location.assign(redirectTo);
-    return;
   }
 
   return (
-    <Container className="py-16 sm:py-20">
-      <div className="mx-auto max-w-md">
-        <div className="mb-8 flex justify-center">
-          <Logo variant="purple" brand="corporate" height={52} />
+    <div className="grid min-h-[calc(100dvh-var(--shell-top-offset))] lg:grid-cols-2">
+      <div className="relative hidden overflow-hidden bg-[var(--nabus-nav-dark)] lg:block">
+        <div className="absolute inset-0 bg-gradient-to-br from-[var(--nabus-nav-dark)] via-[#2a1018] to-[var(--nabus-primary)]/60" />
+        <div className="relative flex h-full flex-col justify-end p-12">
+          <p className="text-sm font-semibold text-white/80">Nabus Motors</p>
+          <h2 className="mt-2 text-2xl font-bold text-white">
+            Your vehicles, orders, and imports — all in one place.
+          </h2>
         </div>
-        <h1 className="text-2xl font-semibold">Sign In</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Sign in with your personal account to track pre-orders, purchases, and
-          message our team.
-        </p>
-        {expired && (
-          <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            Session expired — please sign in again.
-          </p>
-        )}
-        {registered && (
-          <p className="mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-            Account created. Sign in to view your registration ID and track pre-orders.
-          </p>
-        )}
-        <div className="mt-8 space-y-5">
-          <GoogleSignInButton
-            redirectPath={redirectTo}
-            rememberMe={rememberMe}
-            disabled={loading}
-            onError={setError}
-          />
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-border" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">or</span>
-            </div>
-          </div>
-        </div>
-        <form
-          className="mt-5 space-y-5"
-          onSubmit={handleSubmit}
-          autoComplete="off"
-          data-1p-ignore
-          data-lpignore="true"
-        >
-          <div className="space-y-1.5">
-            <Label htmlFor="customer-login-email">Email</Label>
-            <Input
-              id="customer-login-email"
-              name="customer-login-email"
-              type="email"
-              autoComplete="off"
-              data-1p-ignore
-              data-lpignore="true"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="customer-login-password">Password</Label>
-              <Link
-                href="/forgot-password"
-                className="text-xs font-medium text-brand-purple hover:text-foreground"
-              >
-                Forgot password?
-              </Link>
-            </div>
-            <PasswordInput
-              id="customer-login-password"
-              name="customer-login-password"
-              autoComplete="off"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              className="size-4 rounded border-border text-brand-purple focus:ring-brand-purple"
-            />
-            Stay signed in for up to 24 hours
-          </label>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <Button type="submit" className="w-full" size="lg" disabled={loading}>
-            {loading ? "Signing in…" : "Sign In"}
-          </Button>
-        </form>
-        <p className="mt-4 text-center text-xs text-muted-foreground">
-          If you forgot your password, use{" "}
-          <Link href="/forgot-password" className="text-brand-purple hover:underline">
-            Forgot password
-          </Link>{" "}
-          or contact us on WhatsApp with your reference number.
-        </p>
-        <p className="mt-4 text-center text-sm text-muted-foreground">
-          Don&apos;t have an account?{" "}
-          <Link
-            href={
-              redirectTo === "/account"
-                ? "/register"
-                : `/register?redirect=${encodeURIComponent(redirectTo)}`
-            }
-            className="font-medium text-brand-purple hover:text-foreground"
-          >
-            Register
-          </Link>
-        </p>
       </div>
-    </Container>
+
+      <div className="flex items-center justify-center px-4 py-12 sm:px-8">
+        <div className="w-full max-w-md">
+          <div className="mb-8 flex justify-center lg:justify-start">
+            <Logo variant="purple" brand="auto" height={48} srcOverride="/logo.png" />
+          </div>
+          <h1 className="text-2xl font-bold text-[var(--nabus-charcoal)]">Welcome Back</h1>
+          <p className="mt-2 text-sm text-[var(--nabus-text-secondary)]">
+            Sign in to track pre-orders, purchases, and message our team.
+          </p>
+          {expired && (
+            <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Session expired — please sign in again.
+            </p>
+          )}
+          {registered && (
+            <p className="mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+              Account created. Sign in to view your registration ID and track pre-orders.
+            </p>
+          )}
+          <div className="mt-8 space-y-5">
+            <GoogleSignInButton
+              redirectPath={redirectTo}
+              rememberMe={rememberMe}
+              disabled={loading}
+              onError={setError}
+            />
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-[var(--nabus-border)]" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-[var(--nabus-surface)] px-2 text-[var(--nabus-text-secondary)]">
+                  or
+                </span>
+              </div>
+            </div>
+          </div>
+          <form
+            className="mt-5 space-y-5"
+            onSubmit={handleSubmit}
+            autoComplete="off"
+            data-1p-ignore
+            data-lpignore="true"
+          >
+            <div className="space-y-1.5">
+              <Label htmlFor="customer-login-email">Email</Label>
+              <Input
+                id="customer-login-email"
+                name="customer-login-email"
+                type="email"
+                autoComplete="off"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="h-11 rounded-lg border-[var(--nabus-input-border)] focus-visible:border-[var(--nabus-primary)]"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="customer-login-password">Password</Label>
+                <Link
+                  href="/forgot-password"
+                  className="text-xs font-medium text-[var(--nabus-primary)] hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+              <PasswordInput
+                id="customer-login-password"
+                name="customer-login-password"
+                autoComplete="off"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="h-11 rounded-lg border-[var(--nabus-input-border)]"
+              />
+            </div>
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--nabus-text-secondary)]">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="size-4 rounded border-[var(--nabus-input-border)] text-[var(--nabus-primary)]"
+              />
+              Stay signed in for up to 24 hours
+            </label>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <Button
+              type="submit"
+              className="h-11 w-full rounded-lg bg-[var(--nabus-primary)] hover:bg-[var(--nabus-primary-hover)]"
+              size="lg"
+              disabled={loading}
+            >
+              {loading ? "Signing in…" : "Sign In"}
+            </Button>
+          </form>
+          <p className="mt-6 text-center text-sm text-[var(--nabus-text-secondary)]">
+            Don&apos;t have an account?{" "}
+            <Link
+              href={
+                redirectTo === ROUTES.corporate.account
+                  ? ROUTES.corporate.register
+                  : `${ROUTES.corporate.register}?redirect=${encodeURIComponent(redirectTo)}`
+              }
+              className="font-semibold text-[var(--nabus-primary)] hover:underline"
+            >
+              Create account
+            </Link>
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<Container className="py-16 sm:py-20">{null}</Container>}>
+    <Suspense fallback={<div className="min-h-[50vh]" />}>
       <LoginForm />
     </Suspense>
   );

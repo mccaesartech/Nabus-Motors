@@ -3,7 +3,7 @@
  * Prefer NEXT_PUBLIC_SITE_URL in Vercel; this is only the unset/invalid fallback.
  * Requires healthy Namecheap DNS — see LAUNCH_DOMAIN_CUTOVER.md (and docs/domain-cutover.md).
  *
- * Emergency only: set PUBLIC_SITE_URL_EMERGENCY_FALLBACK=https://nabus-motors.vercel.app
+ * Emergency only: set PUBLIC_SITE_URL_EMERGENCY_FALLBACK=https://nabusmotors.vercel.app
  * while custom DNS is broken. Do not leave that set for launch.
  */
 export const PRODUCTION_PUBLIC_SITE_URL = "https://www.nabusmotors.com";
@@ -11,8 +11,8 @@ const PRODUCTION_AUTO_SITE_URL = "https://www.nabusmotors.com";
 const DEV_LOCALHOST_URL = "http://localhost:3000";
 /** Known legacy / temporary Vercel hostnames — normalize to the canonical custom domain. */
 const NON_CANONICAL_PUBLIC_HOSTS = new Set([
-  "nabus-motors.vercel.app",
   "nabusmotors.vercel.app",
+  "nabus-motors.vercel.app",
 ]);
 
 function isNonCanonicalPublicHost(hostname: string): boolean {
@@ -103,6 +103,20 @@ export function resolvePublicSiteUrl(
 
 export function getPublicSiteUrl(): string {
   return resolvePublicSiteUrl(process.env.NEXT_PUBLIC_SITE_URL, isDevelopment());
+}
+
+/** Set NEXT_PUBLIC_CUSTOM_DOMAIN_LIVE=true only after nabusmotors.com DNS points at Vercel. */
+export function isCustomDomainLive(): boolean {
+  const raw = process.env.NEXT_PUBLIC_CUSTOM_DOMAIN_LIVE?.trim().toLowerCase();
+  return raw === "true" || raw === "1";
+}
+
+/** Browser-safe canonical origin (NEXT_PUBLIC_* is inlined at build time). */
+export function getClientPublicSiteUrl(): string {
+  return resolvePublicSiteUrl(
+    process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.NODE_ENV === "development"
+  );
 }
 
 /**
