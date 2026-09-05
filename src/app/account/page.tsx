@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { MessageSquare, MessageSquarePlus, Package, Send, Ship, ShoppingCart, CalendarCheck, Car, Truck, Settings } from "lucide-react";
+import { MessageSquare, MessageSquarePlus, Package, Send, Ship, Car, Truck, Settings } from "lucide-react";
 import { ShipmentTimeline } from "@/components/shared/shipment-timeline";
 import { ImportMilestoneTimeline } from "@/components/shared/import-milestone-timeline";
 import { VisualShipmentTimeline } from "@/components/shared/visual-shipment-timeline";
@@ -31,7 +31,7 @@ import { cn } from "@/lib/utils";
 import { shipmentStatusLabel } from "@/lib/platform/shipment";
 import { formatCargoDisplay } from "@/lib/freight/cargo-options";
 import type { CustomerCartSummary, PartsOrderSummary } from "@/lib/parts/cart-types";
-import { NabusDashboardCard } from "@/components/nabus/nabus-dashboard-card";
+import { FoldIndex } from "@/components/fold/fold-primitives";
 import { AccountCartSection } from "@/components/account/account-cart-section";
 import { OrderHistorySection } from "@/components/account/order-history-section";
 import { RecentOrderBanner } from "@/components/account/recent-order-banner";
@@ -530,8 +530,8 @@ function AccountContent() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-10">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="mx-auto max-w-4xl space-y-12">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-start">
             <ProfileAvatarViewer
               avatarUrl={avatarPreviewUrl}
@@ -546,42 +546,40 @@ function AccountContent() {
               }}
             />
             <div className="min-w-0">
-              <h1 className="text-2xl font-semibold sm:text-3xl">My Account</h1>
-              <p className="mt-2 text-muted-foreground">
-                Welcome back, <span className="font-medium text-foreground">{displayName}</span>
-              </p>
-              <p className="text-sm text-muted-foreground">{user.email}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <FoldIndex n="YOU" />
+              <h1 className="font-display mt-2 text-3xl leading-tight text-[var(--nabus-graphite)] sm:text-4xl">
+                Welcome back
+              </h1>
+              <p className="mt-2 text-[var(--nabus-graphite)]">{displayName}</p>
+              <p className="text-sm text-[var(--nabus-muted)]">{user.email}</p>
+              <p className="mt-1 text-xs text-[var(--nabus-muted)]">
                 {authProviderLabel}
                 {memberSinceLabel ? ` · Member since ${memberSinceLabel}` : null}
                 {locationLabel ? ` · ${locationLabel}` : null}
                 {profile?.phone ? ` · ${profile.phone}` : null}
               </p>
               {profile?.registration_id && (
-                <div className="mt-4 inline-flex flex-col gap-1 rounded-lg border border-[var(--nabus-wine)]/20 bg-[var(--nabus-red-soft)] px-4 py-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Your registration ID
+                <div className="mt-4 inline-flex flex-col gap-1 border-l border-[var(--nabus-gold)] bg-[var(--nabus-paper)] px-4 py-3">
+                  <p className="font-mono text-[10px] tracking-[0.16em] uppercase text-[var(--nabus-muted)]">
+                    Registration
                   </p>
-                  <p className="font-mono text-lg font-semibold text-[var(--nabus-primary)]">
+                  <p className="font-mono text-lg text-[var(--nabus-wine)]">
                     {profile.registration_id}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Use this ID when contacting us. Your account is private — only you can see your data.
                   </p>
                 </div>
               )}
               <Link
                 href="/account/settings"
-                className="mt-3 inline-flex min-h-10 items-center text-sm font-medium text-[var(--nabus-primary)] hover:underline"
+                className="mt-3 inline-flex min-h-10 items-center text-sm text-[var(--nabus-wine)] underline underline-offset-4"
               >
-                Edit profile details →
+                Edit profile
               </Link>
             </div>
           </div>
           <Button
             variant="outline"
             onClick={() => setLogoutConfirmOpen(true)}
-            className="min-h-11"
+            className="min-h-11 rounded-none border-[var(--nabus-border)]"
           >
             Sign out
           </Button>
@@ -597,31 +595,26 @@ function AccountContent() {
 
         <AccountNotificationsSection />
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <NabusDashboardCard
-            title="Active Orders"
-            value={pendingOrderCount}
-            description="Pending parts orders"
-            icon={Package}
-          />
-          <NabusDashboardCard
-            title="Saved Vehicles"
-            value={cartSummary?.vehicle_count ?? 0}
-            description="In your cart"
-            icon={ShoppingCart}
-          />
-          <NabusDashboardCard
-            title="Upcoming Payment"
-            value={catalogPreorders.filter((p) => p.payment_status !== "completed").length}
-            description="Pre-orders awaiting deposit"
-            icon={Car}
-          />
-          <NabusDashboardCard
-            title="Service Booking"
-            value={appointments.filter((a) => a.status === "scheduled" || a.status === "confirmed").length}
-            description="Scheduled visits"
-            icon={CalendarCheck}
-          />
+        <div className="grid gap-8 border-y border-[var(--nabus-border)] py-6 sm:grid-cols-3">
+          <div>
+            <p className="font-mono text-[11px] tracking-[0.16em] uppercase text-[var(--nabus-muted)]">Reservation</p>
+            <p className="font-display mt-1 text-3xl text-[var(--nabus-graphite)]">
+              {catalogPreorders.filter((p) => p.payment_status !== "completed").length}
+            </p>
+            <p className="mt-1 text-sm text-[var(--nabus-muted)]">Awaiting deposit</p>
+          </div>
+          <div>
+            <p className="font-mono text-[11px] tracking-[0.16em] uppercase text-[var(--nabus-muted)]">Saved</p>
+            <p className="font-display mt-1 text-3xl text-[var(--nabus-graphite)]">
+              {cartSummary?.vehicle_count ?? 0}
+            </p>
+            <p className="mt-1 text-sm text-[var(--nabus-muted)]">Cars you kept</p>
+          </div>
+          <div>
+            <p className="font-mono text-[11px] tracking-[0.16em] uppercase text-[var(--nabus-muted)]">Orders</p>
+            <p className="font-display mt-1 text-3xl text-[var(--nabus-graphite)]">{pendingOrderCount}</p>
+            <p className="mt-1 text-sm text-[var(--nabus-muted)]">In progress</p>
+          </div>
         </div>
 
         {!dataLoading && partsOrders.length > 0 && <RecentOrderBanner orders={partsOrders} />}

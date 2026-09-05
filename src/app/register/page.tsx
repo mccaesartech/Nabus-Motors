@@ -167,12 +167,12 @@ function RegisterForm() {
 
   return (
     <NabusAuthSplitShell
-      panelTitle="Track imports, orders, and messages — all in one place."
-      panelBody="Create your account to manage pre-orders, purchases, and showroom visits from one dashboard."
+      panelTitle="A locker for the cars you keep."
+      panelBody="Reservations, imports, and messages from the Dzorwulu floor."
     >
-          <h1 className="text-2xl font-bold text-[var(--nabus-charcoal)]">Create Account</h1>
-          <p className="mt-2 text-sm text-[var(--nabus-text-secondary)]">
-            Create your account to track pre-orders, purchases, and message our team.
+          <h1 className="font-display text-3xl text-[var(--nabus-graphite)]">Open a locker</h1>
+          <p className="mt-2 text-sm text-[var(--nabus-muted)]">
+            Save cars, reserve on the floor, and keep your paperwork in one place.
           </p>
         <div className="mt-8 space-y-5">
           <GoogleSignInButton

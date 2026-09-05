@@ -4,8 +4,8 @@ import { Suspense } from "react";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { NabusHeader, NabusHeaderStatic } from "@/components/nabus/nabus-header";
-import { NabusFooter } from "@/components/nabus/nabus-footer";
+import { FoldHeader, FoldHeaderStatic } from "@/components/fold/fold-header";
+import { FoldFooter } from "@/components/fold/fold-footer";
 import { CustomerBackBar } from "@/components/layout/customer-back-bar";
 import { MaintenanceBanner } from "@/components/layout/maintenance-banner";
 import { InstallCustomerAppBanner } from "@/components/pwa/install-customer-app-banner";
@@ -49,7 +49,7 @@ export function SiteChrome({
   const pathname = usePathname() ?? "";
   const isAdmin = isAdminAppPath(pathname);
   const useAutoChrome = isAutoDivisionPath(pathname);
-  const isAutoHome = pathname === ROUTES.auto.home;
+  const isAutoHome = pathname === "/" || pathname === ROUTES.auto.home || pathname === ROUTES.corporate.home;
 
   if (isAdmin) {
     return (
@@ -66,8 +66,8 @@ export function SiteChrome({
       {operational.maintenanceMode && pathname !== "/maintenance" ? (
         <MaintenanceBanner message={operational.maintenance_message} />
       ) : null}
-      <Suspense fallback={<NabusHeaderStatic content={content} transparent={isAutoHome} />}>
-        <NabusHeader content={content} transparent={isAutoHome} />
+      <Suspense fallback={<FoldHeaderStatic content={content} transparent={isAutoHome} />}>
+        <FoldHeader content={content} transparent={isAutoHome} />
       </Suspense>
       <main
         id="main-content"
@@ -81,7 +81,7 @@ export function SiteChrome({
         {children}
         <InstallCustomerAppBanner />
       </main>
-      <NabusFooter content={content} brand="auto" />
+      <FoldFooter content={content} brand="auto" />
       <WhatsAppFloat whatsappNumber={operational.whatsapp_number || content.global.whatsappNumber} />
       <PwaInstallToastHost />
       {useAutoChrome ? <CompareFloatingBar /> : null}

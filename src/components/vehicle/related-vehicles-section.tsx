@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { NabusCarTile } from "@/components/nabus/nabus-car-tile";
-import { NabusSectionLabel } from "@/components/nabus/nabus-section-label";
+import { FoldCarTile } from "@/components/fold/fold-car-tile";
+import { FoldIndex } from "@/components/fold/fold-primitives";
 import type { Vehicle } from "@/lib/types";
 
 type RelatedVehiclesSectionProps = {
@@ -14,7 +14,7 @@ type RelatedVehiclesSectionProps = {
 export function RelatedVehiclesSection({
   vehicle,
   limit = 3,
-  title = "Similar Drives",
+  title = "Similar",
 }: RelatedVehiclesSectionProps) {
   const [related, setRelated] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,17 +48,22 @@ export function RelatedVehiclesSection({
 
   if (loading || related.length === 0) return null;
 
+  const [first, ...rest] = related;
+
   return (
-    <section className="mt-16 border-t border-[var(--nabus-border)] bg-[var(--nabus-paper)] py-12">
-      <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-10 xl:px-12">
-        <NabusSectionLabel>{title}</NabusSectionLabel>
-        <h2 className="mt-3 text-2xl font-semibold tracking-tight text-[var(--nabus-graphite)]">
-          You might also consider
-        </h2>
-        <div className="mt-8 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-          {related.map((item) => (
-            <NabusCarTile key={item.id} vehicle={item} />
-          ))}
+    <section className="mt-16 border-t border-[var(--nabus-border)] bg-[var(--nabus-paper)] py-14">
+      <div className="mx-auto max-w-[92rem] px-4 sm:px-6 lg:px-8 xl:px-10">
+        <FoldIndex n="LIKE" />
+        <h2 className="font-display mt-3 text-3xl leading-tight text-[var(--nabus-graphite)]">{title}</h2>
+        <div className="mt-8 grid gap-10 lg:grid-cols-12">
+          <div className="lg:col-span-6">
+            <FoldCarTile vehicle={first} layout="featured-large" />
+          </div>
+          <div className="grid gap-10 lg:col-span-6 sm:grid-cols-2">
+            {rest.map((item) => (
+              <FoldCarTile key={item.id} vehicle={item} />
+            ))}
+          </div>
         </div>
       </div>
     </section>

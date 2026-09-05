@@ -110,7 +110,7 @@ export function CompareEmptyState() {
         Add up to 4 vehicles from inventory to compare specifications side by side.
       </p>
       <Button className="mt-4" render={<Link href={ROUTES.auto.inventory} />}>
-        Browse Inventory
+        Open the catalogue
       </Button>
     </div>
   );

@@ -28,10 +28,10 @@ export default function RentalsPage() {
           action={
             <div className="flex flex-wrap items-center justify-center gap-3">
               <Button
-                className="rounded-full bg-[var(--nabus-primary)]"
+                className="rounded-none bg-[var(--nabus-wine)]"
                 render={<Link href={ROUTES.auto.inventory} />}
               >
-                Browse Inventory
+                Open the catalogue
               </Button>
               <Button
                 variant="outline"

@@ -42,7 +42,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
     ? "Available in Ghana"
     : isPreorderView
       ? pageCopy.preorderTitle || "Import Ready"
-      : "The Showroom";
+      : "CARS";
 
   const headerDescription = isLocallyAvailableView
     ? "In-stock Ghana inventory and newly arrived vehicles — ready for immediate delivery."

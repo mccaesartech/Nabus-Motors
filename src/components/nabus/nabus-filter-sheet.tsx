@@ -39,7 +39,7 @@ export function NabusFilterSheet({ open, onClose, side = "left" }: NabusFilterSh
                 open ? "translate-x-0" : "-translate-x-full"
               )
             : cn(
-                "inset-x-0 bottom-0 max-h-[85dvh] rounded-t-lg border-t border-[var(--nabus-border)]",
+                "inset-x-0 bottom-0 max-h-[85dvh] rounded-none border-t border-[var(--nabus-border)]",
                 open ? "translate-y-0" : "translate-y-full"
               )
         )}

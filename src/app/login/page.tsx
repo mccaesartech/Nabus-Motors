@@ -130,12 +130,12 @@ function LoginForm() {
 
   return (
     <NabusAuthSplitShell
-      panelTitle="Your vehicles, orders, and imports — all in one place."
-      panelBody="Sign in to track pre-orders, manage purchases, and message our showroom team."
+      panelTitle="Your locker is waiting."
+      panelBody="Reservations, saved cars, and messages from the Dzorwulu floor."
     >
-          <h1 className="text-2xl font-bold text-[var(--nabus-charcoal)]">Welcome Back</h1>
-          <p className="mt-2 text-sm text-[var(--nabus-text-secondary)]">
-            Sign in to track pre-orders, purchases, and message our team.
+          <h1 className="font-display text-3xl text-[var(--nabus-graphite)]">Your locker</h1>
+          <p className="mt-2 text-sm text-[var(--nabus-muted)]">
+            Reservations, saved cars, and messages from the floor.
           </p>
           {expired && (
             <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -182,7 +182,7 @@ function LoginForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="h-11 rounded-lg border-[var(--nabus-input-border)] focus-visible:border-[var(--nabus-primary)]"
+                className="h-11 rounded-none border-[var(--nabus-input-border)] focus-visible:border-[var(--nabus-wine)]"
               />
             </div>
             <div className="space-y-1.5">
@@ -202,7 +202,7 @@ function LoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="h-11 rounded-lg border-[var(--nabus-input-border)]"
+                className="h-11 rounded-none border-[var(--nabus-input-border)]"
               />
             </div>
             <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--nabus-text-secondary)]">
@@ -217,7 +217,7 @@ function LoginForm() {
             {error && <p className="text-sm text-red-600">{error}</p>}
             <Button
               type="submit"
-              className="h-11 w-full rounded-lg bg-[var(--nabus-primary)] hover:bg-[var(--nabus-primary-hover)]"
+              className="h-11 w-full rounded-none bg-[var(--nabus-wine)] hover:bg-[var(--nabus-crimson)]"
               size="lg"
               disabled={loading}
             >

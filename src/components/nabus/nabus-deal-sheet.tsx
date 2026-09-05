@@ -52,7 +52,7 @@ export function NabusDealSheet({ vehicle, className, sticky = true }: NabusDealS
   return (
     <aside
       className={cn(
-        "border border-[var(--nabus-border)] bg-[var(--nabus-paper)] p-6 sm:p-8",
+        "border-l border-[var(--nabus-gold)] bg-[var(--nabus-paper)] p-6 sm:p-8",
         sticky && "lg:sticky lg:top-[calc(var(--shell-top-offset)+1.5rem)]",
         className
       )}
@@ -60,7 +60,7 @@ export function NabusDealSheet({ vehicle, className, sticky = true }: NabusDealS
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <NabusStatusChip status={vehicle.status ?? "available"} />
-          <h1 className="mt-3 text-xl font-semibold tracking-tight text-[var(--nabus-graphite)] sm:text-2xl">
+          <h1 className="font-display mt-3 text-2xl leading-[1.15] text-[var(--nabus-graphite)] sm:text-3xl">
             {vehicleName}
           </h1>
         </div>

@@ -172,7 +172,7 @@ export function GarageView() {
                   <Button variant="outline" onClick={handleClearAll}>
                     Clear saved
                   </Button>
-                  <Button render={<Link href={ROUTES.auto.inventory} />}>Browse Inventory</Button>
+                  <Button render={<Link href={ROUTES.auto.inventory} />}>Open the catalogue</Button>
                 </div>
               </div>
             ) : (
@@ -180,7 +180,7 @@ export function GarageView() {
                 title="No saved vehicles"
                 description="Save vehicles from inventory to track them here."
                 href={ROUTES.auto.inventory}
-                label="Browse Inventory"
+                label="Open the catalogue"
               />
             )}
           </TabsContent>
@@ -197,7 +197,7 @@ export function GarageView() {
                 title="No recently viewed vehicles"
                 description="Vehicles you view will appear here for easy access."
                 href={ROUTES.auto.inventory}
-                label="Browse Inventory"
+                label="Open the catalogue"
               />
             )}
           </TabsContent>
@@ -253,7 +253,7 @@ export function GarageView() {
                 title="Save at least 2 vehicles to compare"
                 description="Add vehicles to your saved list to compare specifications side by side."
                 href={ROUTES.auto.inventory}
-                label="Browse Inventory"
+                label="Open the catalogue"
               />
             )}
           </TabsContent>

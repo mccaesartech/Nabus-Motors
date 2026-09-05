@@ -1,7 +1,7 @@
 /** Brand colors from globals.css — used in manifests and PWA chrome. */
-export const PWA_THEME_COLOR = "#941D30";
-export const ADMIN_PWA_THEME_COLOR = "#292725";
-export const PWA_BACKGROUND_COLOR = "#F7F4EE";
+export const PWA_THEME_COLOR = "#6B1D2E";
+export const ADMIN_PWA_THEME_COLOR = "#1A1613";
+export const PWA_BACKGROUND_COLOR = "#F2EBE0";
 
 export const CUSTOMER_PWA = {
   id: "nabus-motors-customer",

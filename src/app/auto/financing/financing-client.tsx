@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { Container } from "@/components/shared/container";
-import { SectionHeader } from "@/components/shared/section-header";
+import { NabusEditorialPageHero } from "@/components/nabus/nabus-editorial-page-hero";
+import { FoldIndex } from "@/components/fold/fold-primitives";
 import { FinancingCalculator } from "@/components/vehicle/financing-calculator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,40 +78,29 @@ export function FinancingPageClient({ hero }: FinancingPageClientProps) {
 
   return (
     <>
-      <section className="relative bg-brand-primary py-20 sm:py-24">
-        <Container className="relative">
-          {hero.eyebrow && (
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-white/70">
-              {hero.eyebrow}
-            </p>
-          )}
-          <h1 className="mt-4 max-w-lg text-3xl font-semibold text-white sm:text-4xl">
-            {hero.title}
-          </h1>
-          <p className="mt-4 max-w-xl text-base leading-relaxed text-on-dark-secondary">
-            {hero.subtitle}
-          </p>
-        </Container>
-      </section>
+      <NabusEditorialPageHero
+        title={hero.title}
+        description={hero.subtitle}
+      />
 
-      <section className="py-14 sm:py-16">
+      <section className="bg-[var(--nabus-ivory)] py-14 sm:py-16">
         <Container>
-          <div className="grid gap-10 lg:grid-cols-2">
+          <div className="grid gap-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
             <div>
-              <SectionHeader
-                title="Loan Calculator"
-                description="Estimate your monthly payment before applying."
-                className="mb-6"
-              />
+              <FoldIndex n="CALC" />
+              <h2 className="font-display mt-3 text-3xl text-[var(--nabus-graphite)]">Monthly figure</h2>
+              <p className="mt-2 mb-6 max-w-sm text-sm text-[var(--nabus-muted)]">
+                Estimate a payment before you apply. Final terms follow approval.
+              </p>
               <FinancingCalculator price={35000} collapsible={false} />
             </div>
 
             <div>
-              <SectionHeader
-                title="Eligibility Requirements"
-                description="Standard requirements for financing approval."
-                className="mb-6"
-              />
+              <FoldIndex n="NEED" />
+              <h2 className="font-display mt-3 text-3xl text-[var(--nabus-graphite)]">What we ask for</h2>
+              <p className="mt-2 mb-6 max-w-sm text-sm text-[var(--nabus-muted)]">
+                Standard papers for a Ghana finance request.
+              </p>
               <ul className="space-y-3">
                 {requirements.map((req) => (
                   <li key={req} className="flex gap-3 text-sm">
@@ -148,11 +138,11 @@ export function FinancingPageClient({ hero }: FinancingPageClientProps) {
 
       <section className="border-t border-border bg-muted/50 py-14 sm:py-16">
         <Container>
-          <SectionHeader
-            title="Finance Application"
-            description="Complete the form below and a finance specialist will contact you within one business day."
-            className="mb-8"
-          />
+          <FoldIndex n="FORM" />
+          <h2 className="font-display mt-3 text-3xl text-[var(--nabus-graphite)]">Finance application</h2>
+          <p className="mt-2 mb-8 max-w-md text-sm text-[var(--nabus-muted)]">
+            Send this through and a specialist will call within one business day.
+          </p>
 
           {submitted ? (
             <div className="mx-auto max-w-md border border-border bg-white p-8 text-center">

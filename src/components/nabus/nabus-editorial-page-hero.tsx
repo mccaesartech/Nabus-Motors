@@ -1,4 +1,4 @@
-import { NabusSectionLabel } from "./nabus-section-label";
+import { FoldCrease, FoldIndex } from "@/components/fold/fold-primitives";
 
 type NabusEditorialPageHeroProps = {
   label?: string;
@@ -7,19 +7,20 @@ type NabusEditorialPageHeroProps = {
 };
 
 export function NabusEditorialPageHero({
-  label,
+  label: _label,
   title,
   description,
 }: NabusEditorialPageHeroProps) {
   return (
-    <section className="bg-[var(--nabus-warm-graphite)] py-16 sm:py-20">
-      <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-10 xl:px-12">
-        {label ? <NabusSectionLabel tone="dark">{label}</NabusSectionLabel> : null}
-        <h1 className="mt-4 max-w-2xl text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+    <section className="relative overflow-hidden bg-[var(--nabus-ivory)] py-16 sm:py-22">
+      <FoldCrease className="top-10 left-[-2%] opacity-80" />
+      <div className="mx-auto max-w-[92rem] px-4 sm:px-6 lg:px-8 xl:px-10">
+        <FoldIndex n={_label ? "PAGE" : "00"} />
+        <h1 className="font-display mt-4 max-w-2xl text-[clamp(2.2rem,5vw,4rem)] leading-[1.06] text-[var(--nabus-graphite)]">
           {title}
         </h1>
         {description ? (
-          <p className="mt-4 max-w-xl text-sm leading-relaxed text-white/75">{description}</p>
+          <p className="mt-4 max-w-md text-sm leading-relaxed text-[var(--nabus-muted)]">{description}</p>
         ) : null}
       </div>
     </section>

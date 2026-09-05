@@ -1,4 +1,4 @@
-import { Instrument_Sans, IBM_Plex_Mono } from "next/font/google";
+import { Geist, Newsreader, IBM_Plex_Mono } from "next/font/google";
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { Suspense } from "react";
@@ -30,11 +30,18 @@ const CACHE_RECOVERY_INLINE_SCRIPT = buildCacheRecoveryInlineScript(
  * (required for per-request script nonces — see docs/CSP.md).
  */
 
-const instrumentSans = Instrument_Sans({
+const geist = Geist({
   subsets: ["latin"],
-  variable: "--font-instrument",
+  variable: "--font-geist",
+  display: "swap",
+});
+
+const newsreader = Newsreader({
+  subsets: ["latin"],
+  variable: "--font-newsreader",
   display: "swap",
   weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
 });
 
 const ibmPlexMono = IBM_Plex_Mono({
@@ -109,7 +116,7 @@ export default async function RootLayout({
   const settings = await getSiteSettings();
 
   return (
-    <html lang="en" className={`${instrumentSans.variable} ${ibmPlexMono.variable} light h-full`} suppressHydrationWarning>
+    <html lang="en" className={`${geist.variable} ${newsreader.variable} ${ibmPlexMono.variable} light h-full`} suppressHydrationWarning>
       <head>
         <ResourceHints />
         <meta

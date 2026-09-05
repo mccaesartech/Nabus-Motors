@@ -1,7 +1,13 @@
-import { redirect } from "next/navigation";
-import { ROUTES } from "@/lib/routes";
+import { FoldHomePage } from "@/components/fold/fold-home-page";
 
-/** Nabus Motors public entry — editorial showroom lives at /auto */
+export const metadata = {
+  title: "Nabus Motors",
+  description:
+    "The Dzorwulu showroom. Verified cars, financing, and ownership support in Accra, Ghana.",
+};
+
+export const revalidate = 60;
+
 export default function RootPage() {
-  redirect(ROUTES.auto.home);
+  return <FoldHomePage />;
 }

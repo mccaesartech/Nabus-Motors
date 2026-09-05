@@ -31,8 +31,8 @@ export async function VehicleDetailPage({ slug }: VehicleDetailPageProps) {
 
   return (
     <div className="bg-[var(--nabus-ivory)] py-8 sm:py-12">
-      <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-10 xl:px-12">
-        <nav className="mb-6 font-mono text-[11px] uppercase tracking-wide text-[var(--nabus-muted)]">
+      <div className="mx-auto max-w-[92rem] px-4 sm:px-6 lg:px-8 xl:px-10">
+        <nav className="mb-6 font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--nabus-muted)]">
           <Link
             href={ROUTES.auto.inventory}
             prefetch
@@ -46,7 +46,7 @@ export async function VehicleDetailPage({ slug }: VehicleDetailPageProps) {
 
         <NabusVehicleDetail vehicle={vehicle} />
       </div>
-      <RelatedVehiclesSection vehicle={vehicle} limit={3} title="Similar Drives" />
+      <RelatedVehiclesSection vehicle={vehicle} limit={3} title="Similar" />
     </div>
   );
 }

@@ -427,9 +427,9 @@ export function SalesTrendChart({
             <Line
               type="monotone"
               dataKey="value"
-              stroke="#b7192e"
+              stroke="#6b1d2e"
               strokeWidth={2}
-              dot={{ r: 3, fill: "#b7192e" }}
+              dot={{ r: 3, fill: "#6b1d2e" }}
               activeDot={{ r: 5 }}
               {...CHART_ANIMATION}
             />
@@ -492,7 +492,7 @@ export function RevenueTrendChart({
             />
             <Bar
               dataKey="value"
-              fill="#b7192e"
+              fill="#6b1d2e"
               radius={[4, 4, 0, 0]}
               {...CHART_ANIMATION}
             />

@@ -1,4 +1,4 @@
-/** Primary public navigation — Nabus Motors editorial showroom. */
+/** Primary public navigation — Nabus Fold showroom. */
 import { ROUTES } from "@/lib/routes";
 
 export type NabusNavLink = {
@@ -16,8 +16,7 @@ export type NabusNavItem =
 
 export const NABUS_PRIMARY_NAV: NabusNavItem[] = [
   { href: ROUTES.auto.inventory, label: "Cars" },
-  { href: `${ROUTES.auto.inventory}?sort=newest`, label: "New In" },
-  { href: `${ROUTES.auto.inventory}#collections`, label: "Collections" },
+  { href: `${ROUTES.auto.inventory}?sort=newest`, label: "New" },
   { href: ROUTES.auto.financing, label: "Finance" },
   { href: ROUTES.auto.sell, label: "Sell" },
   { href: ROUTES.corporate.about, label: "About" },
@@ -26,7 +25,7 @@ export const NABUS_PRIMARY_NAV: NabusNavItem[] = [
 export const NABUS_UTILITY_LINKS: NabusNavLink[] = [
   { href: ROUTES.auto.garage, label: "Saved" },
   { href: ROUTES.corporate.account, label: "Account" },
-  { href: ROUTES.corporate.contact, label: "Visit Showroom" },
+  { href: ROUTES.corporate.contact, label: "Visit Dzorwulu" },
 ];
 
 export function flattenNavItems(items: NabusNavItem[]): NabusNavLink[] {

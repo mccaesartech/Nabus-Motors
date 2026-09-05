@@ -1,25 +1,25 @@
 /* Nabus Motors platform admin — light workspace, dark sidebar */
 
 .platform-theme {
-  --platform-bg: #f7f7f7;
-  --platform-bg-secondary: #ffffff;
-  --platform-card: #ffffff;
-  --platform-accent: #b7192e;
-  --platform-accent-hover: #8d1223;
-  --platform-text: #181818;
-  --platform-text-secondary: #696969;
-  --platform-border: #e5e5e5;
-  --platform-sidebar-bg: #202020;
-  --platform-sidebar-text: rgba(255, 255, 255, 0.75);
-  --platform-sidebar-text-active: #ffffff;
+  --platform-bg: #f8f3ea;
+  --platform-bg-secondary: #f2ebe0;
+  --platform-card: #f8f3ea;
+  --platform-accent: #6b1d2e;
+  --platform-accent-hover: #4a1220;
+  --platform-text: #1a1613;
+  --platform-text-secondary: #6f6860;
+  --platform-border: #d9d0c3;
+  --platform-sidebar-bg: #1a1613;
+  --platform-sidebar-text: rgba(248, 243, 234, 0.72);
+  --platform-sidebar-text-active: #f8f3ea;
   --platform-success: #16a34a;
-  --platform-warning: #e0a723;
-  --platform-error: #b7192e;
-  --platform-card-shadow-hover: 0 4px 16px rgba(24, 24, 24, 0.06);
+  --platform-warning: #c4a35a;
+  --platform-error: #6b1d2e;
+  --platform-card-shadow-hover: none;
 
   /* Nabus component tokens — inherit in admin workspace */
-  --nabus-primary: #b7192e;
-  --nabus-primary-hover: #8d1223;
+  --nabus-primary: #6b1d2e;
+  --nabus-primary-hover: #4a1220;
   --nabus-yellow: #e0a723;
   --nabus-yellow-light: #f4c542;
   --nabus-red-soft: #fcecef;
@@ -34,7 +34,7 @@
   background-color: var(--platform-bg);
   color: var(--platform-text);
   min-height: 100vh;
-  font-family: var(--font-inter), system-ui, sans-serif;
+  font-family: var(--font-geist), system-ui, sans-serif;
   cursor: default;
 }
 

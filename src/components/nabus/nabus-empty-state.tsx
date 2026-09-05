@@ -19,7 +19,7 @@ export function NabusEmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--nabus-border)] bg-[var(--nabus-surface)] px-6 py-16 text-center",
+        "flex flex-col items-start justify-center border-t border-[var(--nabus-border)] bg-transparent px-0 py-16 text-left",
         className
       )}
     >

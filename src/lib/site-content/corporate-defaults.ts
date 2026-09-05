@@ -130,7 +130,7 @@ export const DEFAULT_CORPORATE_HOMEPAGE: CorporateHomepageSiteContent = {
     "Reach our team for vehicle inquiries, financing options, service appointments, or trade-in valuations.",
   contactCtaPrimaryLabel: "Contact Us",
   contactCtaPrimaryHref: ROUTES.corporate.contact,
-  contactCtaSecondaryLabel: "Browse Inventory",
+  contactCtaSecondaryLabel: "Open the catalogue",
   contactCtaSecondaryHref: ROUTES.auto.home,
 };
 
@@ -581,7 +581,7 @@ export type InventoryPageSiteContent = {
 };
 
 export const DEFAULT_INVENTORY_PAGE: InventoryPageSiteContent = {
-  title: "Vehicle Inventory",
+  title: "CARS",
   subtitle: "Verified vehicles with transparent pricing and detailed inspection reports.",
   preorderTitle: "Pre-Order Vehicles",
   preorderSubtitle:

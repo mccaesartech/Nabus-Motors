@@ -312,9 +312,9 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
   },
   homepage: {
     eyebrow: "NABUS MOTORS",
-    title: "Drive Your Dream Car",
+    title: "The Dzorwulu Showroom",
     subtitle:
-      "Award-winning automobile dealer in Accra — verified vehicles, flexible Autochek financing, and professional service from inquiry to delivery.",
+      "Cars chosen on the floor in Accra. Inspected, priced, ready to reserve.",
     heroBackgroundMode: "video",
     backgroundImage: "",
     backgroundVideoUrl: "",
@@ -325,7 +325,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     embedMinimalBranding: true,
     embedHideControls: true,
     embedHideRelated: true,
-    ctaPrimaryLabel: "Browse Inventory",
+    ctaPrimaryLabel: "Open the catalogue",
     ctaPrimaryHref: "/auto/inventory",
     ctaSecondaryLabel: "Pre-Order",
     ctaSecondaryHref: "/auto/inventory?status=pre_order",
@@ -333,9 +333,9 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     ctaTertiaryHref: "/auto/sell",
   },
   whyChooseUs: {
-    title: "Why Choose Nabus Motors",
+    title: "How Nabus works",
     description:
-      "Award-winning dealer recognised for customer service, verified vehicles, and flexible financing — the qualities that matter when purchasing a car.",
+      "Verified cars, inspections you can read, and financing that starts with a monthly figure.",
     cards: [
       {
         icon: "BadgeCheck",
@@ -610,7 +610,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
       { href: "/auto/buy", label: "Buy" },
       { href: "/auto/sell", label: "Sell" },
       { href: "/auto/inventory?status=pre_order", label: "Pre-Order" },
-      { href: "/auto/inventory", label: "Inventory" },
+      { href: "/auto/inventory", label: "Cars" },
       { href: "/auto/financing", label: "Financing" },
       { href: "/auto/spare-parts", label: "Spare Parts" },
       { href: "/about", label: "About Us" },

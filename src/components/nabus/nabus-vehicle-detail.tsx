@@ -11,7 +11,7 @@ import { NabusVehicleGallery } from "@/components/nabus/nabus-vehicle-gallery";
 import { NabusDealSheet } from "@/components/nabus/nabus-deal-sheet";
 import { NabusSpecStrip } from "@/components/nabus/nabus-spec-strip";
 import { NabusFinanceCalculator } from "@/components/nabus/nabus-finance-calculator";
-import { NabusOwnershipPack } from "@/components/nabus/nabus-ownership-pack";
+import { FoldOwnership } from "@/components/fold/home/fold-ownership";
 import { AddVehicleToCartButton } from "@/components/vehicle/add-vehicle-to-cart-button";
 import { VehicleInspectionSummary } from "@/components/vehicle/vehicle-inspection-summary";
 import { VehicleWarrantyInfo } from "@/components/vehicle/vehicle-warranty-info";
@@ -192,7 +192,7 @@ export function NabusVehicleDetail({ vehicle }: NabusVehicleDetailProps) {
       </div>
 
       <div className="mt-12">
-        <NabusOwnershipPack tone="light" />
+        <FoldOwnership compact />
       </div>
 
       {/* Mobile sticky reserve bar */}

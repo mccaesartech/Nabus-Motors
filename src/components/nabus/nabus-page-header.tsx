@@ -1,3 +1,4 @@
+import { FoldIndex } from "@/components/fold/fold-primitives";
 import { cn } from "@/lib/utils";
 
 type NabusPageHeaderProps = {
@@ -10,7 +11,6 @@ type NabusPageHeaderProps = {
 };
 
 export function NabusPageHeader({
-  eyebrow,
   title,
   description,
   action,
@@ -21,29 +21,18 @@ export function NabusPageHeader({
     <header
       className={cn(
         "mb-8 sm:mb-10",
-        variant === "accent" &&
-          "rounded-2xl border border-[var(--nabus-primary)]/15 bg-[var(--nabus-red-soft)] p-6 sm:p-8",
-        variant === "dark" &&
-          "rounded-2xl bg-[var(--nabus-charcoal)] p-6 text-white sm:p-8",
+        variant === "accent" && "border-l border-[var(--nabus-gold)] bg-[var(--nabus-paper)] px-5 py-5",
+        variant === "dark" && "bg-[var(--nabus-graphite)] px-5 py-6 text-[var(--nabus-paper)]",
         className
       )}
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          {eyebrow ? (
-            <p
-              className={cn(
-                "text-xs font-bold uppercase tracking-[0.18em]",
-                variant === "dark" ? "text-[var(--nabus-yellow)]" : "text-[var(--nabus-primary)]"
-              )}
-            >
-              {eyebrow}
-            </p>
-          ) : null}
+          <FoldIndex n="PAGE" tone={variant === "dark" ? "ink" : "paper"} />
           <h1
             className={cn(
-              "mt-1 text-[1.75rem] font-bold tracking-tight sm:text-[2rem]",
-              variant === "dark" ? "text-white" : "text-[var(--nabus-charcoal)]"
+              "font-display mt-2 text-[clamp(1.8rem,4vw,2.8rem)] leading-[1.1]",
+              variant === "dark" ? "text-[var(--nabus-paper)]" : "text-[var(--nabus-graphite)]"
             )}
           >
             {title}
@@ -51,8 +40,8 @@ export function NabusPageHeader({
           {description ? (
             <p
               className={cn(
-                "mt-2 max-w-2xl text-sm leading-relaxed sm:text-base",
-                variant === "dark" ? "text-white/75" : "text-[var(--nabus-text-secondary)]"
+                "mt-2 max-w-xl text-sm leading-relaxed",
+                variant === "dark" ? "text-white/65" : "text-[var(--nabus-muted)]"
               )}
             >
               {description}
