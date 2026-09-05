@@ -89,12 +89,14 @@ export function GarageView() {
       )}
       <Container>
         <div className="mb-8">
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-            My Garage
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--nabus-muted)]">
+            Saved
+          </p>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--nabus-graphite)] sm:text-3xl">
+            Your shortlist
           </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Manage saved vehicles, track price changes, and review recently viewed
-            inventory.
+          <p className="mt-2 text-sm text-[var(--nabus-muted)]">
+            Vehicles you have saved, recently viewed, and ready to compare.
           </p>
         </div>
 

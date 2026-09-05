@@ -1,7 +1,6 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Container } from "@/components/shared/container";
 import { fetchVehicleBySlug } from "@/lib/supabase/vehicles";
 import { formatVehicleName } from "@/lib/format";
 import { ROUTES } from "@/lib/routes";
@@ -31,23 +30,23 @@ export async function VehicleDetailPage({ slug }: VehicleDetailPageProps) {
   if (!vehicle) notFound();
 
   return (
-    <div className="py-10 sm:py-14">
-      <Container>
-        <nav className="mb-6 text-sm text-[var(--nabus-text-secondary)]">
+    <div className="bg-[var(--nabus-ivory)] py-8 sm:py-12">
+      <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-10 xl:px-12">
+        <nav className="mb-6 font-mono text-[11px] uppercase tracking-wide text-[var(--nabus-muted)]">
           <Link
             href={ROUTES.auto.inventory}
             prefetch
-            className="transition-colors duration-200 hover:text-[var(--nabus-charcoal)]"
+            className="transition-colors duration-200 hover:text-[var(--nabus-graphite)]"
           >
-            Inventory
+            Cars
           </Link>
           <span className="mx-2">/</span>
-          <span className="text-[var(--nabus-charcoal)]">{formatVehicleName(vehicle)}</span>
+          <span className="text-[var(--nabus-graphite)]">{formatVehicleName(vehicle)}</span>
         </nav>
 
         <NabusVehicleDetail vehicle={vehicle} />
-      </Container>
-      <RelatedVehiclesSection vehicle={vehicle} />
+      </div>
+      <RelatedVehiclesSection vehicle={vehicle} limit={3} title="Similar Drives" />
     </div>
   );
 }

@@ -36,7 +36,7 @@ export function VehicleCardOverlayActions({ vehicle }: VehicleCardOverlayActions
         variant="icon"
         onToggle={(action) => {
           if (action === "full") {
-            window.alert("Compare list is full (max 4 vehicles). Remove one to add another.");
+            window.alert("Compare list is full (max 3 vehicles). Remove one to add another.");
           }
         }}
       />

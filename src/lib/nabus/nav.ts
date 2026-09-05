@@ -1,3 +1,4 @@
+/** Primary public navigation — Nabus Motors editorial showroom. */
 import { ROUTES } from "@/lib/routes";
 
 export type NabusNavLink = {
@@ -13,32 +14,19 @@ export type NabusNavItem =
       children: NabusNavLink[];
     };
 
-/** Primary public navigation — Nabus Motors. */
 export const NABUS_PRIMARY_NAV: NabusNavItem[] = [
   { href: ROUTES.auto.inventory, label: "Cars" },
-  { href: ROUTES.auto.preorder, label: "Import" },
-  { href: ROUTES.auto.sell, label: "Sell/Swap" },
-  { href: ROUTES.auto.rentals, label: "Rentals" },
-  {
-    label: "Services",
-    children: [
-      { href: `${ROUTES.corporate.services}#insurance`, label: "Insurance" },
-      { href: `${ROUTES.corporate.services}#registration`, label: "Registration" },
-      { href: `${ROUTES.corporate.services}#roadworthy`, label: "Roadworthy" },
-      { href: `${ROUTES.corporate.services}#diagnosis`, label: "Diagnosis" },
-      { href: `${ROUTES.corporate.services}#after-sales`, label: "After-Sales" },
-      { href: ROUTES.auto.spareParts, label: "Spare Parts" },
-    ],
-  },
+  { href: `${ROUTES.auto.inventory}?sort=newest`, label: "New In" },
+  { href: `${ROUTES.auto.inventory}#collections`, label: "Collections" },
   { href: ROUTES.auto.financing, label: "Finance" },
-  { href: ROUTES.corporate.freightTracking, label: "Track" },
+  { href: ROUTES.auto.sell, label: "Sell" },
   { href: ROUTES.corporate.about, label: "About" },
 ];
 
 export const NABUS_UTILITY_LINKS: NabusNavLink[] = [
-  { href: ROUTES.corporate.freight, label: "Import & Logistics" },
-  { href: ROUTES.auto.garage, label: "My Garage" },
+  { href: ROUTES.auto.garage, label: "Saved" },
   { href: ROUTES.corporate.account, label: "Account" },
+  { href: ROUTES.corporate.contact, label: "Visit Showroom" },
 ];
 
 export function flattenNavItems(items: NabusNavItem[]): NabusNavLink[] {

@@ -110,7 +110,7 @@ export function AddVehicleToCartButton({
       onClick={handleAdd}
     >
       {showIcon && <ShoppingCart className="size-3.5 shrink-0" />}
-      {feedback ? "Added!" : "Add to cart"}
+      {feedback ? "Reserved!" : "Reserve"}
     </button>
   );
 }

@@ -5,9 +5,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-manrope);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-manrope);
+  --font-sans: var(--font-instrument);
+  --font-mono: var(--font-ibm-plex-mono);
+  --font-heading: var(--font-instrument);
   --color-nabus-primary: var(--nabus-primary);
   --color-nabus-primary-hover: var(--nabus-primary-hover);
   --color-nabus-wine: var(--nabus-wine);
@@ -100,106 +100,118 @@
 }
 
 :root {
-  /* Nabus Motors — red, gold, light neutral design system */
-  --nabus-primary: #b7192e;
-  --nabus-primary-hover: #8d1223;
-  --nabus-bright-red: #d52a3e;
-  --nabus-wine: #8d1223;
-  --nabus-yellow: #e0a723;
-  --nabus-yellow-light: #f4c542;
-  --nabus-red-soft: #fcecef;
-  --nabus-yellow-soft: #fff7e0;
-  --nabus-background: #f7f7f7;
-  --nabus-surface: #ffffff;
-  --nabus-charcoal: #181818;
-  --nabus-text-secondary: #696969;
-  --nabus-border: #e5e5e5;
-  --nabus-nav-dark: #202020;
-  --nabus-input-border: #dcdcdc;
+  /* Nabus Motors — editorial wine, gold, warm ivory system */
+  --nabus-wine: #941d30;
+  --nabus-crimson: #b52339;
+  --nabus-gold: #d2a12e;
+  --nabus-gold-bright: #e4b941;
+  --nabus-gold-muted: rgba(210, 161, 46, 0.55);
+  --nabus-gold-soft: rgba(210, 161, 46, 0.12);
+  --nabus-ivory: #f7f4ee;
+  --nabus-paper: #fcfbf8;
+  --nabus-graphite: #171717;
+  --nabus-warm-graphite: #292725;
+  --nabus-muted: #77726c;
+  --nabus-border: #ded9d1;
 
-  --brand-primary: var(--nabus-charcoal);
-  --brand-black: var(--nabus-charcoal);
-  --brand-charcoal: var(--nabus-charcoal);
-  --brand-charcoal-light: #3d3834;
-  --brand-charcoal-dark: #1a1816;
-  --brand-indigo: var(--nabus-charcoal);
-  --brand-indigo-light: #3d3834;
-  --brand-indigo-dark: #1a1816;
-  --brand-lavender: var(--nabus-background);
-  --brand-lavender-light: var(--nabus-surface);
+  /* Legacy aliases — mapped to editorial tokens */
+  --nabus-primary: var(--nabus-wine);
+  --nabus-primary-hover: var(--nabus-crimson);
+  --nabus-bright-red: var(--nabus-crimson);
+  --nabus-yellow: var(--nabus-gold);
+  --nabus-yellow-light: var(--nabus-gold-bright);
+  --nabus-red-soft: rgba(148, 29, 48, 0.06);
+  --nabus-yellow-soft: var(--nabus-gold-soft);
+  --nabus-background: var(--nabus-ivory);
+  --nabus-surface: var(--nabus-paper);
+  --nabus-charcoal: var(--nabus-graphite);
+  --nabus-text-secondary: var(--nabus-muted);
+  --nabus-nav-dark: var(--nabus-warm-graphite);
+  --nabus-input-border: var(--nabus-border);
+
+  --brand-primary: var(--nabus-graphite);
+  --brand-black: var(--nabus-graphite);
+  --brand-charcoal: var(--nabus-graphite);
+  --brand-charcoal-light: var(--nabus-warm-graphite);
+  --brand-charcoal-dark: #0f0f0f;
+  --brand-indigo: var(--nabus-graphite);
+  --brand-indigo-light: var(--nabus-warm-graphite);
+  --brand-indigo-dark: #0f0f0f;
+  --brand-lavender: var(--nabus-ivory);
+  --brand-lavender-light: var(--nabus-paper);
   --brand-lavender-dark: var(--nabus-border);
-  --brand-auto-accent: var(--nabus-primary);
-  --brand-auto-accent-light: #d52a3e;
-  --brand-auto-accent-dark: var(--nabus-wine);
+  --brand-auto-accent: var(--nabus-wine);
+  --brand-auto-accent-light: var(--nabus-crimson);
+  --brand-auto-accent-dark: #6b1524;
   --brand-freight-accent: var(--nabus-wine);
-  --brand-freight-accent-light: var(--nabus-primary);
-  --brand-freight-accent-dark: #6b1e28;
-  --brand-purple: var(--nabus-primary);
-  --brand-purple-light: #d94455;
-  --brand-purple-dark: var(--nabus-wine);
-  --brand-accent: var(--nabus-primary);
-  --brand-accent-light: #d94455;
-  --brand-accent-dark: var(--nabus-wine);
-  --brand-emphasis: var(--nabus-charcoal);
-  --brand-emphasis-muted: var(--nabus-text-secondary);
-  --brand-surface: var(--nabus-background);
-  --brand-muted: var(--nabus-text-secondary);
-  --brand-muted-light: #8a817c;
+  --brand-freight-accent-light: var(--nabus-crimson);
+  --brand-freight-accent-dark: #6b1524;
+  --brand-purple: var(--nabus-wine);
+  --brand-purple-light: var(--nabus-crimson);
+  --brand-purple-dark: #6b1524;
+  --brand-accent: var(--nabus-wine);
+  --brand-accent-light: var(--nabus-crimson);
+  --brand-accent-dark: #6b1524;
+  --brand-emphasis: var(--nabus-graphite);
+  --brand-emphasis-muted: var(--nabus-muted);
+  --brand-surface: var(--nabus-ivory);
+  --brand-muted: var(--nabus-muted);
+  --brand-muted-light: #9a948d;
   --brand-muted-dark: #524c48;
-  --text-secondary: var(--nabus-text-secondary);
-  --text-on-dark-secondary: rgba(255, 255, 255, 0.85);
+  --text-secondary: var(--nabus-muted);
+  --text-on-dark-secondary: rgba(252, 251, 248, 0.82);
 
-  --background: var(--nabus-background);
-  --foreground: var(--nabus-charcoal);
-  --card: var(--nabus-surface);
-  --card-foreground: var(--nabus-charcoal);
-  --popover: var(--nabus-surface);
-  --popover-foreground: var(--nabus-charcoal);
-  --primary: var(--nabus-primary);
-  --primary-foreground: #ffffff;
-  --secondary: var(--nabus-background);
-  --secondary-foreground: var(--nabus-charcoal);
-  --muted: var(--nabus-background);
-  --muted-foreground: var(--nabus-text-secondary);
+  --background: var(--nabus-ivory);
+  --foreground: var(--nabus-graphite);
+  --card: var(--nabus-paper);
+  --card-foreground: var(--nabus-graphite);
+  --popover: var(--nabus-paper);
+  --popover-foreground: var(--nabus-graphite);
+  --primary: var(--nabus-wine);
+  --primary-foreground: var(--nabus-paper);
+  --secondary: var(--nabus-ivory);
+  --secondary-foreground: var(--nabus-graphite);
+  --muted: var(--nabus-ivory);
+  --muted-foreground: var(--nabus-muted);
   --accent: var(--nabus-red-soft);
-  --accent-foreground: var(--nabus-charcoal);
+  --accent-foreground: var(--nabus-graphite);
   --destructive: #dc2626;
   --border: var(--nabus-border);
   --input: var(--nabus-border);
-  --ring: var(--nabus-primary);
-  --chart-1: var(--nabus-primary);
-  --chart-2: var(--nabus-charcoal);
-  --chart-3: var(--nabus-text-secondary);
-  --chart-4: var(--nabus-yellow-soft);
-  --chart-5: var(--nabus-background);
-  --radius: 0.75rem;
-  --sidebar: var(--nabus-nav-dark);
-  --sidebar-foreground: #ffffff;
-  --sidebar-primary: var(--nabus-primary);
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #2a2a2a;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #333333;
-  --sidebar-ring: var(--nabus-primary);
+  --ring: var(--nabus-wine);
+  --chart-1: var(--nabus-wine);
+  --chart-2: var(--nabus-gold);
+  --chart-3: var(--nabus-muted);
+  --chart-4: var(--nabus-gold-soft);
+  --chart-5: var(--nabus-ivory);
+  --radius: 0.25rem;
+  --sidebar: var(--nabus-warm-graphite);
+  --sidebar-foreground: var(--nabus-paper);
+  --sidebar-primary: var(--nabus-wine);
+  --sidebar-primary-foreground: var(--nabus-paper);
+  --sidebar-accent: #3a3632;
+  --sidebar-accent-foreground: var(--nabus-paper);
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: var(--nabus-gold);
 
-  --section-warm: var(--nabus-background);
+  --section-warm: var(--nabus-ivory);
   --icon-box-bg: var(--nabus-red-soft);
   --icon-box-border: var(--nabus-border);
-  --icon-box-fg: var(--nabus-primary);
+  --icon-box-fg: var(--nabus-wine);
 
-  --shadow-luxury: 0 1px 3px rgba(39, 35, 32, 0.06);
-  --shadow-luxury-lg: 0 8px 30px rgba(39, 35, 32, 0.08);
+  --shadow-luxury: none;
+  --shadow-luxury-lg: 0 8px 32px rgba(23, 23, 23, 0.06);
 
   --utility-strip-height: 0px;
-  --header-height: 4.5rem;
+  --header-height: 4rem;
   --header-subnav-height: 0px;
-  --header-logo-size: 2.5rem;
+  --header-logo-size: 2.25rem;
   --header-logo-spacing: 1.5rem;
   --header-nav-gap: 1rem;
   --header-util-gap: 1.25rem;
   --shell-top-offset: var(--header-height);
-  --brand-cta-gold: var(--nabus-primary);
-  --brand-cta-gold-hover: var(--nabus-primary-hover);
+  --brand-cta-gold: var(--nabus-wine);
+  --brand-cta-gold-hover: var(--nabus-crimson);
   --compare-bar-height: 0px;
 }
 
@@ -279,8 +291,12 @@
   h2,
   h3,
   h4 {
-    font-family: var(--font-heading), var(--font-manrope), system-ui, sans-serif;
+    font-family: var(--font-heading), var(--font-instrument), system-ui, sans-serif;
     letter-spacing: -0.02em;
+  }
+
+  .font-mono {
+    font-family: var(--font-mono), ui-monospace, monospace;
   }
 }
 

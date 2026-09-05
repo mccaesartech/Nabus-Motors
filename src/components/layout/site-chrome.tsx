@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense, useMemo } from "react";
+import { Suspense } from "react";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
-import { NabusHeader, NabusHeaderStatic } from "@/components/layout/nabus-header";
-import { NabusFooter } from "@/components/layout/nabus-footer";
+import { cn } from "@/lib/utils";
+import { NabusHeader, NabusHeaderStatic } from "@/components/nabus/nabus-header";
+import { NabusFooter } from "@/components/nabus/nabus-footer";
 import { CustomerBackBar } from "@/components/layout/customer-back-bar";
 import { MaintenanceBanner } from "@/components/layout/maintenance-banner";
 import { InstallCustomerAppBanner } from "@/components/pwa/install-customer-app-banner";
@@ -48,8 +49,7 @@ export function SiteChrome({
   const pathname = usePathname() ?? "";
   const isAdmin = isAdminAppPath(pathname);
   const useAutoChrome = isAutoDivisionPath(pathname);
-
-  const showSpareParts = operational.featureShowSparePartsNav;
+  const isAutoHome = pathname === ROUTES.auto.home;
 
   if (isAdmin) {
     return (
@@ -66,13 +66,16 @@ export function SiteChrome({
       {operational.maintenanceMode && pathname !== "/maintenance" ? (
         <MaintenanceBanner message={operational.maintenance_message} />
       ) : null}
-      <Suspense fallback={<NabusHeaderStatic content={content} showSpareParts={showSpareParts} />}>
-        <NabusHeader content={content} showSpareParts={showSpareParts} />
+      <Suspense fallback={<NabusHeaderStatic content={content} transparent={isAutoHome} />}>
+        <NabusHeader content={content} transparent={isAutoHome} />
       </Suspense>
       <main
         id="main-content"
         tabIndex={-1}
-        className="min-w-0 flex-1 overflow-x-hidden pt-[var(--shell-top-offset)] pb-[var(--compare-bar-height,0px)] outline-none"
+        className={cn(
+          "min-w-0 flex-1 overflow-x-hidden pb-[var(--compare-bar-height,0px)] outline-none",
+          isAutoHome ? "pt-0" : "pt-[var(--shell-top-offset)]"
+        )}
       >
         <CustomerBackBar />
         {children}

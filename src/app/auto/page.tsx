@@ -1,44 +1,46 @@
-import { NabusHero } from "@/components/home/nabus/nabus-hero";
-import { NabusQuickActionDock } from "@/components/home/nabus/nabus-quick-action-dock";
-import { NabusFeaturedCarousel } from "@/components/home/nabus/nabus-featured-carousel";
-import { NabusShopByNeed } from "@/components/home/nabus/nabus-shop-by-need";
-import { NabusAdvantageBand } from "@/components/home/nabus/nabus-advantage-band";
-import { NabusImportJourney } from "@/components/home/nabus/nabus-import-journey";
-import { NabusFinancingSection } from "@/components/home/nabus/nabus-financing-section";
-import { NabusOffersStrip } from "@/components/home/nabus/nabus-offers-strip";
-import { NabusServicesAlternating } from "@/components/home/nabus/nabus-services-alternating";
-import { NabusAwardSection } from "@/components/home/nabus/nabus-award-section";
-import { NabusFinalCta } from "@/components/home/nabus/nabus-final-cta";
+import { SceneShowroomOpening } from "@/components/home/nabus/scene-showroom-opening";
+import { SceneFindYourDrive } from "@/components/home/nabus/scene-find-your-drive";
+import { SceneNabusSelect } from "@/components/home/nabus/scene-nabus-select";
+import { SceneJustLanded } from "@/components/home/nabus/scene-just-landed";
+import { SceneShopTheWay } from "@/components/home/nabus/scene-shop-the-way";
+import { NabusOwnershipPack } from "@/components/nabus/nabus-ownership-pack";
+import { SceneFinance } from "@/components/home/nabus/scene-finance";
+import { SceneLatestDeal } from "@/components/home/nabus/scene-latest-deal";
+import { SceneShowroomLocation } from "@/components/home/nabus/scene-showroom-location";
 import { getSiteContent } from "@/lib/site-content";
-import { fetchFeaturedVehicles } from "@/lib/supabase/vehicles";
+import { fetchFeaturedVehicles, getLocallyAvailableVehicles } from "@/lib/supabase/vehicles";
 
 export const metadata = {
   title: "Nabus Motors",
   description:
-    "Dream it. Drive it. Live it. Verified vehicles, seamless imports, flexible financing, and complete automotive services in Accra, Ghana.",
+    "FIND YOUR NEXT DRIVE. Verified vehicles, seamless imports, flexible financing, and complete automotive services in Accra, Ghana.",
 };
 
 export const revalidate = 60;
 
 export default async function AutoHomePage() {
-  const [content, featured] = await Promise.all([
+  const [content, featured, local] = await Promise.all([
     getSiteContent(),
     fetchFeaturedVehicles(),
+    getLocallyAvailableVehicles(),
   ]);
+
+  const selectVehicles = featured.length >= 3 ? featured.slice(0, 3) : featured;
+  const justLanded = local.length > 0 ? local.slice(0, 10) : featured.slice(0, 8);
+  const latestDeal = featured[0];
+  const heroVehicle = featured[0];
 
   return (
     <>
-      <NabusHero content={content.homepage} />
-      <NabusQuickActionDock />
-      <NabusFeaturedCarousel vehicles={featured.slice(0, 8)} />
-      <NabusShopByNeed />
-      <NabusAdvantageBand />
-      <NabusImportJourney />
-      <NabusFinancingSection />
-      <NabusOffersStrip />
-      <NabusServicesAlternating />
-      <NabusAwardSection />
-      <NabusFinalCta />
+      <SceneShowroomOpening content={content.homepage} heroVehicle={heroVehicle} />
+      <SceneFindYourDrive />
+      {selectVehicles.length > 0 ? <SceneNabusSelect vehicles={selectVehicles} /> : null}
+      <SceneJustLanded vehicles={justLanded} />
+      <SceneShopTheWay />
+      <NabusOwnershipPack />
+      <SceneFinance />
+      {latestDeal ? <SceneLatestDeal vehicle={latestDeal} /> : null}
+      <SceneShowroomLocation />
     </>
   );
 }

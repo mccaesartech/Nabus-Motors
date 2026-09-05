@@ -1,4 +1,4 @@
-import { Manrope } from "next/font/google";
+import { Instrument_Sans, IBM_Plex_Mono } from "next/font/google";
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { Suspense } from "react";
@@ -30,11 +30,18 @@ const CACHE_RECOVERY_INLINE_SCRIPT = buildCacheRecoveryInlineScript(
  * (required for per-request script nonces — see docs/CSP.md).
  */
 
-const manrope = Manrope({
+const instrumentSans = Instrument_Sans({
   subsets: ["latin"],
-  variable: "--font-manrope",
+  variable: "--font-instrument",
   display: "swap",
-  weight: ["400", "500", "600", "700", "800"],
+  weight: ["400", "500", "600", "700"],
+});
+
+const ibmPlexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  variable: "--font-ibm-plex-mono",
+  display: "swap",
+  weight: ["400", "500"],
 });
 
 export const viewport: Viewport = {
@@ -102,7 +109,7 @@ export default async function RootLayout({
   const settings = await getSiteSettings();
 
   return (
-    <html lang="en" className={`${manrope.variable} light h-full`} suppressHydrationWarning>
+    <html lang="en" className={`${instrumentSans.variable} ${ibmPlexMono.variable} light h-full`} suppressHydrationWarning>
       <head>
         <ResourceHints />
         <meta

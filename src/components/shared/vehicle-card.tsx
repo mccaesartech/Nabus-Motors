@@ -1,1 +1,1 @@
-export { NabusVehicleCard as VehicleCard } from "@/components/nabus/nabus-vehicle-card";
+export { NabusCarTile as VehicleCard } from "@/components/nabus/nabus-car-tile";

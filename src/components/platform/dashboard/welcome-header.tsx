@@ -37,10 +37,10 @@ export function WelcomeHeader({ userName, role }: WelcomeHeaderProps) {
       <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-1">
           <h1 className="break-words text-2xl font-bold tracking-tight text-[var(--platform-text)] sm:text-[1.75rem]">
-            {greeting}, {userName.split(" ")[0]}
+            Today at Nabus
           </h1>
           <p className="max-w-2xl break-words text-sm leading-relaxed text-[var(--platform-text-secondary)]">
-            Here&apos;s what&apos;s happening at Nabus Motors today.
+            {greeting}, {userName.split(" ")[0]} — here&apos;s your workspace overview.
           </p>
         </div>
         <div className="flex w-full min-w-0 shrink-0 flex-col items-start gap-2 sm:w-auto sm:items-end">

@@ -5,7 +5,7 @@ import type { Vehicle } from "@/lib/types";
 
 const STORAGE_KEY = "true-goshen-compare";
 const COMPARE_EVENT = "true-goshen-compare-change";
-export const MAX_COMPARE_VEHICLES = 4;
+export const MAX_COMPARE_VEHICLES = 3;
 
 const EMPTY_IDS: string[] = [];
 
